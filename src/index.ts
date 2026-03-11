@@ -59,10 +59,16 @@ server.tool(
   {},
   async () => {
     let qrDataUrl = "";
+    let qrRawUrl = "";
 
-    const loginPromise = telegram.startQrLogin((dataUrl) => {
-      qrDataUrl = dataUrl;
-    });
+    const loginPromise = telegram.startQrLogin(
+      (dataUrl) => {
+        qrDataUrl = dataUrl;
+      },
+      (url) => {
+        qrRawUrl = url;
+      },
+    );
 
     // Wait for first QR to be generated
     const startTime = Date.now();
@@ -83,8 +89,21 @@ server.tool(
       }
     });
 
-    // Return as MCP image content + markdown image as fallback
+    // Return as MCP image content + text with fallback options
     const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
+    const qrApiUrl = qrRawUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrRawUrl)}`
+      : "";
+
+    const instructions = [
+      "Scan this QR code in Telegram: **Settings → Devices → Link Desktop Device**.",
+      "",
+      qrApiUrl ? `If the QR image is not visible, open this link in your browser:\n${qrApiUrl}` : "",
+      "",
+      "After scanning, run **telegram-status** to verify the connection.",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     return {
       content: [
@@ -95,7 +114,7 @@ server.tool(
         },
         {
           type: "text",
-          text: `Scan QR in Telegram: Settings → Devices → Link Desktop Device.\n\nIf image not visible: ![QR](${qrDataUrl})\n\nAfter scanning, check with telegram-status.`,
+          text: instructions,
         },
       ],
     };

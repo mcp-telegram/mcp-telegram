@@ -83,9 +83,13 @@ claude mcp add telegram -s user \
   -- npx @overpod/mcp-telegram
 ```
 
-### Claude Desktop / Cursor / VS Code
+### Claude Desktop
 
-Add to your MCP configuration file:
+1. Open your config file:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+2. Add the Telegram server:
 
 ```json
 {
@@ -101,6 +105,18 @@ Add to your MCP configuration file:
   }
 }
 ```
+
+3. Restart Claude Desktop.
+
+4. Ask Claude: **"Run telegram-login"** -- a QR code will appear. If the image is not visible, Claude will provide a browser link to view the QR code. Scan it in Telegram (**Settings > Devices > Link Desktop Device**).
+
+5. Ask Claude: **"Run telegram-status"** to verify the connection.
+
+> **Note**: No terminal required! Login works entirely through Claude Desktop.
+
+### Cursor / VS Code
+
+Add the same JSON config above to your MCP settings (Cursor Settings > MCP, or VS Code MCP config).
 
 ### Mastra
 

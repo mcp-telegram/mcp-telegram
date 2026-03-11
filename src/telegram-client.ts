@@ -44,7 +44,11 @@ export class TelegramService {
 
   private async saveSession(session: string): Promise<void> {
     this.sessionString = session;
-    await writeFile(SESSION_FILE, session, "utf-8");
+    try {
+      await writeFile(SESSION_FILE, session, "utf-8");
+    } catch {
+      // File write may fail in containerized environments — session string is still in memory
+    }
   }
 
   async connect(): Promise<boolean> {

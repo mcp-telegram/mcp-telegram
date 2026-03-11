@@ -229,7 +229,10 @@ export class TelegramService {
     });
   }
 
-  async getDialogs(limit = 20): Promise<
+  async getDialogs(
+    limit = 20,
+    offsetDate?: number,
+  ): Promise<
     Array<{
       id: string;
       name: string;
@@ -238,13 +241,93 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const dialogs = await this.client.getDialogs({ limit });
+    const dialogs = await this.client.getDialogs({ limit, ...(offsetDate ? { offsetDate } : {}) });
     return dialogs.map((d) => ({
       id: d.id?.toString() ?? "",
       name: d.title ?? d.name ?? "Unknown",
       type: d.isGroup ? "group" : d.isChannel ? "channel" : "private",
       unreadCount: d.unreadCount,
     }));
+  }
+
+  async getUnreadDialogs(limit = 20): Promise<
+    Array<{
+      id: string;
+      name: string;
+      type: string;
+      unreadCount: number;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const dialogs = await this.client.getDialogs({ limit: limit * 3 });
+    return dialogs
+      .filter((d) => d.unreadCount > 0)
+      .slice(0, limit)
+      .map((d) => ({
+        id: d.id?.toString() ?? "",
+        name: d.title ?? d.name ?? "Unknown",
+        type: d.isGroup ? "group" : d.isChannel ? "channel" : "private",
+        unreadCount: d.unreadCount,
+      }));
+  }
+
+  async markAsRead(chatId: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    await this.client.markAsRead(chatId);
+  }
+
+  async forwardMessage(fromChatId: string, toChatId: string, messageIds: number[]): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    await this.client.forwardMessages(toChatId, { messages: messageIds, fromPeer: fromChatId });
+  }
+
+  async editMessage(chatId: string, messageId: number, newText: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    await this.client.editMessage(chatId, { message: messageId, text: newText });
+  }
+
+  async deleteMessages(chatId: string, messageIds: number[]): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    await this.client.deleteMessages(chatId, messageIds, { revoke: true });
+  }
+
+  async getChatInfo(chatId: string): Promise<{
+    id: string;
+    name: string;
+    type: string;
+    username?: string;
+    description?: string;
+    membersCount?: number;
+  }> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const entity = await this.client.getEntity(chatId);
+    if (entity instanceof Api.User) {
+      const parts = [entity.firstName, entity.lastName].filter(Boolean);
+      return {
+        id: entity.id.toString(),
+        name: parts.join(" ") || "Unknown",
+        type: "private",
+        username: entity.username ?? undefined,
+      };
+    }
+    if (entity instanceof Api.Channel) {
+      return {
+        id: entity.id.toString(),
+        name: entity.title,
+        type: entity.megagroup ? "group" : "channel",
+        username: entity.username ?? undefined,
+        membersCount: entity.participantsCount ?? undefined,
+      };
+    }
+    if (entity instanceof Api.Chat) {
+      return {
+        id: entity.id.toString(),
+        name: entity.title,
+        type: "group",
+        membersCount: entity.participantsCount ?? undefined,
+      };
+    }
+    return { id: chatId, name: "Unknown", type: "unknown" };
   }
 
   /** Resolve sender ID to a display name */
@@ -269,6 +352,7 @@ export class TelegramService {
   async getMessages(
     chatId: string,
     limit = 10,
+    offsetId?: number,
   ): Promise<
     Array<{
       id: number;
@@ -278,7 +362,7 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const messages = await this.client.getMessages(chatId, { limit });
+    const messages = await this.client.getMessages(chatId, { limit, ...(offsetId ? { offsetId } : {}) });
     const results = await Promise.all(
       messages.map(async (m) => ({
         id: m.id,

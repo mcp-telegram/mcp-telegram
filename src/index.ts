@@ -127,13 +127,14 @@ server.tool(
   "List Telegram chats",
   {
     limit: z.number().default(20).describe("Number of chats to return"),
+    offsetDate: z.number().optional().describe("Unix timestamp offset for pagination"),
   },
-  async ({ limit }) => {
+  async ({ limit, offsetDate }) => {
     const err = await requireConnection();
     if (err) return { content: [{ type: "text", text: err }] };
 
     try {
-      const dialogs = await telegram.getDialogs(limit);
+      const dialogs = await telegram.getDialogs(limit, offsetDate);
       const text = dialogs
         .map(
           (d) =>
@@ -153,13 +154,14 @@ server.tool(
   {
     chatId: z.string().describe("Chat ID or username"),
     limit: z.number().default(10).describe("Number of messages to return"),
+    offsetId: z.number().optional().describe("Message ID to start from (for pagination)"),
   },
-  async ({ chatId, limit }) => {
+  async ({ chatId, limit, offsetId }) => {
     const err = await requireConnection();
     if (err) return { content: [{ type: "text", text: err }] };
 
     try {
-      const messages = await telegram.getMessages(chatId, limit);
+      const messages = await telegram.getMessages(chatId, limit, offsetId);
       const text = messages.map((m) => `[${m.date}] ${m.sender}: ${m.text}`).join("\n\n");
       return { content: [{ type: "text", text: text || "No messages" }] };
     } catch (e) {
@@ -210,6 +212,143 @@ server.tool(
       const messages = await telegram.searchMessages(chatId, query, limit);
       const text = messages.map((m) => `[${m.date}] ${m.sender}: ${m.text}`).join("\n\n");
       return { content: [{ type: "text", text: text || "No messages found" }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-get-unread",
+  "Get unread Telegram chats",
+  {
+    limit: z.number().default(20).describe("Number of unread chats to return"),
+  },
+  async ({ limit }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const dialogs = await telegram.getUnreadDialogs(limit);
+      const text = dialogs
+        .map(
+          (d) =>
+            `${d.type === "group" ? "G" : d.type === "channel" ? "C" : "P"} ${d.name} (${d.id}) [${d.unreadCount} unread]`,
+        )
+        .join("\n");
+      return { content: [{ type: "text", text: text || "No unread chats" }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-mark-as-read",
+  "Mark a Telegram chat as read",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+  },
+  async ({ chatId }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.markAsRead(chatId);
+      return { content: [{ type: "text", text: `Marked ${chatId} as read` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-forward-message",
+  "Forward messages between Telegram chats",
+  {
+    fromChatId: z.string().describe("Source chat ID or username"),
+    toChatId: z.string().describe("Destination chat ID or username"),
+    messageIds: z.array(z.number()).describe("Array of message IDs to forward"),
+  },
+  async ({ fromChatId, toChatId, messageIds }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.forwardMessage(fromChatId, toChatId, messageIds);
+      return {
+        content: [
+          { type: "text", text: `Forwarded ${messageIds.length} message(s) from ${fromChatId} to ${toChatId}` },
+        ],
+      };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-edit-message",
+  "Edit a sent message in Telegram",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    messageId: z.number().describe("ID of the message to edit"),
+    text: z.string().describe("New message text"),
+  },
+  async ({ chatId, messageId, text }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.editMessage(chatId, messageId, text);
+      return { content: [{ type: "text", text: `Message ${messageId} edited in ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-delete-message",
+  "Delete messages in a Telegram chat",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    messageIds: z.array(z.number()).describe("Array of message IDs to delete"),
+  },
+  async ({ chatId, messageIds }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.deleteMessages(chatId, messageIds);
+      return { content: [{ type: "text", text: `Deleted ${messageIds.length} message(s) in ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-get-chat-info",
+  "Get detailed info about a Telegram chat",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+  },
+  async ({ chatId }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const info = await telegram.getChatInfo(chatId);
+      const lines = [
+        `Name: ${info.name}`,
+        `ID: ${info.id}`,
+        `Type: ${info.type}`,
+        ...(info.username ? [`Username: @${info.username}`] : []),
+        ...(info.description ? [`Description: ${info.description}`] : []),
+        ...(info.membersCount != null ? [`Members: ${info.membersCount}`] : []),
+      ];
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }

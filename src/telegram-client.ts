@@ -267,15 +267,25 @@ export class TelegramService {
     const message = messages[0];
     if (!message) throw new Error(`Message ${messageId} not found`);
     if (!message.media) throw new Error(`Message ${messageId} has no media`);
-    const buffer = await this.client.downloadMedia(message);
+    const buffer = await this.client.downloadMedia(message) as Buffer;
     if (!buffer) throw new Error("Failed to download media");
-    const media = message.media as unknown as Record<string, unknown>;
-    const doc = media.document as unknown as Record<string, unknown> | undefined;
-    const photo = media.photo as unknown as Record<string, unknown> | undefined;
-    let mimeType = "application/octet-stream";
-    if (doc?.mimeType) mimeType = doc.mimeType as string;
-    else if (photo) mimeType = "image/jpeg";
-    return { buffer: buffer as Buffer, mimeType };
+    const mimeType = this.detectMimeType(buffer, message.media);
+    return { buffer, mimeType };
+  }
+
+  /** Detect MIME type from buffer magic bytes, falling back to media metadata */
+  private detectMimeType(buffer: Buffer, media: unknown): string {
+    // Check magic bytes first
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return "image/jpeg";
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return "image/png";
+    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return "image/gif";
+    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) return "image/webp";
+    // Fall back to document mimeType
+    const m = media as unknown as Record<string, unknown>;
+    const doc = m.document as unknown as Record<string, unknown> | undefined;
+    if (doc?.mimeType) return doc.mimeType as string;
+    if (m.photo) return "image/jpeg";
+    return "application/octet-stream";
   }
 
   async pinMessage(chatId: string, messageId: number, silent = false): Promise<void> {

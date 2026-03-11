@@ -157,13 +157,15 @@ server.tool(
     chatId: z.string().describe("Chat ID or username"),
     limit: z.number().default(10).describe("Number of messages to return"),
     offsetId: z.number().optional().describe("Message ID to start from (for pagination)"),
+    minDate: z.number().optional().describe("Unix timestamp: only messages after this date"),
+    maxDate: z.number().optional().describe("Unix timestamp: only messages before this date"),
   },
-  async ({ chatId, limit, offsetId }) => {
+  async ({ chatId, limit, offsetId, minDate, maxDate }) => {
     const err = await requireConnection();
     if (err) return { content: [{ type: "text", text: err }] };
 
     try {
-      const messages = await telegram.getMessages(chatId, limit, offsetId);
+      const messages = await telegram.getMessages(chatId, limit, offsetId, minDate, maxDate);
       const text = messages
         .map(
           (m) =>
@@ -210,13 +212,15 @@ server.tool(
     chatId: z.string().describe("Chat ID or username"),
     query: z.string().describe("Search text"),
     limit: z.number().default(20).describe("Max results"),
+    minDate: z.number().optional().describe("Unix timestamp: only messages after this date"),
+    maxDate: z.number().optional().describe("Unix timestamp: only messages before this date"),
   },
-  async ({ chatId, query, limit }) => {
+  async ({ chatId, query, limit, minDate, maxDate }) => {
     const err = await requireConnection();
     if (err) return { content: [{ type: "text", text: err }] };
 
     try {
-      const messages = await telegram.searchMessages(chatId, query, limit);
+      const messages = await telegram.searchMessages(chatId, query, limit, minDate, maxDate);
       const text = messages
         .map(
           (m) =>

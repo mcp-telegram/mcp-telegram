@@ -407,6 +407,8 @@ export class TelegramService {
     chatId: string,
     limit = 10,
     offsetId?: number,
+    minDate?: number,
+    maxDate?: number,
   ): Promise<
     Array<{
       id: number;
@@ -417,9 +419,18 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const messages = await this.client.getMessages(chatId, { limit, ...(offsetId ? { offsetId } : {}) });
+    const opts: Record<string, unknown> = {
+      limit,
+      ...(offsetId ? { offsetId } : {}),
+      ...(maxDate ? { offsetDate: maxDate } : {}),
+    };
+    const messages = await this.client.getMessages(chatId, opts);
+    let filtered = messages;
+    if (minDate) {
+      filtered = filtered.filter((m) => (m.date ?? 0) >= minDate);
+    }
     const results = await Promise.all(
-      messages.map(async (m) => ({
+      filtered.map(async (m) => ({
         id: m.id,
         text: m.message ?? "",
         sender: await this.resolveSenderName(m.senderId),
@@ -474,6 +485,8 @@ export class TelegramService {
     chatId: string,
     query: string,
     limit = 20,
+    minDate?: number,
+    maxDate?: number,
   ): Promise<
     Array<{
       id: number;
@@ -487,9 +500,14 @@ export class TelegramService {
     const messages = await this.client.getMessages(chatId, {
       search: query,
       limit,
+      ...(maxDate ? { offsetDate: maxDate } : {}),
     });
+    let filtered = messages;
+    if (minDate) {
+      filtered = filtered.filter((m) => (m.date ?? 0) >= minDate);
+    }
     const results = await Promise.all(
-      messages.map(async (m) => ({
+      filtered.map(async (m) => ({
         id: m.id,
         text: m.message ?? "",
         sender: await this.resolveSenderName(m.senderId),

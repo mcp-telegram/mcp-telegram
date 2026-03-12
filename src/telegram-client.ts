@@ -288,7 +288,7 @@ export class TelegramService {
     const message = messages[0];
     if (!message) throw new Error(`Message ${messageId} not found`);
     if (!message.media) throw new Error(`Message ${messageId} has no media`);
-    const buffer = await this.client.downloadMedia(message) as Buffer;
+    const buffer = (await this.client.downloadMedia(message)) as Buffer;
     if (!buffer) throw new Error("Failed to download media");
     const mimeType = this.detectMimeType(buffer, message.media);
     return { buffer, mimeType };
@@ -297,8 +297,8 @@ export class TelegramService {
   /** Detect MIME type from buffer magic bytes, falling back to media metadata */
   private detectMimeType(buffer: Buffer, media: unknown): string {
     // Check magic bytes first
-    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return "image/jpeg";
-    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return "image/png";
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
     if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return "image/gif";
     if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) return "image/webp";
     // Fall back to document mimeType
@@ -407,9 +407,7 @@ export class TelegramService {
       let membersCount = entity.participantsCount ?? undefined;
       let description: string | undefined;
       try {
-        const full = await this.client.invoke(
-          new Api.channels.GetFullChannel({ channel: entity }),
-        );
+        const full = await this.client.invoke(new Api.channels.GetFullChannel({ channel: entity }));
         if (full.fullChat instanceof Api.ChannelFull) {
           membersCount = membersCount ?? full.fullChat.participantsCount ?? undefined;
           description = full.fullChat.about || undefined;
@@ -430,9 +428,7 @@ export class TelegramService {
       let membersCount = entity.participantsCount ?? undefined;
       let description: string | undefined;
       try {
-        const full = await this.client.invoke(
-          new Api.messages.GetFullChat({ chatId: entity.id }),
-        );
+        const full = await this.client.invoke(new Api.messages.GetFullChat({ chatId: entity.id }));
         if (full.fullChat instanceof Api.ChatFull) {
           if (!membersCount && full.fullChat.participants instanceof Api.ChatParticipants) {
             membersCount = full.fullChat.participants.participants.length;

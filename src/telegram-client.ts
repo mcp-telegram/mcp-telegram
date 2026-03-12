@@ -128,6 +128,25 @@ export class TelegramService {
     }
   }
 
+  /**
+   * Log out from Telegram completely — terminates the session on Telegram servers.
+   * After this, the session string becomes invalid and won't appear in "Active Sessions".
+   */
+  async logOut(): Promise<boolean> {
+    if (!this.client || !this.connected) return false;
+    try {
+      await this.client.invoke(new Api.auth.LogOut());
+      this.connected = false;
+      this.sessionString = "";
+      this.client = null;
+      return true;
+    } catch (error) {
+      console.error("[telegram] logOut error:", error);
+      await this.disconnect();
+      return false;
+    }
+  }
+
   isConnected(): boolean {
     return this.connected;
   }

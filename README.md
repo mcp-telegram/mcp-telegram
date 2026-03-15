@@ -20,7 +20,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API
 - **Userbot** -- operates as your personal account, not a bot
-- **20 tools** -- messaging, chat management, media, contacts, and more
+- **21 tools** -- messaging, chat management, media, contacts, and more
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
@@ -183,6 +183,7 @@ const telegramMcp = new MCPClient({
 | `telegram-mark-as-read` | Mark a chat as read |
 | `telegram-get-chat-info` | Get detailed info about a chat (name, type, members count, description) |
 | `telegram-get-chat-members` | List members of a group or channel |
+| `telegram-join-chat` | Join a group or channel by username or invite link |
 | `telegram-pin-message` | Pin a message in a chat |
 | `telegram-unpin-message` | Unpin a message in a chat |
 
@@ -277,6 +278,12 @@ Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-10012345
 | `messageId` | number | yes | Message ID to pin |
 | `silent` | boolean | no | Pin without notification (default: false) |
 
+### telegram-join-chat
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `target` | string | yes | Username (@group), link (t.me/group), or invite link (t.me/+xxx) |
+
 ### telegram-search-messages
 
 | Parameter | Type | Required | Description |
@@ -333,7 +340,7 @@ npm run format     # Format code with Biome
 
 ```
 src/
-  index.ts            -- MCP server entry point, 20 tool definitions
+  index.ts            -- MCP server entry point, 21 tool definitions
   telegram-client.ts  -- TelegramService class (GramJS wrapper)
   qr-login-cli.ts     -- CLI utility for QR code login
 ```

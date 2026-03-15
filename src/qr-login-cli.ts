@@ -1,14 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config";
-import { exec } from "node:child_process";
-import { writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
 import { TelegramService } from "./telegram-client.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const QR_IMAGE_PATH = join(__dirname, "..", "qr-login.png");
 
 const API_ID = Number(process.env.TELEGRAM_API_ID);
 const API_HASH = process.env.TELEGRAM_API_HASH;
@@ -19,11 +12,6 @@ if (!API_ID || !API_HASH) {
 }
 
 const telegram = new TelegramService(API_ID, API_HASH);
-
-function openFile(path: string) {
-  const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-  exec(`${cmd} "${path}"`);
-}
 
 async function main() {
   // Check if already connected
@@ -40,14 +28,7 @@ async function main() {
   console.log("  Settings > Devices > Link Desktop Device\n");
 
   const result = await telegram.startQrLogin(
-    // onQrDataUrl — save as PNG and open
-    async (dataUrl) => {
-      const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-      await writeFile(QR_IMAGE_PATH, Buffer.from(base64, "base64"));
-      console.log(`QR saved: ${QR_IMAGE_PATH}`);
-      openFile(QR_IMAGE_PATH);
-    },
-    // onQrUrl — also show in terminal
+    () => {},
     async (url) => {
       const terminalQr = await QRCode.toString(url, { type: "terminal", small: true });
       console.log(terminalQr);

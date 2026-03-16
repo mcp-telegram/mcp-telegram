@@ -1,7 +1,7 @@
 {
   "name": "@overpod/mcp-telegram",
-  "version": "1.4.0",
-  "description": "MCP server for Telegram userbot — 20 tools for messages, media, contacts & more. Built on GramJS/MTProto.",
+  "version": "1.5.0",
+  "description": "MCP server for Telegram userbot — 24 tools for messages, media, contacts & more. Built on GramJS/MTProto.",
   "type": "module",
   "main": "dist/index.js",
   "exports": {

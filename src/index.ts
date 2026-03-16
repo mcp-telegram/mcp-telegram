@@ -549,11 +549,7 @@ server.tool(
   "telegram-join-chat",
   "Join a Telegram group or channel by username or invite link",
   {
-    target: z
-      .string()
-      .describe(
-        "Username (@group), link (t.me/group), or invite link (t.me/+xxx)",
-      ),
+    target: z.string().describe("Username (@group), link (t.me/group), or invite link (t.me/+xxx)"),
   },
   async ({ target }) => {
     const err = await requireConnection();
@@ -573,6 +569,87 @@ server.tool(
       return {
         content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
       };
+    }
+  },
+);
+
+server.tool(
+  "telegram-send-reaction",
+  "Send an emoji reaction to a message. Pass emoji to react, omit to remove reaction",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    messageId: z.number().describe("Message ID to react to"),
+    emoji: z.string().optional().describe("Reaction emoji (e.g. 👍❤️🔥😂🎉). Omit to remove reaction"),
+  },
+  async ({ chatId, messageId, emoji }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.sendReaction(chatId, messageId, emoji);
+      const action = emoji ? `Reacted ${emoji} to` : "Removed reaction from";
+      return { content: [{ type: "text", text: `${action} message ${messageId} in ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Reaction error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-send-scheduled",
+  "Send a scheduled message to a Telegram chat. The message will be delivered at the specified time by Telegram servers",
+  {
+    chatId: z.string().describe("Chat ID or username (use 'me' or 'self' for Saved Messages)"),
+    text: z.string().describe("Message text"),
+    scheduleDate: z.number().describe("Unix timestamp when to send the message (must be in the future)"),
+    replyTo: z.number().optional().describe("Message ID to reply to"),
+    parseMode: z.enum(["md", "html"]).optional().describe("Message format: md (Markdown) or html"),
+  },
+  async ({ chatId, text, scheduleDate, replyTo, parseMode }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    // Resolve 'me'/'self' to Saved Messages
+    let target = chatId;
+    if (target === "me" || target === "self") {
+      try {
+        const me = await telegram.getMe();
+        target = me.id;
+      } catch {
+        return { content: [{ type: "text", text: "Failed to resolve Saved Messages" }] };
+      }
+    }
+
+    try {
+      await telegram.sendScheduledMessage(target, text, scheduleDate, replyTo, parseMode);
+      const date = new Date(scheduleDate * 1000).toISOString();
+      return { content: [{ type: "text", text: `Message scheduled for ${date} in ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Schedule error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-create-poll",
+  "Create a poll in a Telegram chat",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    question: z.string().describe("Poll question"),
+    answers: z.array(z.string()).min(2).max(10).describe("Answer options (2-10)"),
+    multipleChoice: z.boolean().default(false).describe("Allow multiple answers"),
+    quiz: z.boolean().default(false).describe("Quiz mode (one correct answer)"),
+    correctAnswer: z.number().optional().describe("Index of correct answer (0-based, required for quiz mode)"),
+  },
+  async ({ chatId, question, answers, multipleChoice, quiz, correctAnswer }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const msgId = await telegram.createPoll(chatId, question, answers, { multipleChoice, quiz, correctAnswer });
+      return { content: [{ type: "text", text: `Poll created in ${chatId}${msgId ? ` (message #${msgId})` : ""}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Poll error: ${(e as Error).message}` }] };
     }
   },
 );

@@ -686,20 +686,89 @@ export class TelegramService {
     };
   }
 
-  async joinChat(
-    target: string,
-  ): Promise<{ id: string; title: string; type: string }> {
+  async sendReaction(chatId: string, messageId: number, emoji?: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const peer = await this.client.getInputEntity(chatId);
+    const reaction = emoji ? [new Api.ReactionEmoji({ emoticon: emoji })] : []; // empty = remove reaction
+    await this.client.invoke(
+      new Api.messages.SendReaction({
+        peer,
+        msgId: messageId,
+        reaction,
+      }),
+    );
+  }
+
+  async sendScheduledMessage(
+    chatId: string,
+    text: string,
+    scheduleDate: number,
+    replyTo?: number,
+    parseMode?: "md" | "html",
+  ): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    await this.client.sendMessage(chatId, {
+      message: text,
+      schedule: scheduleDate,
+      ...(replyTo ? { replyTo } : {}),
+      ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
+    });
+  }
+
+  async createPoll(
+    chatId: string,
+    question: string,
+    answers: string[],
+    options?: { multipleChoice?: boolean; quiz?: boolean; correctAnswer?: number },
+  ): Promise<number> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const peer = await this.client.getInputEntity(chatId);
+    const pollAnswers = answers.map(
+      (text, i) =>
+        new Api.PollAnswer({
+          text: new Api.TextWithEntities({ text, entities: [] }),
+          option: Buffer.from([i]),
+        }),
+    );
+    const poll = new Api.Poll({
+      id: bigInt(Date.now()),
+      question: new Api.TextWithEntities({ text: question, entities: [] }),
+      answers: pollAnswers,
+      multipleChoice: options?.multipleChoice ?? false,
+      quiz: options?.quiz ?? false,
+    });
+    const result = await this.client.invoke(
+      new Api.messages.SendMedia({
+        peer,
+        media: new Api.InputMediaPoll({
+          poll,
+          ...(options?.quiz && options.correctAnswer != null
+            ? { correctAnswers: [Buffer.from([options.correctAnswer])] }
+            : {}),
+        }),
+        message: "",
+        randomId: bigInt(Math.floor(Math.random() * 1e15)),
+      }),
+    );
+    // Extract message ID from result
+    if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+      for (const update of result.updates) {
+        if (update instanceof Api.UpdateMessageID) {
+          return update.id;
+        }
+      }
+    }
+    return 0;
+  }
+
+  async joinChat(target: string): Promise<{ id: string; title: string; type: string }> {
     if (!this.client) throw new Error("Not connected");
 
     // Extract invite hash from various link formats
-    const inviteMatch = target.match(
-      /(?:t\.me\/\+|t\.me\/joinchat\/|tg:\/\/join\?invite=)([a-zA-Z0-9_-]+)/,
-    );
+    const inviteMatch = target.match(/(?:t\.me\/\+|t\.me\/joinchat\/|tg:\/\/join\?invite=)([a-zA-Z0-9_-]+)/);
 
     if (inviteMatch) {
-      const result = await this.client.invoke(
-        new Api.messages.ImportChatInvite({ hash: inviteMatch[1] }),
-      );
+      const result = await this.client.invoke(new Api.messages.ImportChatInvite({ hash: inviteMatch[1] }));
       const chat = (result as Api.Updates).chats?.[0];
       if (!chat) throw new Error("Failed to join via invite link");
       return {
@@ -726,8 +795,6 @@ export class TelegramService {
       };
     }
 
-    throw new Error(
-      "Target is not a group or channel. Use username, @username, or invite link.",
-    );
+    throw new Error("Target is not a group or channel. Use username, @username, or invite link.");
   }
 }

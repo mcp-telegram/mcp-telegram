@@ -20,7 +20,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API
 - **Userbot** -- operates as your personal account, not a bot
-- **21 tools** -- messaging, chat management, media, contacts, and more
+- **24 tools** -- messaging, reactions, polls, scheduled messages, media, contacts, and more
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
@@ -162,6 +162,9 @@ const telegramMcp = new MCPClient({
 |------|-------------|
 | `telegram-send-message` | Send a text message to a chat |
 | `telegram-send-file` | Send a file (photo, document, video, etc.) to a chat |
+| `telegram-send-reaction` | Send or remove an emoji reaction on a message |
+| `telegram-send-scheduled` | Schedule a message for future delivery |
+| `telegram-create-poll` | Create a poll (multiple choice or quiz mode) |
 | `telegram-edit-message` | Edit a previously sent message |
 | `telegram-delete-message` | Delete messages in a chat |
 | `telegram-forward-message` | Forward messages between chats |
@@ -284,6 +287,35 @@ Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-10012345
 |-----------|------|----------|-------------|
 | `target` | string | yes | Username (@group), link (t.me/group), or invite link (t.me/+xxx) |
 
+### telegram-send-reaction
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chatId` | string | yes | Chat ID or @username |
+| `messageId` | number | yes | Message ID to react to |
+| `emoji` | string | no | Reaction emoji (e.g. 👍❤️🔥😂🎉). Omit to remove reaction |
+
+### telegram-send-scheduled
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chatId` | string | yes | Chat ID or @username (use `"me"` or `"self"` for Saved Messages) |
+| `text` | string | yes | Message text |
+| `scheduleDate` | number | yes | Unix timestamp when to send (must be in the future) |
+| `replyTo` | number | no | Message ID to reply to |
+| `parseMode` | `"md"` / `"html"` | no | Message formatting mode |
+
+### telegram-create-poll
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chatId` | string | yes | Chat ID or @username |
+| `question` | string | yes | Poll question |
+| `answers` | string[] | yes | Answer options (2-10 items) |
+| `multipleChoice` | boolean | no | Allow multiple answers (default: false) |
+| `quiz` | boolean | no | Quiz mode with one correct answer (default: false) |
+| `correctAnswer` | number | no | Index of correct answer, 0-based (required for quiz mode) |
+
 ### telegram-search-messages
 
 | Parameter | Type | Required | Description |
@@ -340,7 +372,7 @@ npm run format     # Format code with Biome
 
 ```
 src/
-  index.ts            -- MCP server entry point, 21 tool definitions
+  index.ts            -- MCP server entry point, 24 tool definitions
   telegram-client.ts  -- TelegramService class (GramJS wrapper)
   qr-login-cli.ts     -- CLI utility for QR code login
 ```

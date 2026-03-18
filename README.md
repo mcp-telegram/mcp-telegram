@@ -61,6 +61,34 @@ claude mcp add telegram -s user \
 
 That's it! Ask Claude to run `telegram-status` to verify.
 
+### Multiple Accounts
+
+Use `TELEGRAM_SESSION_PATH` to run separate Telegram accounts side by side:
+
+```bash
+# Login each account with a unique session path
+TELEGRAM_API_ID=ID1 TELEGRAM_API_HASH=HASH1 TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-work npx @overpod/mcp-telegram login
+TELEGRAM_API_ID=ID2 TELEGRAM_API_HASH=HASH2 TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-personal npx @overpod/mcp-telegram login
+```
+
+Then add each as a separate MCP server:
+
+```bash
+claude mcp add telegram-work -s user \
+  -e TELEGRAM_API_ID=ID1 \
+  -e TELEGRAM_API_HASH=HASH1 \
+  -e TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-work \
+  -- npx @overpod/mcp-telegram
+
+claude mcp add telegram-personal -s user \
+  -e TELEGRAM_API_ID=ID2 \
+  -e TELEGRAM_API_HASH=HASH2 \
+  -e TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-personal \
+  -- npx @overpod/mcp-telegram
+```
+
+Each account gets its own session file — no conflicts.
+
 ## Installation Options
 
 ### npx (recommended, zero install)

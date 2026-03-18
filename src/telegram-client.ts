@@ -1,7 +1,8 @@
-import { existsSync } from "node:fs";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { existsSync, mkdirSync } from "node:fs";
+import { chmod, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
 import bigInt from "big-integer";
 import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
@@ -9,7 +10,23 @@ import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SESSION_FILE = join(__dirname, "..", ".telegram-session");
+const LEGACY_SESSION_FILE = join(__dirname, "..", ".telegram-session");
+const DEFAULT_SESSION_DIR = join(homedir(), ".mcp-telegram");
+const DEFAULT_SESSION_FILE = join(DEFAULT_SESSION_DIR, "session");
+
+const SESSION_STRING_RE = /^[A-Za-z0-9+/=]+$/;
+const MIN_SESSION_LENGTH = 100;
+
+function resolveSessionPath(sessionPath?: string): string {
+  return sessionPath ?? process.env.TELEGRAM_SESSION_PATH ?? DEFAULT_SESSION_FILE;
+}
+
+function ensureSessionDir(filePath: string): void {
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
+}
 
 export class TelegramService {
   private client: TelegramClient | null = null;
@@ -17,19 +34,42 @@ export class TelegramService {
   private apiHash: string;
   private sessionString = "";
   private connected = false;
+  private sessionPath: string;
   lastError = "";
 
-  constructor(apiId: number, apiHash: string) {
+  constructor(apiId: number, apiHash: string, options?: { sessionPath?: string }) {
     this.apiId = apiId;
     this.apiHash = apiHash;
+    this.sessionPath = resolveSessionPath(options?.sessionPath);
   }
 
   async loadSession(): Promise<boolean> {
-    if (existsSync(SESSION_FILE)) {
-      this.sessionString = (await readFile(SESSION_FILE, "utf-8")).trim();
-      return true;
+    // Try current session path
+    if (existsSync(this.sessionPath)) {
+      const raw = (await readFile(this.sessionPath, "utf-8")).trim();
+      if (this.isValidSessionString(raw)) {
+        this.sessionString = raw;
+        // Fix permissions on existing files
+        try { await chmod(this.sessionPath, 0o600); } catch {}
+        return true;
+      }
+    }
+    // Migrate from legacy path (inside node_modules / package root)
+    if (this.sessionPath === DEFAULT_SESSION_FILE && existsSync(LEGACY_SESSION_FILE)) {
+      const raw = (await readFile(LEGACY_SESSION_FILE, "utf-8")).trim();
+      if (this.isValidSessionString(raw)) {
+        this.sessionString = raw;
+        ensureSessionDir(this.sessionPath);
+        await writeFile(this.sessionPath, raw, { encoding: "utf-8", mode: 0o600 });
+        try { await unlink(LEGACY_SESSION_FILE); } catch {}
+        return true;
+      }
     }
     return false;
+  }
+
+  private isValidSessionString(value: string): boolean {
+    return value.length >= MIN_SESSION_LENGTH && SESSION_STRING_RE.test(value);
   }
 
   /** Set session string in memory (for programmatic / hosted use) */
@@ -45,7 +85,8 @@ export class TelegramService {
   private async saveSession(session: string): Promise<void> {
     this.sessionString = session;
     try {
-      await writeFile(SESSION_FILE, session, "utf-8");
+      ensureSessionDir(this.sessionPath);
+      await writeFile(this.sessionPath, session, { encoding: "utf-8", mode: 0o600 });
     } catch {
       // File write may fail in containerized environments — session string is still in memory
     }
@@ -106,8 +147,8 @@ export class TelegramService {
     this.connected = false;
     this.sessionString = "";
     this.client = null;
-    if (existsSync(SESSION_FILE)) {
-      await unlink(SESSION_FILE);
+    if (existsSync(this.sessionPath)) {
+      await unlink(this.sessionPath);
     }
   }
 

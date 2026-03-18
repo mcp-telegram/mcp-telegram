@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { chmod, readFile, unlink, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { homedir } from "node:os";
 import bigInt from "big-integer";
 import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
@@ -50,7 +50,9 @@ export class TelegramService {
       if (this.isValidSessionString(raw)) {
         this.sessionString = raw;
         // Fix permissions on existing files
-        try { await chmod(this.sessionPath, 0o600); } catch {}
+        try {
+          await chmod(this.sessionPath, 0o600);
+        } catch {}
         return true;
       }
     }
@@ -61,7 +63,9 @@ export class TelegramService {
         this.sessionString = raw;
         ensureSessionDir(this.sessionPath);
         await writeFile(this.sessionPath, raw, { encoding: "utf-8", mode: 0o600 });
-        try { await unlink(LEGACY_SESSION_FILE); } catch {}
+        try {
+          await unlink(LEGACY_SESSION_FILE);
+        } catch {}
         return true;
       }
     }

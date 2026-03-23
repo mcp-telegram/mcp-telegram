@@ -679,6 +679,7 @@ export class TelegramService {
       sender: string;
       date: string;
       media?: { type: string; fileName?: string; size?: number };
+      reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
@@ -699,6 +700,7 @@ export class TelegramService {
         sender: await this.resolveSenderName(m.senderId),
         date: new Date((m.date ?? 0) * 1000).toISOString(),
         media: this.extractMediaInfo(m.media),
+        reactions: this.extractReactions(m.reactions),
       })),
     );
     return results;
@@ -795,6 +797,7 @@ export class TelegramService {
       date: string;
       chat: { id: string; name: string; type: string; username?: string };
       media?: { type: string; fileName?: string; size?: number };
+      reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
@@ -861,6 +864,7 @@ export class TelegramService {
           date: new Date((m.date ?? 0) * 1000).toISOString(),
           chat: chatsMap.get(chatId) || { id: chatId, name: "Unknown", type: "unknown" },
           media: this.extractMediaInfo(m.media),
+          reactions: this.extractReactions(m.reactions),
         };
       }),
     );
@@ -880,6 +884,7 @@ export class TelegramService {
       sender: string;
       date: string;
       media?: { type: string; fileName?: string; size?: number };
+      reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
@@ -899,6 +904,7 @@ export class TelegramService {
         sender: await this.resolveSenderName(m.senderId),
         date: new Date((m.date ?? 0) * 1000).toISOString(),
         media: this.extractMediaInfo(m.media),
+        reactions: this.extractReactions(m.reactions),
       })),
     );
     return results;
@@ -1049,17 +1055,151 @@ export class TelegramService {
     return "image/jpeg"; // Telegram profile photos are almost always JPEG
   }
 
-  async sendReaction(chatId: string, messageId: number, emoji?: string): Promise<void> {
+  /** Extract reactions from a message into a simple format */
+  private extractReactions(
+    reactions?: Api.MessageReactions,
+  ): { emoji: string; count: number; me: boolean }[] | undefined {
+    if (!reactions?.results?.length) return undefined;
+    const items: { emoji: string; count: number; me: boolean }[] = [];
+    for (const r of reactions.results) {
+      let emoji: string;
+      if (r.reaction instanceof Api.ReactionEmoji) {
+        emoji = r.reaction.emoticon;
+      } else if (r.reaction instanceof Api.ReactionCustomEmoji) {
+        emoji = `custom:${r.reaction.documentId}`;
+      } else if (r.reaction instanceof Api.ReactionPaid) {
+        emoji = "⭐";
+      } else {
+        continue;
+      }
+      items.push({ emoji, count: r.count, me: r.chosenOrder != null });
+    }
+    return items.length > 0 ? items : undefined;
+  }
+
+  async sendReaction(
+    chatId: string,
+    messageId: number,
+    emoji?: string | string[],
+    addToExisting = false,
+  ): Promise<{ emoji: string; count: number; me: boolean }[] | undefined> {
     if (!this.client || !this.connected) throw new Error("Not connected");
     const peer = await this.client.getInputEntity(chatId);
-    const reaction = emoji ? [new Api.ReactionEmoji({ emoticon: emoji })] : []; // empty = remove reaction
-    await this.client.invoke(
+
+    const reactionList: Api.TypeReaction[] = [];
+    if (emoji) {
+      const emojis = Array.isArray(emoji) ? emoji : [emoji];
+
+      if (addToExisting) {
+        // Fetch current reactions to preserve them
+        const msgs = await this.client.getMessages(chatId, { ids: [messageId] });
+        const msg = msgs[0];
+        if (msg?.reactions?.results) {
+          for (const r of msg.reactions.results) {
+            if (r.chosenOrder != null) {
+              reactionList.push(r.reaction);
+            }
+          }
+        }
+      }
+
+      for (const e of emojis) {
+        reactionList.push(new Api.ReactionEmoji({ emoticon: e }));
+      }
+    }
+    // empty array = remove all reactions
+
+    const result = await this.client.invoke(
       new Api.messages.SendReaction({
         peer,
         msgId: messageId,
-        reaction,
+        reaction: reactionList,
       }),
     );
+
+    // Extract updated reactions from the response
+    if ("updates" in result) {
+      for (const upd of result.updates) {
+        if (upd instanceof Api.UpdateMessageReactions) {
+          return this.extractReactions(upd.reactions);
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  async getMessageReactions(
+    chatId: string,
+    messageId: number,
+  ): Promise<{
+    reactions: {
+      emoji: string;
+      count: number;
+      users: { id: string; name: string }[];
+    }[];
+    total: number;
+  }> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const peer = await this.client.getInputEntity(chatId);
+
+    // First get the message to know which reactions exist
+    const msgs = await this.client.getMessages(chatId, { ids: [messageId] });
+    const msg = msgs[0];
+    if (!msg?.reactions?.results?.length) {
+      return { reactions: [], total: 0 };
+    }
+
+    const reactionsOut: {
+      emoji: string;
+      count: number;
+      users: { id: string; name: string }[];
+    }[] = [];
+
+    for (const rc of msg.reactions.results) {
+      let emoji: string;
+      if (rc.reaction instanceof Api.ReactionEmoji) {
+        emoji = rc.reaction.emoticon;
+      } else if (rc.reaction instanceof Api.ReactionCustomEmoji) {
+        emoji = `custom:${rc.reaction.documentId}`;
+      } else if (rc.reaction instanceof Api.ReactionPaid) {
+        emoji = "⭐";
+      } else {
+        continue;
+      }
+
+      const users: { id: string; name: string }[] = [];
+
+      // Try to get the list of users who reacted (may fail if canSeeList is false)
+      if (msg.reactions.canSeeList) {
+        try {
+          const list = await this.client.invoke(
+            new Api.messages.GetMessageReactionsList({
+              peer,
+              id: messageId,
+              reaction: rc.reaction,
+              limit: 50,
+            }),
+          );
+          if (list instanceof Api.messages.MessageReactionsList) {
+            for (const r of list.reactions) {
+              const userId = r.peerId instanceof Api.PeerUser ? r.peerId.userId.toString() : "";
+              if (userId) {
+                const name = await this.resolveSenderName(bigInt(Number.parseInt(userId)));
+                users.push({ id: userId, name });
+              }
+            }
+          }
+        } catch {
+          // canSeeList may be false or request may fail for channels
+        }
+      }
+
+      reactionsOut.push({ emoji, count: rc.count, users });
+    }
+
+    const total = reactionsOut.reduce((sum, r) => sum + r.count, 0);
+    return { reactions: reactionsOut, total };
   }
 
   async sendScheduledMessage(
@@ -1187,6 +1327,7 @@ export class TelegramService {
       sender: string;
       date: string;
       media?: { type: string; fileName?: string; size?: number };
+      reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
@@ -1214,6 +1355,7 @@ export class TelegramService {
           sender: await this.resolveSenderName(m.senderId),
           date: new Date((m.date ?? 0) * 1000).toISOString(),
           media: this.extractMediaInfo(m.media),
+          reactions: this.extractReactions(m.reactions),
         })),
     );
     return results;

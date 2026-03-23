@@ -24,6 +24,13 @@ if (!API_ID || !API_HASH) {
 
 const telegram = new TelegramService(API_ID, API_HASH);
 
+/** Format reactions array into compact text like: [👍×5 ❤️×3(me) 🔥×1] */
+function formatReactions(reactions?: { emoji: string; count: number; me: boolean }[]): string {
+  if (!reactions?.length) return "";
+  const parts = reactions.map((r) => `${r.emoji}×${r.count}${r.me ? "(me)" : ""}`);
+  return ` [${parts.join(" ")}]`;
+}
+
 const server = new McpServer({
   name: "mcp-telegram",
   version: "1.0.0",
@@ -205,7 +212,7 @@ server.tool(
       const text = messages
         .map(
           (m) =>
-            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
         )
         .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages" }] };
@@ -259,7 +266,7 @@ server.tool(
       const text = messages
         .map(
           (m) =>
-            `[#${m.id}] [${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${m.chat.name}${m.chat.username ? ` @${m.chat.username}` : ""}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+            `[#${m.id}] [${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${m.chat.name}${m.chat.username ? ` @${m.chat.username}` : ""}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
         )
         .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages found" }] };
@@ -288,7 +295,7 @@ server.tool(
       const text = messages
         .map(
           (m) =>
-            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
         )
         .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages found" }] };
@@ -675,22 +682,61 @@ server.tool(
 
 server.tool(
   "telegram-send-reaction",
-  "Send an emoji reaction to a message. Pass emoji to react, omit to remove reaction",
+  "Send emoji reaction(s) to a message. Supports multiple reactions and adding to existing ones. Omit emoji to remove all reactions",
   {
     chatId: z.string().describe("Chat ID or username"),
     messageId: z.number().describe("Message ID to react to"),
-    emoji: z.string().optional().describe("Reaction emoji (e.g. 👍❤️🔥😂🎉). Omit to remove reaction"),
+    emoji: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .describe("Reaction emoji(s): single '👍' or array ['👍','🔥']. Omit to remove all reactions"),
+    addToExisting: z
+      .boolean()
+      .default(false)
+      .describe("If true, add reaction(s) to existing ones instead of replacing"),
   },
-  async ({ chatId, messageId, emoji }) => {
+  async ({ chatId, messageId, emoji, addToExisting }) => {
     const err = await requireConnection();
     if (err) return { content: [{ type: "text", text: err }] };
 
     try {
-      await telegram.sendReaction(chatId, messageId, emoji);
-      const action = emoji ? `Reacted ${emoji} to` : "Removed reaction from";
-      return { content: [{ type: "text", text: `${action} message ${messageId} in ${chatId}` }] };
+      const updated = await telegram.sendReaction(chatId, messageId, emoji, addToExisting);
+      const emojiStr = Array.isArray(emoji) ? emoji.join("") : emoji;
+      const action = emoji ? `Reacted ${emojiStr} to` : "Removed reactions from";
+      const reactionsInfo = updated
+        ? ` | Reactions: ${updated.map((r) => `${r.emoji}×${r.count}${r.me ? "(me)" : ""}`).join(" ")}`
+        : "";
+      return { content: [{ type: "text", text: `${action} message ${messageId} in ${chatId}${reactionsInfo}` }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Reaction error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-get-reactions",
+  "Get detailed reaction info for a message: which reactions, counts, and who reacted (when visible)",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    messageId: z.number().describe("Message ID to get reactions for"),
+  },
+  async ({ chatId, messageId }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const result = await telegram.getMessageReactions(chatId, messageId);
+      if (result.reactions.length === 0) {
+        return { content: [{ type: "text", text: `No reactions on message ${messageId}` }] };
+      }
+      const lines = result.reactions.map((r) => {
+        const usersStr = r.users.length > 0 ? `: ${r.users.map((u) => u.name).join(", ")}` : "";
+        return `${r.emoji} × ${r.count}${usersStr}`;
+      });
+      lines.push(`\nTotal: ${result.total} reactions`);
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
   },
 );
@@ -893,7 +939,7 @@ server.tool(
       const text = messages
         .map(
           (m) =>
-            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
         )
         .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages in this topic" }] };

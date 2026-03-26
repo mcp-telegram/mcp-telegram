@@ -112,6 +112,34 @@ cd mcp-telegram
 npm install && npm run build
 ```
 
+### Docker
+
+```bash
+git clone https://github.com/overpod/mcp-telegram.git
+cd mcp-telegram
+docker build -t mcp-telegram .
+```
+
+Login (interactive terminal required):
+
+```bash
+docker run -it --rm \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
+  -v ~/.mcp-telegram:/root/.mcp-telegram \
+  --entrypoint node mcp-telegram dist/qr-login-cli.js
+```
+
+Run the MCP server:
+
+```bash
+docker run -i --rm \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
+  -v ~/.mcp-telegram:/root/.mcp-telegram \
+  mcp-telegram
+```
+
 ## Usage with MCP Clients
 
 ### Claude Code (CLI)
@@ -148,11 +176,38 @@ claude mcp add telegram -s user \
 
 3. Restart Claude Desktop.
 
-4. Ask Claude: **"Run telegram-login"** -- a QR code will appear. If the image is not visible, Claude will provide a browser link to view the QR code. Scan it in Telegram (**Settings > Devices > Link Desktop Device**).
+4. Ask Claude: **"Run telegram-login"** -- a QR code will appear. If the image is not visible, the QR is saved to `~/.mcp-telegram/qr-login.png`. Scan it in Telegram (**Settings > Devices > Link Desktop Device**).
 
 5. Ask Claude: **"Run telegram-status"** to verify the connection.
 
 > **Note**: No terminal required! Login works entirely through Claude Desktop.
+
+### Claude Desktop (Docker)
+
+1. Login via terminal first (see [Docker](#docker) section above).
+
+2. Add to your config file:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows (WSL)**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "telegram": {
+      "command": "wsl",
+      "args": [
+        "docker", "run", "-i", "--rm",
+        "-e", "TELEGRAM_API_ID=YOUR_ID",
+        "-e", "TELEGRAM_API_HASH=YOUR_HASH",
+        "-v", "~/.mcp-telegram:/root/.mcp-telegram",
+        "mcp-telegram"
+      ]
+    }
+  }
+}
+```
+
+3. Restart Claude Desktop. Ask Claude: **"Run telegram-status"** to verify.
 
 ### Cursor / VS Code
 
@@ -512,6 +567,8 @@ src/
 - Session is stored in `~/.mcp-telegram/session` with `0600` permissions (owner-only access)
 - Session directory is created with `0700` permissions
 - Phone number is **not required** -- QR-only authentication
+- No data is sent to third-party services -- all communication goes directly to Telegram servers via MTProto
+- QR login codes are generated locally and never leave your machine
 - This is a **userbot** (personal account), not a bot -- respect the [Telegram Terms of Service](https://core.telegram.org/api/terms)
 
 ## License

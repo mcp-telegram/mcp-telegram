@@ -32,18 +32,19 @@ const server = new McpServer({
 registerTools(server, telegram);
 
 async function main() {
-  // Try to auto-connect with saved session
-  await telegram.loadSession();
-  if (await telegram.connect()) {
-    const me = await telegram.getMe();
-    console.error(`[mcp-telegram] Auto-connected as @${me.username}`);
-  } else if (telegram.lastError) {
-    console.error(`[mcp-telegram] ${telegram.lastError}`);
-  }
-
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[mcp-telegram] MCP server running on stdio");
+
+  // Auto-connect with saved session after MCP is ready (non-blocking)
+  telegram.loadSession().then(async () => {
+    if (await telegram.connect()) {
+      const me = await telegram.getMe();
+      console.error(`[mcp-telegram] Auto-connected as @${me.username}`);
+    } else if (telegram.lastError) {
+      console.error(`[mcp-telegram] ${telegram.lastError}`);
+    }
+  });
 }
 
 main().catch((err) => {

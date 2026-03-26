@@ -1185,7 +1185,7 @@ export class TelegramService {
             for (const r of list.reactions) {
               const userId = r.peerId instanceof Api.PeerUser ? r.peerId.userId.toString() : "";
               if (userId) {
-                const name = await this.resolveSenderName(bigInt(Number.parseInt(userId)));
+                const name = await this.resolveSenderName(bigInt(Number.parseInt(userId, 10)));
                 users.push({ id: userId, name });
               }
             }

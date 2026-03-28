@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import bigInt from "big-integer";
 import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
-import { StringSession } from "telegram/sessions/index.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
+import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

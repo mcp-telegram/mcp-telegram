@@ -90,6 +90,32 @@ claude mcp add telegram-personal -s user \
 
 Each account gets its own session file — no conflicts.
 
+### Proxy Support
+
+If Telegram is blocked or you're running in a containerized environment (Docker, K3s), use a SOCKS5 or MTProxy:
+
+```bash
+# SOCKS5 proxy
+TELEGRAM_PROXY_IP=127.0.0.1 \
+TELEGRAM_PROXY_PORT=10808 \
+npx @overpod/mcp-telegram
+
+# MTProxy
+TELEGRAM_PROXY_IP=proxy.example.com \
+TELEGRAM_PROXY_PORT=443 \
+TELEGRAM_PROXY_SECRET=ee00000000000000000000000000000000 \
+npx @overpod/mcp-telegram
+```
+
+| Variable | Description |
+|----------|-------------|
+| `TELEGRAM_PROXY_IP` | Proxy server address |
+| `TELEGRAM_PROXY_PORT` | Proxy server port |
+| `TELEGRAM_PROXY_SOCKS_TYPE` | `4` or `5` (default: `5`) |
+| `TELEGRAM_PROXY_SECRET` | MTProxy secret (enables MTProxy mode) |
+| `TELEGRAM_PROXY_USERNAME` | Optional proxy auth |
+| `TELEGRAM_PROXY_PASSWORD` | Optional proxy auth |
+
 ## Installation Options
 
 ### npx (recommended, zero install)

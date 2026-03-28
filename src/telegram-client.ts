@@ -335,9 +335,10 @@ export class TelegramService {
     topicId?: number,
   ): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
+    const resolved = await this.resolvePeer(chatId);
     if (topicId) {
       // Forum topics require raw API call with InputReplyToMessage
-      const peer = await this.client.getInputEntity(chatId);
+      const peer = await this.client.getInputEntity(resolved);
       await this.client.invoke(
         new Api.messages.SendMessage({
           peer,
@@ -350,7 +351,7 @@ export class TelegramService {
         }),
       );
     } else {
-      await this.client.sendMessage(chatId, {
+      await this.client.sendMessage(resolved, {
         message: text,
         ...(replyTo ? { replyTo } : {}),
         ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
@@ -360,12 +361,14 @@ export class TelegramService {
 
   async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    await this.client.sendFile(chatId, { file: filePath, caption });
+    const resolved = await this.resolvePeer(chatId);
+    await this.client.sendFile(resolved, { file: filePath, caption });
   }
 
   async downloadMedia(chatId: string, messageId: number, downloadPath: string): Promise<string> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const messages = await this.client.getMessages(chatId, { ids: [messageId] });
+    const resolved = await this.resolvePeer(chatId);
+    const messages = await this.client.getMessages(resolved, { ids: [messageId] });
     const message = messages[0];
     if (!message) throw new Error(`Message ${messageId} not found`);
     if (!message.media) throw new Error(`Message ${messageId} has no media`);
@@ -377,7 +380,8 @@ export class TelegramService {
 
   async downloadMediaAsBuffer(chatId: string, messageId: number): Promise<{ buffer: Buffer; mimeType: string }> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const messages = await this.client.getMessages(chatId, { ids: [messageId] });
+    const resolved = await this.resolvePeer(chatId);
+    const messages = await this.client.getMessages(resolved, { ids: [messageId] });
     const message = messages[0];
     if (!message) throw new Error(`Message ${messageId} not found`);
     if (!message.media) throw new Error(`Message ${messageId} has no media`);
@@ -404,12 +408,14 @@ export class TelegramService {
 
   async pinMessage(chatId: string, messageId: number, silent = false): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    await this.client.pinMessage(chatId, messageId, { notify: !silent });
+    const resolved = await this.resolvePeer(chatId);
+    await this.client.pinMessage(resolved, messageId, { notify: !silent });
   }
 
   async unpinMessage(chatId: string, messageId: number): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    await this.client.unpinMessage(chatId, messageId);
+    const resolved = await this.resolvePeer(chatId);
+    await this.client.unpinMessage(resolved, messageId);
   }
 
   async getDialogs(
@@ -566,17 +572,69 @@ export class TelegramService {
 
   async forwardMessage(fromChatId: string, toChatId: string, messageIds: number[]): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    await this.client.forwardMessages(toChatId, { messages: messageIds, fromPeer: fromChatId });
+    const resolvedFrom = await this.resolvePeer(fromChatId);
+    const resolvedTo = await this.resolvePeer(toChatId);
+    await this.client.forwardMessages(resolvedTo, { messages: messageIds, fromPeer: resolvedFrom });
   }
 
   async editMessage(chatId: string, messageId: number, newText: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    await this.client.editMessage(chatId, { message: messageId, text: newText });
+    const resolved = await this.resolvePeer(chatId);
+    await this.client.editMessage(resolved, { message: messageId, text: newText });
   }
 
   async deleteMessages(chatId: string, messageIds: number[]): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    await this.client.deleteMessages(chatId, messageIds, { revoke: true });
+    const resolved = await this.resolvePeer(chatId);
+    await this.client.deleteMessages(resolved, messageIds, { revoke: true });
+  }
+
+  /**
+   * Resolve a chat by ID, username, or display name.
+   * Falls back to searching user's dialogs if getEntity() fails.
+   */
+  // biome-ignore lint: GramJS has no proper entity union type
+  async resolveChat(chatId: string): Promise<any> {
+    if (!this.client) throw new Error("Not connected");
+
+    // First try direct resolve (numeric ID, username, phone)
+    try {
+      return await this.client.getEntity(chatId);
+    } catch {
+      // Fall through to dialog search
+    }
+
+    // Search dialogs by display name
+    const dialogs = await this.client.getDialogs({ limit: 100 });
+    const query = chatId.toLowerCase();
+
+    // Exact match first
+    const exact = dialogs.find((d) => d.title?.toLowerCase() === query);
+    if (exact?.entity) return exact.entity;
+
+    // Partial match
+    const partial = dialogs.filter((d) => d.title?.toLowerCase().includes(query));
+    if (partial.length === 1 && partial[0].entity) return partial[0].entity;
+    if (partial.length > 1) {
+      const matches = partial.map((d) => `  ${d.title} (${d.entity?.id?.toString() ?? "?"})`).join("\n");
+      throw new Error(`Multiple chats match "${chatId}". Use the numeric ID instead:\n${matches}`);
+    }
+
+    throw new Error(
+      `Cannot find chat "${chatId}". Use a numeric ID, @username, or run telegram-search-chats to find it.`,
+    );
+  }
+
+  /**
+   * Resolve chatId to a peer string that GramJS methods accept.
+   * Handles display names by searching dialogs.
+   */
+  // biome-ignore lint: GramJS has no proper entity union type
+  private async resolvePeer(chatId: string): Promise<any> {
+    // Numeric IDs and @usernames work directly
+    if (/^-?\d+$/.test(chatId) || chatId.startsWith("@")) return chatId;
+    // Everything else — resolve via dialogs
+    return this.resolveChat(chatId);
   }
 
   async getChatInfo(chatId: string): Promise<{
@@ -591,7 +649,7 @@ export class TelegramService {
     forum?: boolean;
   }> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
     if (entity instanceof Api.User) {
       const parts = [entity.firstName, entity.lastName].filter(Boolean);
       return {
@@ -709,12 +767,13 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
+    const resolved = await this.resolvePeer(chatId);
     const opts: Record<string, unknown> = {
       limit,
       ...(offsetId ? { offsetId } : {}),
       ...(maxDate ? { offsetDate: maxDate } : {}),
     };
-    const messages = await this.client.getMessages(chatId, opts);
+    const messages = await this.client.getMessages(resolved, opts);
     let filtered = messages;
     if (minDate) {
       filtered = filtered.filter((m) => (m.date ?? 0) >= minDate);
@@ -914,7 +973,8 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const messages = await this.client.getMessages(chatId, {
+    const resolved = await this.resolvePeer(chatId);
+    const messages = await this.client.getMessages(resolved, {
       search: query,
       limit,
       ...(maxDate ? { offsetDate: maxDate } : {}),
@@ -1110,7 +1170,8 @@ export class TelegramService {
     addToExisting = false,
   ): Promise<{ emoji: string; count: number; me: boolean }[] | undefined> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const peer = await this.client.getInputEntity(chatId);
+    const resolved = await this.resolvePeer(chatId);
+    const peer = await this.client.getInputEntity(resolved);
 
     const reactionList: Api.TypeReaction[] = [];
     if (emoji) {
@@ -1118,7 +1179,7 @@ export class TelegramService {
 
       if (addToExisting) {
         // Fetch current reactions to preserve them
-        const msgs = await this.client.getMessages(chatId, { ids: [messageId] });
+        const msgs = await this.client.getMessages(resolved, { ids: [messageId] });
         const msg = msgs[0];
         if (msg?.reactions?.results) {
           for (const r of msg.reactions.results) {
@@ -1167,10 +1228,11 @@ export class TelegramService {
     total: number;
   }> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const peer = await this.client.getInputEntity(chatId);
+    const resolved = await this.resolvePeer(chatId);
+    const peer = await this.client.getInputEntity(resolved);
 
     // First get the message to know which reactions exist
-    const msgs = await this.client.getMessages(chatId, { ids: [messageId] });
+    const msgs = await this.client.getMessages(resolved, { ids: [messageId] });
     const msg = msgs[0];
     if (!msg?.reactions?.results?.length) {
       return { reactions: [], total: 0 };
@@ -1236,7 +1298,8 @@ export class TelegramService {
     parseMode?: "md" | "html",
   ): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    await this.client.sendMessage(chatId, {
+    const resolved = await this.resolvePeer(chatId);
+    await this.client.sendMessage(resolved, {
       message: text,
       schedule: scheduleDate,
       ...(replyTo ? { replyTo } : {}),
@@ -1305,7 +1368,7 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
     if (!(entity instanceof Api.Channel)) throw new Error("Forum topics are only available in supergroups");
     const result = await this.client.invoke(
       new Api.channels.GetForumTopics({
@@ -1391,7 +1454,7 @@ export class TelegramService {
   async isForum(chatId: string): Promise<boolean> {
     if (!this.client || !this.connected) throw new Error("Not connected");
     try {
-      const entity = await this.client.getEntity(chatId);
+      const entity = await this.resolveChat(chatId);
       if (entity instanceof Api.Channel) {
         return Boolean(entity.forum);
       }
@@ -1532,7 +1595,7 @@ export class TelegramService {
   async inviteToGroup(chatId: string, users: string[]): Promise<{ invited: string[]; failed: string[] }> {
     if (!this.client) throw new Error("Not connected");
 
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
     const invited: string[] = [];
     const failed: string[] = [];
 
@@ -1564,7 +1627,7 @@ export class TelegramService {
   async kickUser(chatId: string, userId: string): Promise<void> {
     if (!this.client) throw new Error("Not connected");
 
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
     const user = await this.client.getEntity(userId);
     if (!(user instanceof Api.User)) throw new Error("Target is not a user");
     const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
@@ -1593,7 +1656,7 @@ export class TelegramService {
   async banUser(chatId: string, userId: string): Promise<void> {
     if (!this.client) throw new Error("Not connected");
 
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
     const user = await this.client.getEntity(userId);
     if (!(user instanceof Api.User)) throw new Error("Target is not a user");
     if (!(entity instanceof Api.Channel)) throw new Error("Ban is only supported for supergroups and channels");
@@ -1611,7 +1674,7 @@ export class TelegramService {
   async unbanUser(chatId: string, userId: string): Promise<void> {
     if (!this.client) throw new Error("Not connected");
 
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
     const user = await this.client.getEntity(userId);
     if (!(user instanceof Api.User)) throw new Error("Target is not a user");
     if (!(entity instanceof Api.Channel)) throw new Error("Unban is only supported for supergroups and channels");
@@ -1632,7 +1695,7 @@ export class TelegramService {
   ): Promise<void> {
     if (!this.client) throw new Error("Not connected");
 
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
 
     if (options.title) {
       if (entity instanceof Api.Channel) {
@@ -1665,7 +1728,7 @@ export class TelegramService {
   async leaveGroup(chatId: string): Promise<void> {
     if (!this.client) throw new Error("Not connected");
 
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
 
     if (entity instanceof Api.Channel) {
       await this.client.invoke(new Api.channels.LeaveChannel({ channel: entity }));
@@ -1684,7 +1747,7 @@ export class TelegramService {
   async setAdmin(chatId: string, userId: string, options?: { title?: string }): Promise<void> {
     if (!this.client) throw new Error("Not connected");
 
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
     if (!(entity instanceof Api.Channel)) throw new Error("Set admin is only supported for supergroups and channels");
 
     const user = await this.client.getEntity(userId);
@@ -1713,7 +1776,7 @@ export class TelegramService {
   async removeAdmin(chatId: string, userId: string): Promise<void> {
     if (!this.client) throw new Error("Not connected");
 
-    const entity = await this.client.getEntity(chatId);
+    const entity = await this.resolveChat(chatId);
     if (!(entity instanceof Api.Channel))
       throw new Error("Remove admin is only supported for supergroups and channels");
 

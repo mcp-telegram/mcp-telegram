@@ -16,6 +16,10 @@
 
 An MCP (Model Context Protocol) server that connects AI assistants like Claude to Telegram via the MTProto protocol. Unlike bots, this runs as a **userbot** -- it operates under your personal Telegram account using [GramJS](https://github.com/nicedoc/gramjs), giving full access to your chats, contacts, and message history.
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/overpod-mcp-telegram).
+
 ## Features
 
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API

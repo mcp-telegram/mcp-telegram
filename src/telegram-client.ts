@@ -10,6 +10,7 @@ import { CustomFile } from "telegram/client/uploads.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
+import { NetworkError, AuthError, retryWithBackoff } from "./errors.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LEGACY_SESSION_FILE = join(__dirname, "..", ".telegram-session");
@@ -139,32 +140,32 @@ export class TelegramService {
     });
 
     try {
-      await this.client.connect();
-      // Verify session is still valid
-      await this.client.getMe();
+      await retryWithBackoff(async () => {
+        await this.client!.connect();
+        // Verify session is still valid
+        await this.client!.getMe();
+      }, { maxAttempts: 3, initialDelayMs: 1000 });
+      
       this.connected = true;
       return true;
     } catch (err: unknown) {
-      const error = err as { errorMessage?: string; message?: string };
-      const msg = error.errorMessage || error.message || "";
-
-      // Auth revoked — delete invalid session
-      if (msg === "AUTH_KEY_UNREGISTERED" || msg === "SESSION_REVOKED" || msg === "USER_DEACTIVATED") {
+      // Handle auth errors
+      if (AuthError.isAuthError(err)) {
         await this.clearSession();
         this.lastError = "Session revoked. Run telegram-login to re-authenticate.";
       }
-      // Network error — keep session, just report
-      else if (
-        msg.includes("TIMEOUT") ||
-        msg.includes("ECONNREFUSED") ||
-        msg.includes("ENETUNREACH") ||
-        msg.includes("ENOTFOUND") ||
-        msg.includes("network")
-      ) {
+      // Handle network errors
+      else if (err instanceof NetworkError || NetworkError.isNetworkError(err)) {
+        const msg = err instanceof NetworkError ? err.message : 
+                    (err as { errorMessage?: string; message?: string }).errorMessage || 
+                    (err as { errorMessage?: string; message?: string }).message || "";
         this.lastError = `Network error: ${msg}. Run telegram-status to retry connection.`;
       }
       // Unknown error
       else {
+        const msg = (err as { errorMessage?: string; message?: string }).errorMessage || 
+                    (err as { errorMessage?: string; message?: string }).message || 
+                    String(err);
         this.lastError = `Connection error: ${msg}`;
       }
 
@@ -321,15 +322,24 @@ export class TelegramService {
     }
   }
 
+  /**
+   * Execute a Telegram API call with automatic retry on network errors
+   */
+  private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    return retryWithBackoff(fn, { maxAttempts: 3, initialDelayMs: 1000 });
+  }
+
   async getMe(): Promise<{ id: string; username?: string; firstName?: string }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const me = await this.client.getMe();
-    const user = me as Api.User;
-    return {
-      id: user.id.toString(),
-      username: user.username ?? undefined,
-      firstName: user.firstName ?? undefined,
-    };
+    return this.withRetry(async () => {
+      const me = await this.client!.getMe();
+      const user = me as Api.User;
+      return {
+        id: user.id.toString(),
+        username: user.username ?? undefined,
+        firstName: user.firstName ?? undefined,
+      };
+    });
   }
 
   async sendMessage(
@@ -340,28 +350,30 @@ export class TelegramService {
     topicId?: number,
   ): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const resolved = await this.resolvePeer(chatId);
-    if (topicId) {
-      // Forum topics require raw API call with InputReplyToMessage
-      const peer = await this.client.getInputEntity(resolved);
-      await this.client.invoke(
-        new Api.messages.SendMessage({
-          peer,
-          message: text,
-          randomId: bigInt(Math.floor(Math.random() * 1e15)),
-          replyTo: new Api.InputReplyToMessage({
-            replyToMsgId: replyTo ?? topicId,
-            topMsgId: topicId,
+    await this.withRetry(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      if (topicId) {
+        // Forum topics require raw API call with InputReplyToMessage
+        const peer = await this.client!.getInputEntity(resolved);
+        await this.client!.invoke(
+          new Api.messages.SendMessage({
+            peer,
+            message: text,
+            randomId: bigInt(Math.floor(Math.random() * 1e15)),
+            replyTo: new Api.InputReplyToMessage({
+              replyToMsgId: replyTo ?? topicId,
+              topMsgId: topicId,
+            }),
           }),
-        }),
-      );
-    } else {
-      await this.client.sendMessage(resolved, {
-        message: text,
-        ...(replyTo ? { replyTo } : {}),
-        ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
-      });
-    }
+        );
+      } else {
+        await this.client!.sendMessage(resolved, {
+          message: text,
+          ...(replyTo ? { replyTo } : {}),
+          ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
+        });
+      }
+    });
   }
 
   async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
@@ -372,15 +384,17 @@ export class TelegramService {
 
   async downloadMedia(chatId: string, messageId: number, downloadPath: string): Promise<string> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const resolved = await this.resolvePeer(chatId);
-    const messages = await this.client.getMessages(resolved, { ids: [messageId] });
-    const message = messages[0];
-    if (!message) throw new Error(`Message ${messageId} not found`);
-    if (!message.media) throw new Error(`Message ${messageId} has no media`);
-    const buffer = await this.client.downloadMedia(message);
-    if (!buffer) throw new Error("Failed to download media");
-    await writeFile(downloadPath, buffer as Buffer);
-    return downloadPath;
+    return this.withRetry(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const messages = await this.client!.getMessages(resolved, { ids: [messageId] });
+      const message = messages[0];
+      if (!message) throw new Error(`Message ${messageId} not found`);
+      if (!message.media) throw new Error(`Message ${messageId} has no media`);
+      const buffer = await this.client!.downloadMedia(message);
+      if (!buffer) throw new Error("Failed to download media");
+      await writeFile(downloadPath, buffer as Buffer);
+      return downloadPath;
+    });
   }
 
   async downloadMediaAsBuffer(chatId: string, messageId: number): Promise<{ buffer: Buffer; mimeType: string }> {
@@ -438,25 +452,27 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const fetchLimit = filterType ? limit * 3 : limit;
-    const dialogs = await this.client.getDialogs({ limit: fetchLimit, ...(offsetDate ? { offsetDate } : {}) });
-    const mapped = dialogs.map((d) => {
-      const type = d.isGroup ? "group" : d.isChannel ? "channel" : "private";
-      const isUser = d.entity instanceof Api.User;
-      return {
-        id: d.id?.toString() ?? "",
-        name: d.title ?? d.name ?? "Unknown",
-        type,
-        unreadCount: d.unreadCount,
-        ...(isUser
-          ? { isBot: Boolean((d.entity as Api.User).bot), isContact: Boolean((d.entity as Api.User).contact) }
-          : {}),
-      };
+    return this.withRetry(async () => {
+      const fetchLimit = filterType ? limit * 3 : limit;
+      const dialogs = await this.client!.getDialogs({ limit: fetchLimit, ...(offsetDate ? { offsetDate } : {}) });
+      const mapped = dialogs.map((d) => {
+        const type = d.isGroup ? "group" : d.isChannel ? "channel" : "private";
+        const isUser = d.entity instanceof Api.User;
+        return {
+          id: d.id?.toString() ?? "",
+          name: d.title ?? d.name ?? "Unknown",
+          type,
+          unreadCount: d.unreadCount,
+          ...(isUser
+            ? { isBot: Boolean((d.entity as Api.User).bot), isContact: Boolean((d.entity as Api.User).contact) }
+            : {}),
+        };
+      });
+      if (filterType === "contact_requests") {
+        return mapped.filter((d) => d.type === "private" && d.isContact === false).slice(0, limit);
+      }
+      return filterType ? mapped.filter((d) => d.type === filterType).slice(0, limit) : mapped;
     });
-    if (filterType === "contact_requests") {
-      return mapped.filter((d) => d.type === "private" && d.isContact === false).slice(0, limit);
-    }
-    return filterType ? mapped.filter((d) => d.type === filterType).slice(0, limit) : mapped;
   }
 
   async getUnreadDialogs(limit = 20): Promise<

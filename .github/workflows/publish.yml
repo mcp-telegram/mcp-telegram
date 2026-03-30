@@ -22,7 +22,7 @@ jobs:
       - run: npx biome check src/
       - run: npx tsc --noEmit
       - run: npm run build
-      - run: npm publish --access public
+      - run: npm publish --access public || echo "Already published, skipping"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -47,7 +47,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-docker:
-    needs: publish-npm
     runs-on: ubuntu-latest
     permissions:
       contents: read

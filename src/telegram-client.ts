@@ -18,6 +18,7 @@ const DEFAULT_SESSION_FILE = join(DEFAULT_SESSION_DIR, "session");
 
 const SESSION_STRING_RE = /^[A-Za-z0-9+/=]+$/;
 const MIN_SESSION_LENGTH = 100;
+const NOT_CONNECTED_ERROR = "Not connected. Run telegram-status to check or telegram-login to authenticate.";
 
 function resolveSessionPath(sessionPath?: string): string {
   return sessionPath ?? process.env.TELEGRAM_SESSION_PATH ?? DEFAULT_SESSION_FILE;
@@ -150,7 +151,7 @@ export class TelegramService {
       // Auth revoked — delete invalid session
       if (msg === "AUTH_KEY_UNREGISTERED" || msg === "SESSION_REVOKED" || msg === "USER_DEACTIVATED") {
         await this.clearSession();
-        this.lastError = "Session revoked. Re-login required.";
+        this.lastError = "Session revoked. Run telegram-login to re-authenticate.";
       }
       // Network error — keep session, just report
       else if (
@@ -160,7 +161,7 @@ export class TelegramService {
         msg.includes("ENOTFOUND") ||
         msg.includes("network")
       ) {
-        this.lastError = `Network error: ${msg}. Session preserved, will retry on next call.`;
+        this.lastError = `Network error: ${msg}. Run telegram-status to retry connection.`;
       }
       // Unknown error
       else {
@@ -321,7 +322,7 @@ export class TelegramService {
   }
 
   async getMe(): Promise<{ id: string; username?: string; firstName?: string }> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const me = await this.client.getMe();
     const user = me as Api.User;
     return {
@@ -338,7 +339,7 @@ export class TelegramService {
     parseMode?: "md" | "html",
     topicId?: number,
   ): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     if (topicId) {
       // Forum topics require raw API call with InputReplyToMessage
@@ -364,13 +365,13 @@ export class TelegramService {
   }
 
   async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     await this.client.sendFile(resolved, { file: filePath, caption });
   }
 
   async downloadMedia(chatId: string, messageId: number, downloadPath: string): Promise<string> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     const messages = await this.client.getMessages(resolved, { ids: [messageId] });
     const message = messages[0];
@@ -383,7 +384,7 @@ export class TelegramService {
   }
 
   async downloadMediaAsBuffer(chatId: string, messageId: number): Promise<{ buffer: Buffer; mimeType: string }> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     const messages = await this.client.getMessages(resolved, { ids: [messageId] });
     const message = messages[0];
@@ -411,13 +412,13 @@ export class TelegramService {
   }
 
   async pinMessage(chatId: string, messageId: number, silent = false): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     await this.client.pinMessage(resolved, messageId, { notify: !silent });
   }
 
   async unpinMessage(chatId: string, messageId: number): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     await this.client.unpinMessage(resolved, messageId);
   }
@@ -436,7 +437,7 @@ export class TelegramService {
       isContact?: boolean;
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const fetchLimit = filterType ? limit * 3 : limit;
     const dialogs = await this.client.getDialogs({ limit: fetchLimit, ...(offsetDate ? { offsetDate } : {}) });
     const mapped = dialogs.map((d) => {
@@ -470,7 +471,7 @@ export class TelegramService {
       topics?: Array<{ id: number; title: string; unreadCount: number }>;
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const dialogs = await this.client.getDialogs({ limit: limit * 3 });
     const unread = dialogs.filter((d) => d.unreadCount > 0).slice(0, limit);
     const results = await Promise.all(
@@ -521,7 +522,7 @@ export class TelegramService {
       lastMessageDate?: number;
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const dialogs = await this.client.getDialogs({ limit: limit * 5 });
     return dialogs
       .filter((d) => {
@@ -545,7 +546,7 @@ export class TelegramService {
   }
 
   async addContact(userId: string, firstName: string, lastName?: string, phone?: string): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.client.getInputEntity(userId);
     await this.client.invoke(
       new Api.contacts.AddContact({
@@ -558,37 +559,37 @@ export class TelegramService {
   }
 
   async blockUser(userId: string): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.client.getInputEntity(userId);
     await this.client.invoke(new Api.contacts.Block({ id: entity }));
   }
 
   async reportSpam(chatId: string): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const peer = await this.client.getInputEntity(chatId);
     await this.client.invoke(new Api.messages.ReportSpam({ peer }));
   }
 
   async markAsRead(chatId: string): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     await this.client.markAsRead(chatId);
   }
 
   async forwardMessage(fromChatId: string, toChatId: string, messageIds: number[]): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolvedFrom = await this.resolvePeer(fromChatId);
     const resolvedTo = await this.resolvePeer(toChatId);
     await this.client.forwardMessages(resolvedTo, { messages: messageIds, fromPeer: resolvedFrom });
   }
 
   async editMessage(chatId: string, messageId: number, newText: string): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     await this.client.editMessage(resolved, { message: messageId, text: newText });
   }
 
   async deleteMessages(chatId: string, messageIds: number[]): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     await this.client.deleteMessages(resolved, messageIds, { revoke: true });
   }
@@ -599,7 +600,7 @@ export class TelegramService {
    */
   // biome-ignore lint: GramJS has no proper entity union type
   async resolveChat(chatId: string): Promise<any> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     // First try direct resolve (numeric ID, username, phone)
     try {
@@ -652,7 +653,7 @@ export class TelegramService {
     isContact?: boolean;
     forum?: boolean;
   }> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.resolveChat(chatId);
     if (entity instanceof Api.User) {
       const parts = [entity.firstName, entity.lastName].filter(Boolean);
@@ -770,7 +771,7 @@ export class TelegramService {
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     const opts: Record<string, unknown> = {
       limit,
@@ -808,7 +809,7 @@ export class TelegramService {
       description?: string;
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const result = await this.client.invoke(new Api.contacts.Search({ q: query, limit }));
     const chats: Array<{
       id: string;
@@ -889,7 +890,7 @@ export class TelegramService {
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const result = await this.client.invoke(
       new Api.messages.SearchGlobal({
         q: query,
@@ -976,7 +977,7 @@ export class TelegramService {
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     const messages = await this.client.getMessages(resolved, {
       search: query,
@@ -1001,7 +1002,7 @@ export class TelegramService {
   }
 
   async getContacts(limit = 50): Promise<Array<{ id: string; name: string; username?: string; phone?: string }>> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const result = await this.client.invoke(new Api.contacts.GetContacts({ hash: bigInt(0) }));
     if (!(result instanceof Api.contacts.Contacts)) return [];
     const contacts: Array<{ id: string; name: string; username?: string; phone?: string }> = [];
@@ -1023,7 +1024,7 @@ export class TelegramService {
     chatId: string,
     limit = 50,
   ): Promise<Array<{ id: string; name: string; username?: string; role: string }>> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.resolveChat(chatId);
 
     if (entity instanceof Api.Channel) {
@@ -1072,7 +1073,7 @@ export class TelegramService {
   }
 
   async getMyRole(chatId: string): Promise<{ role: string; chatId: string; chatName: string }> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.resolveChat(chatId);
     const me = await this.getMe();
 
@@ -1137,7 +1138,7 @@ export class TelegramService {
     businessWorkHours?: string;
     businessLocation?: string;
   }> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.client.getEntity(userId);
     if (!(entity instanceof Api.User)) throw new Error("Entity is not a user");
 
@@ -1203,7 +1204,7 @@ export class TelegramService {
     entityId: string,
     options?: { isBig?: boolean; savePath?: string },
   ): Promise<{ buffer: Buffer; mimeType: string } | { filePath: string } | null> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.client.getEntity(entityId);
 
     const buffer = (await this.client.downloadProfilePhoto(entity, {
@@ -1259,7 +1260,7 @@ export class TelegramService {
     emoji?: string | string[],
     addToExisting = false,
   ): Promise<{ emoji: string; count: number; me: boolean }[] | undefined> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     const peer = await this.client.getInputEntity(resolved);
 
@@ -1317,7 +1318,7 @@ export class TelegramService {
     }[];
     total: number;
   }> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     const peer = await this.client.getInputEntity(resolved);
 
@@ -1387,7 +1388,7 @@ export class TelegramService {
     replyTo?: number,
     parseMode?: "md" | "html",
   ): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     await this.client.sendMessage(resolved, {
       message: text,
@@ -1403,7 +1404,7 @@ export class TelegramService {
     answers: string[],
     options?: { multipleChoice?: boolean; quiz?: boolean; correctAnswer?: number },
   ): Promise<number> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const peer = await this.client.getInputEntity(chatId);
     const pollAnswers = answers.map(
       (text, i) =>
@@ -1457,7 +1458,7 @@ export class TelegramService {
       pinned: boolean;
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.resolveChat(chatId);
     if (!(entity instanceof Api.Channel)) throw new Error("Forum topics are only available in supergroups");
     const result = await this.client.invoke(
@@ -1509,7 +1510,7 @@ export class TelegramService {
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const peer = await this.client.getInputEntity(chatId);
     const result = await this.client.invoke(
       new Api.messages.GetReplies({
@@ -1542,7 +1543,7 @@ export class TelegramService {
 
   /** Check if a chat entity is a forum (has topics enabled) */
   async isForum(chatId: string): Promise<boolean> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     try {
       const entity = await this.resolveChat(chatId);
       if (entity instanceof Api.Channel) {
@@ -1553,7 +1554,7 @@ export class TelegramService {
   }
 
   async joinChat(target: string): Promise<{ id: string; title: string; type: string }> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     // Extract invite hash from various link formats
     const inviteMatch = target.match(/(?:t\.me\/\+|t\.me\/joinchat\/|tg:\/\/join\?invite=)([a-zA-Z0-9_-]+)/);
@@ -1596,7 +1597,7 @@ export class TelegramService {
     forum?: boolean;
     description?: string;
   }): Promise<{ id: string; title: string; type: string; inviteLink?: string }> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const { title, users, supergroup = false, forum = false, description } = options;
 
@@ -1683,7 +1684,7 @@ export class TelegramService {
   }
 
   async inviteToGroup(chatId: string, users: string[]): Promise<{ invited: string[]; failed: string[] }> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const entity = await this.resolveChat(chatId);
     const invited: string[] = [];
@@ -1715,7 +1716,7 @@ export class TelegramService {
   }
 
   async kickUser(chatId: string, userId: string): Promise<void> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const entity = await this.resolveChat(chatId);
     const user = await this.client.getEntity(userId);
@@ -1744,7 +1745,7 @@ export class TelegramService {
   }
 
   async banUser(chatId: string, userId: string): Promise<void> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const entity = await this.resolveChat(chatId);
     const user = await this.client.getEntity(userId);
@@ -1762,7 +1763,7 @@ export class TelegramService {
   }
 
   async unbanUser(chatId: string, userId: string): Promise<void> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const entity = await this.resolveChat(chatId);
     const user = await this.client.getEntity(userId);
@@ -1783,7 +1784,7 @@ export class TelegramService {
     chatId: string,
     options: { title?: string; description?: string; photoPath?: string },
   ): Promise<void> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const entity = await this.resolveChat(chatId);
 
@@ -1816,7 +1817,7 @@ export class TelegramService {
   }
 
   async leaveGroup(chatId: string): Promise<void> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const entity = await this.resolveChat(chatId);
 
@@ -1835,7 +1836,7 @@ export class TelegramService {
   }
 
   async setAdmin(chatId: string, userId: string, options?: { title?: string }): Promise<void> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const entity = await this.resolveChat(chatId);
     if (!(entity instanceof Api.Channel)) throw new Error("Set admin is only supported for supergroups and channels");
@@ -1864,7 +1865,7 @@ export class TelegramService {
   }
 
   async removeAdmin(chatId: string, userId: string): Promise<void> {
-    if (!this.client) throw new Error("Not connected");
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const entity = await this.resolveChat(chatId);
     if (!(entity instanceof Api.Channel))

@@ -18,7 +18,9 @@ const API_ID = Number(process.env.TELEGRAM_API_ID);
 const API_HASH = process.env.TELEGRAM_API_HASH;
 
 if (!API_ID || !API_HASH) {
-  console.error("[mcp-telegram] TELEGRAM_API_ID and TELEGRAM_API_HASH must be set");
+  console.error("[mcp-telegram] Missing TELEGRAM_API_ID and TELEGRAM_API_HASH");
+  console.error("Get your credentials at https://my.telegram.org/apps (API development tools)");
+  console.error("Set them in .env or export as environment variables");
   process.exit(1);
 }
 

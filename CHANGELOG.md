@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-04-01
+
+### Added
+- `TelegramService.setTyping(chatId, action?)` — send typing indicators with 10 action types: `typing`, `cancel`, `record_video`, `upload_video`, `record_audio`, `upload_audio`, `upload_photo`, `upload_document`, `choose_sticker`, `game_play` (#17)
+- `TelegramService.getMessageById(chatId, messageId)` — fetch a single message by ID, returns formatted message object or `null`. Uses GramJS `ids` filter for exact lookup (#17)
+
 ## [1.21.0] - 2026-04-01
 
 ### Added

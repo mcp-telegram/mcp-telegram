@@ -589,6 +589,57 @@ export class TelegramService {
     await this.client.markAsRead(chatId);
   }
 
+  private static TYPING_ACTIONS: Record<string, () => Api.TypeSendMessageAction> = {
+    typing: () => new Api.SendMessageTypingAction(),
+    cancel: () => new Api.SendMessageCancelAction(),
+    record_video: () => new Api.SendMessageRecordVideoAction(),
+    upload_video: () => new Api.SendMessageUploadVideoAction({ progress: 0 }),
+    record_audio: () => new Api.SendMessageRecordAudioAction(),
+    upload_audio: () => new Api.SendMessageUploadAudioAction({ progress: 0 }),
+    upload_photo: () => new Api.SendMessageUploadPhotoAction({ progress: 0 }),
+    upload_document: () => new Api.SendMessageUploadDocumentAction({ progress: 0 }),
+    choose_sticker: () => new Api.SendMessageChooseStickerAction(),
+    game_play: () => new Api.SendMessageGamePlayAction(),
+  };
+
+  async setTyping(chatId: string, action: keyof typeof TelegramService.TYPING_ACTIONS = "typing"): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const factory = TelegramService.TYPING_ACTIONS[action];
+    if (!factory)
+      throw new Error(
+        `Unknown typing action: ${action}. Valid: ${Object.keys(TelegramService.TYPING_ACTIONS).join(", ")}`,
+      );
+    const resolved = await this.resolvePeer(chatId);
+    const peer = await this.client.getInputEntity(resolved);
+    await this.client.invoke(new Api.messages.SetTyping({ peer, action: factory() }));
+  }
+
+  async getMessageById(
+    chatId: string,
+    messageId: number,
+  ): Promise<{
+    id: number;
+    text: string;
+    sender: string;
+    date: string;
+    media?: { type: string; fileName?: string; size?: number };
+    reactions?: { emoji: string; count: number; me: boolean }[];
+  } | null> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const resolved = await this.resolvePeer(chatId);
+    const messages = await this.client.getMessages(resolved, { ids: [messageId] });
+    const m = messages[0];
+    if (!m || m.id !== messageId) return null;
+    return {
+      id: m.id,
+      text: m.message ?? "",
+      sender: await this.resolveSenderName(m.senderId),
+      date: new Date((m.date ?? 0) * 1000).toISOString(),
+      media: this.extractMediaInfo(m.media),
+      reactions: this.extractReactions(m.reactions),
+    };
+  }
+
   async forwardMessage(fromChatId: string, toChatId: string, messageIds: number[]): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolvedFrom = await this.resolvePeer(fromChatId);

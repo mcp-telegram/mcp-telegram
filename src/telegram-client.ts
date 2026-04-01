@@ -66,6 +66,10 @@ export class TelegramService {
     return dirname(this.sessionPath);
   }
 
+  getClient(): TelegramClient | null {
+    return this.client;
+  }
+
   constructor(apiId: number, apiHash: string, options?: { sessionPath?: string }) {
     this.apiId = apiId;
     this.apiHash = apiHash;

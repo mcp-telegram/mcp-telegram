@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-04-01
+
+### Added
+- `TelegramService.getClient()` — public accessor for the underlying GramJS `TelegramClient` instance, enabling event handlers like `NewMessage` for real-time listeners (#17)
+
 ## [1.20.0] - 2026-03-31
 
 ### Added

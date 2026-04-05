@@ -2121,18 +2121,8 @@ export class TelegramService {
       );
 
     const rules: Api.TypeInputPrivacyRule[] = [];
-    if (rule === "everyone") rules.push(new Api.InputPrivacyValueAllowAll());
-    else if (rule === "contacts")
-      rules.push(new Api.InputPrivacyValueAllowContacts(), new Api.InputPrivacyValueDisallowAll());
-    else rules.push(new Api.InputPrivacyValueDisallowAll());
 
-    if (allowUsers?.length) {
-      const entities = await Promise.all(allowUsers.map((u) => this.client!.getEntity(u)));
-      const users = entities
-        .filter((e): e is Api.User => e instanceof Api.User)
-        .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
-      rules.push(new Api.InputPrivacyValueAllowUsers({ users }));
-    }
+    // Exceptions must come before the general rule so they are not shadowed
     if (disallowUsers?.length) {
       const entities = await Promise.all(disallowUsers.map((u) => this.client!.getEntity(u)));
       const users = entities
@@ -2140,6 +2130,18 @@ export class TelegramService {
         .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
       rules.push(new Api.InputPrivacyValueDisallowUsers({ users }));
     }
+    if (allowUsers?.length) {
+      const entities = await Promise.all(allowUsers.map((u) => this.client!.getEntity(u)));
+      const users = entities
+        .filter((e): e is Api.User => e instanceof Api.User)
+        .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
+      rules.push(new Api.InputPrivacyValueAllowUsers({ users }));
+    }
+
+    if (rule === "everyone") rules.push(new Api.InputPrivacyValueAllowAll());
+    else if (rule === "contacts")
+      rules.push(new Api.InputPrivacyValueAllowContacts(), new Api.InputPrivacyValueDisallowAll());
+    else rules.push(new Api.InputPrivacyValueDisallowAll());
 
     await this.client.invoke(new Api.account.SetPrivacy({ key: keyFactory(), rules }));
   }

@@ -27,7 +27,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         let muteUntil: number;
         if (!muted) {
           muteUntil = 0;
-        } else if (duration) {
+        } else if (duration !== undefined && duration > 0) {
           muteUntil = Math.floor(Date.now() / 1000) + duration;
         } else {
           muteUntil = 2147483647;
@@ -113,6 +113,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
 
       try {
         const sessions = await telegram.getActiveSessions();
+        if (sessions.length === 0) return ok("No active sessions");
         const text = sessions
           .map(
             (s) =>
@@ -132,36 +133,37 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
       description:
         "Terminate a specific Telegram session by its hash, or explicitly terminate all other sessions by setting terminateAllOther=true",
       inputSchema: {
-        hash: z
+        sessionId: z
           .string()
           .optional()
-          .describe("Session hash to terminate (from get-sessions). Required when terminateAllOther is false"),
+          .describe("Session hash to terminate (numeric string from get-sessions). Required when terminateAllOther is false")
+          .refine((v) => v === undefined || /^\d+$/.test(v), { message: "sessionId must be a numeric string" }),
         terminateAllOther: z
           .boolean()
           .optional()
-          .describe("Set to true to terminate all other sessions. Cannot be combined with hash"),
+          .describe("Set to true to terminate all other sessions. Cannot be combined with sessionId"),
       },
       annotations: DESTRUCTIVE,
     },
-    async ({ hash, terminateAllOther }) => {
+    async ({ sessionId, terminateAllOther }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
         if (terminateAllOther) {
-          if (hash) {
-            return fail(new Error("Provide either hash or terminateAllOther=true, not both"));
+          if (sessionId) {
+            return fail(new Error("Provide either sessionId or terminateAllOther=true, not both"));
           }
           await telegram.terminateAllOtherSessions();
           return ok("All other sessions terminated");
         }
 
-        if (!hash) {
-          return fail(new Error("Provide hash to terminate a specific session, or set terminateAllOther=true"));
+        if (!sessionId) {
+          return fail(new Error("Provide sessionId to terminate a specific session, or set terminateAllOther=true"));
         }
 
-        await telegram.terminateSession(hash);
-        return ok(`Session ${hash} terminated`);
+        await telegram.terminateSession(sessionId);
+        return ok(`Session ${sessionId} terminated`);
       } catch (e) {
         return fail(e);
       }
@@ -238,20 +240,20 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
         expireDate: z.number().optional().describe("Link expiration as Unix timestamp"),
-        usageLimit: z.number().optional().describe("Max number of users who can join via this link"),
+        memberLimit: z.number().optional().describe("Max number of users who can join via this link"),
         requestApproval: z.boolean().optional().describe("Require admin approval to join"),
         title: z.string().optional().describe("Label for the invite link (only visible to admins)"),
       },
       annotations: WRITE,
     },
-    async ({ chatId, expireDate, usageLimit, requestApproval, title }) => {
+    async ({ chatId, expireDate, memberLimit, requestApproval, title }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
         const link = await telegram.exportInviteLink(chatId, {
           expireDate,
-          usageLimit,
+          usageLimit: memberLimit,
           requestNeeded: requestApproval,
           title,
         });

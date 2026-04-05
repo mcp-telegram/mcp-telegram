@@ -15,9 +15,9 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         duration: z
           .number()
           .int()
-          .nonnegative()
+          .positive()
           .optional()
-          .describe("Mute duration in seconds (only when muted=true). Omit to mute forever"),
+          .describe("Mute duration in seconds (only when muted=true, must be > 0). Omit to mute forever"),
       },
       annotations: WRITE,
     },

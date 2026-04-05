@@ -142,6 +142,26 @@ export function registerContactTools(server: McpServer, telegram: TelegramServic
   );
 
   server.registerTool(
+    "telegram-unblock-user",
+    {
+      description: "Unblock a previously blocked Telegram user",
+      inputSchema: { userId: z.string().describe("User ID or username to unblock") },
+      annotations: WRITE,
+    },
+    async ({ userId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.unblockUser(userId);
+        return ok(`User unblocked: ${userId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "telegram-report-spam",
     {
       description: "Report a chat as spam to Telegram",

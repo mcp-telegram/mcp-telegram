@@ -2004,9 +2004,7 @@ export class TelegramService {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     const peer = await this.client.getInputEntity(resolved);
-    const admin = adminId
-      ? await this.client.getInputEntity(await this.resolvePeer(adminId))
-      : new Api.InputUserSelf();
+    const admin = adminId ? await this.client.getInputEntity(await this.resolvePeer(adminId)) : new Api.InputUserSelf();
     const result = await this.client.invoke(
       new Api.messages.GetExportedChatInvites({
         peer,

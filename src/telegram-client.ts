@@ -2128,14 +2128,18 @@ export class TelegramService {
       const users = entities
         .filter((e): e is Api.User => e instanceof Api.User)
         .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
-      rules.push(new Api.InputPrivacyValueDisallowUsers({ users }));
+      if (users.length > 0) {
+        rules.push(new Api.InputPrivacyValueDisallowUsers({ users }));
+      }
     }
     if (allowUsers?.length) {
       const entities = await Promise.all(allowUsers.map((u) => this.client!.getEntity(u)));
       const users = entities
         .filter((e): e is Api.User => e instanceof Api.User)
         .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
-      rules.push(new Api.InputPrivacyValueAllowUsers({ users }));
+      if (users.length > 0) {
+        rules.push(new Api.InputPrivacyValueAllowUsers({ users }));
+      }
     }
 
     if (rule === "everyone") rules.push(new Api.InputPrivacyValueAllowAll());

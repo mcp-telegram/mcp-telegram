@@ -120,7 +120,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
               `${s.current ? "→ " : "  "}${s.device} (${s.platform}) — ${s.appName} ${s.appVersion}\n    IP: ${s.ip} (${s.country}) | Last active: ${s.dateActive}${s.current ? " [CURRENT]" : ""}\n    Hash: ${s.hash}`,
           )
           .join("\n\n");
-        return ok(text);
+        return ok(sanitize(text));
       } catch (e) {
         return fail(e);
       }

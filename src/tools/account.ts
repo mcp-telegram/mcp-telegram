@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
 import { DESTRUCTIVE, fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
 
+const MUTE_FOREVER_UNTIL = 2147483647; // max 32-bit signed int
+
 export function registerAccountTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
     "telegram-mute-chat",
@@ -32,7 +34,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         } else if (duration !== undefined && duration > 0) {
           muteUntil = Math.floor(Date.now() / 1000) + duration;
         } else {
-          muteUntil = 2147483647;
+          muteUntil = MUTE_FOREVER_UNTIL;
         }
         await telegram.muteChat(chatId, muteUntil);
         const status = !muted
@@ -83,6 +85,8 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         chatId: z.string().describe("Chat ID or username"),
         period: z
           .number()
+          .int()
+          .nonnegative()
           .describe("Auto-delete period in seconds. 0 = disable. Common: 86400 (1d), 604800 (1w), 2592000 (1mo)"),
       },
       annotations: WRITE,
@@ -140,28 +144,28 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
           .optional()
           .describe("Session hash to terminate (numeric string from get-sessions). Required when terminateAllOther is false")
           .refine((v) => v === undefined || /^\d+$/.test(v), { message: "sessionId must be a numeric string" }),
-        terminateAllOther: z
+        terminateAll: z
           .boolean()
           .optional()
           .describe("Set to true to terminate all other sessions. Cannot be combined with sessionId"),
       },
       annotations: DESTRUCTIVE,
     },
-    async ({ sessionId, terminateAllOther }) => {
+    async ({ sessionId, terminateAll }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
-        if (terminateAllOther) {
+        if (terminateAll) {
           if (sessionId) {
-            return fail(new Error("Provide either sessionId or terminateAllOther=true, not both"));
+            return fail(new Error("Provide either sessionId or terminateAll=true, not both"));
           }
           await telegram.terminateAllOtherSessions();
           return ok("All other sessions terminated");
         }
 
         if (!sessionId) {
-          return fail(new Error("Provide sessionId to terminate a specific session, or set terminateAllOther=true"));
+          return fail(new Error("Provide sessionId to terminate a specific session, or set terminateAll=true"));
         }
 
         await telegram.terminateSession(sessionId);

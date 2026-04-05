@@ -2090,10 +2090,25 @@ export class TelegramService {
   async terminateAllOtherSessions(): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const sessions = await this.getActiveSessions();
+    const failures: Array<{ hash: string; error: string }> = [];
     for (const s of sessions) {
       if (!s.current) {
-        await this.client.invoke(new Api.account.ResetAuthorization({ hash: bigInt(s.hash) }));
+        try {
+          await this.client.invoke(new Api.account.ResetAuthorization({ hash: bigInt(s.hash) }));
+        } catch (error) {
+          failures.push({
+            hash: s.hash,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `Failed to terminate ${failures.length} session(s): ${failures
+          .map((f) => `${f.hash} (${f.error})`)
+          .join(", ")}`,
+      );
     }
   }
 

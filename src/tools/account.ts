@@ -8,25 +8,36 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
     "telegram-mute-chat",
     {
       description:
-        "Mute or unmute notifications for a Telegram chat. Use muteUntil=0 to unmute, or a future Unix timestamp to mute until that time. Use 2147483647 to mute forever",
+        "Mute or unmute notifications for a Telegram chat. Set muted=true to mute (optionally with duration in seconds), muted=false to unmute",
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
-        muteUntil: z.number().describe("Unix timestamp to mute until. 0 = unmute, 2147483647 = mute forever"),
+        muted: z.boolean().describe("true to mute, false to unmute"),
+        duration: z
+          .number()
+          .optional()
+          .describe("Mute duration in seconds (only when muted=true). Omit to mute forever"),
       },
       annotations: WRITE,
     },
-    async ({ chatId, muteUntil }) => {
+    async ({ chatId, muted, duration }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
+        let muteUntil: number;
+        if (!muted) {
+          muteUntil = 0;
+        } else if (duration) {
+          muteUntil = Math.floor(Date.now() / 1000) + duration;
+        } else {
+          muteUntil = 2147483647;
+        }
         await telegram.muteChat(chatId, muteUntil);
-        const status =
-          muteUntil === 0
-            ? "unmuted"
-            : muteUntil >= 2147483647
-              ? "muted forever"
-              : `muted until ${new Date(muteUntil * 1000).toISOString()}`;
+        const status = !muted
+          ? "unmuted"
+          : duration
+            ? `muted for ${duration}s`
+            : "muted forever";
         return ok(`Chat ${chatId} ${status}`);
       } catch (e) {
         return fail(e);
@@ -118,26 +129,39 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-terminate-session",
     {
-      description: "Terminate a specific Telegram session by its hash, or terminate all other sessions",
+      description:
+        "Terminate a specific Telegram session by its hash, or explicitly terminate all other sessions by setting terminateAllOther=true",
       inputSchema: {
         hash: z
           .string()
           .optional()
-          .describe("Session hash to terminate (from get-sessions). Omit to terminate ALL other sessions"),
+          .describe("Session hash to terminate (from get-sessions). Required when terminateAllOther is false"),
+        terminateAllOther: z
+          .boolean()
+          .optional()
+          .describe("Set to true to terminate all other sessions. Cannot be combined with hash"),
       },
       annotations: DESTRUCTIVE,
     },
-    async ({ hash }) => {
+    async ({ hash, terminateAllOther }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
-        if (hash) {
-          await telegram.terminateSession(hash);
-          return ok(`Session ${hash} terminated`);
+        if (terminateAllOther) {
+          if (hash) {
+            return fail(new Error("Provide either hash or terminateAllOther=true, not both"));
+          }
+          await telegram.terminateAllOtherSessions();
+          return ok("All other sessions terminated");
         }
-        await telegram.terminateAllOtherSessions();
-        return ok("All other sessions terminated");
+
+        if (!hash) {
+          return fail(new Error("Provide hash to terminate a specific session, or set terminateAllOther=true"));
+        }
+
+        await telegram.terminateSession(hash);
+        return ok(`Session ${hash} terminated`);
       } catch (e) {
         return fail(e);
       }

@@ -2001,11 +2001,10 @@ export class TelegramService {
   ): Promise<Array<{ link: string; title?: string; expired: boolean; revoked: boolean; usageCount: number }>> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
-    const me = await this.client.getMe();
     const result = await this.client.invoke(
       new Api.messages.GetExportedChatInvites({
         peer: resolved,
-        adminId: new Api.InputUser({ userId: me.id, accessHash: (me as Api.User).accessHash ?? bigInt.zero }),
+        adminId: new Api.InputUserSelf(),
         limit,
       }),
     );

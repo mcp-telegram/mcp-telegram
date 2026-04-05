@@ -1980,9 +1980,10 @@ export class TelegramService {
   ): Promise<string> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
+    const peer = await this.client.getInputEntity(resolved);
     const result = await this.client.invoke(
       new Api.messages.ExportChatInvite({
-        peer: resolved,
+        peer,
         expireDate: options?.expireDate,
         usageLimit: options?.usageLimit,
         requestNeeded: options?.requestNeeded,
@@ -2001,9 +2002,10 @@ export class TelegramService {
   ): Promise<Array<{ link: string; title?: string; expired: boolean; revoked: boolean; usageCount: number }>> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
+    const peer = await this.client.getInputEntity(resolved);
     const result = await this.client.invoke(
       new Api.messages.GetExportedChatInvites({
-        peer: resolved,
+        peer,
         adminId: new Api.InputUserSelf(),
         limit,
       }),
@@ -2022,9 +2024,10 @@ export class TelegramService {
   async revokeInviteLink(chatId: string, link: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
+    const peer = await this.client.getInputEntity(resolved);
     await this.client.invoke(
       new Api.messages.EditExportedChatInvite({
-        peer: resolved,
+        peer,
         link,
         revoked: true,
       }),
@@ -2051,7 +2054,8 @@ export class TelegramService {
   async setAutoDelete(chatId: string, period: number): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
-    await this.client.invoke(new Api.messages.SetHistoryTTL({ peer: resolved, period }));
+    const peer = await this.client.getInputEntity(resolved);
+    await this.client.invoke(new Api.messages.SetHistoryTTL({ peer, period }));
   }
 
   async getActiveSessions(): Promise<

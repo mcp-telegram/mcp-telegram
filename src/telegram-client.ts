@@ -2275,9 +2275,7 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const result = await this.client.invoke(
-      new Api.messages.GetAllStickers({ hash: bigInt(0) }),
-    );
+    const result = await this.client.invoke(new Api.messages.GetAllStickers({ hash: bigInt(0) }));
     if (result instanceof Api.messages.AllStickersNotModified) {
       return [];
     }
@@ -2300,9 +2298,7 @@ export class TelegramService {
       // Get the sticker set to find the document
       const stickerSet = await this.getStickerSet(stickerSetShortName);
       if (stickerIndex < 0 || stickerIndex >= stickerSet.stickers.length) {
-        throw new Error(
-          `Sticker index ${stickerIndex} out of range (0-${stickerSet.stickers.length - 1})`,
-        );
+        throw new Error(`Sticker index ${stickerIndex} out of range (0-${stickerSet.stickers.length - 1})`);
       }
       const sticker = stickerSet.stickers[stickerIndex];
       const resolved = await this.resolvePeer(chatId);
@@ -2317,13 +2313,9 @@ export class TelegramService {
     }, `sendSticker to ${chatId}`);
   }
 
-  async getRecentStickers(): Promise<
-    Array<{ id: string; accessHash: string; emoji: string }>
-  > {
+  async getRecentStickers(): Promise<Array<{ id: string; accessHash: string; emoji: string }>> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const result = await this.client.invoke(
-      new Api.messages.GetRecentStickers({ hash: bigInt(0) }),
-    );
+    const result = await this.client.invoke(new Api.messages.GetRecentStickers({ hash: bigInt(0) }));
     if (result instanceof Api.messages.RecentStickersNotModified) {
       return [];
     }

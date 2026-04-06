@@ -16,5 +16,4 @@ mcp-telegram-darwin-*
 mcp-telegram-windows-*
 mcp-telegram-login-*
 
-# Bun
-
+# Bun (keep bun.lock committed for reproducible builds)

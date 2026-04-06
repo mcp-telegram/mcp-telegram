@@ -18,3 +18,4 @@ mcp-telegram-login-*
 
 # Bun
 
+docs/.vitepress/dist\ndocs/.vitepress/cache

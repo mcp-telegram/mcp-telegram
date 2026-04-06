@@ -28,7 +28,10 @@
     "lint:fix": "biome check --fix src/",
     "format": "biome format --write src/",
     "test": "tsx --test src/**/*.test.ts",
-    "test:watch": "tsx --test --watch src/**/*.test.ts"
+    "test:watch": "tsx --test --watch src/**/*.test.ts",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "mcp",
@@ -63,6 +66,7 @@
     "@types/node": "^25.5.0",
     "@types/qrcode": "^1.5.6",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitepress": "^1.6.4"
   }
 }

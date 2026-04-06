@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![mcp-telegram MCP server](https://glama.ai/mcp/servers/overpod/mcp-telegram/badges/score.svg)](https://glama.ai/mcp/servers/overpod/mcp-telegram)
 
-> **Hosted version available!** Don't want to self-host? Use [mcp-telegram.com](https://mcp-telegram.com) -- connect Telegram to Claude.ai or ChatGPT in 30 seconds with QR code. No API keys needed.
+> **[📖 Documentation](https://overpod.github.io/mcp-telegram/)** · **[☁️ Cloud version](https://mcp-telegram.com)** — connect Telegram to Claude.ai or ChatGPT in 30 seconds with QR code, no API keys needed.
 
 <p align="center">
   <img src="assets/demo.gif" alt="MCP Telegram demo — connect and summarize chats in Claude" width="700">

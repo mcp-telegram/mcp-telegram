@@ -65,8 +65,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         const lines: string[] = [];
         lines.push(`Found ${sets.length} sticker set(s) for "${query}":\n`);
         for (const set of sets) {
-          const flags = "";
-          lines.push(`• ${set.title}${flags} — ${set.count} stickers`);
+          lines.push(`• ${set.title} — ${set.count} stickers`);
           lines.push(`  Short name: ${set.shortName}`);
         }
         lines.push("");
@@ -98,8 +97,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         const lines: string[] = [];
         lines.push(`${sets.length} installed sticker set(s):\n`);
         for (const set of sets) {
-          const flags = "";
-          lines.push(`• ${set.title}${flags} — ${set.count} stickers`);
+          lines.push(`• ${set.title} — ${set.count} stickers`);
           lines.push(`  Short name: ${set.shortName}`);
         }
         return ok(sanitize(lines.join("\n")));

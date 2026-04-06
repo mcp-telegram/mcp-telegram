@@ -101,7 +101,7 @@ jobs:
         with:
           bun-version: "1.3.11"
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - name: Compile MCP server binary
         run: bun build src/index.ts --compile --target ${{ matrix.target }} --outfile ${{ matrix.server }}

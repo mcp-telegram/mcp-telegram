@@ -132,7 +132,7 @@ mcp-telegram login    # QR login
 
 ### Pre-built binary (no runtime needed)
 
-Download from [Releases](https://github.com/overpod/mcp-telegram/releases) — single-file binaries, zero dependencies:
+Download from [Releases](https://github.com/overpod/mcp-telegram/releases) — standalone single-file binaries, zero dependencies:
 
 | Platform | Server | Login CLI |
 |----------|--------|-----------|

@@ -2189,4 +2189,149 @@ export class TelegramService {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     await this.client.invoke(new Api.account.UpdateUsername({ username }));
   }
+
+  // ─── Stickers ──────────────────────────────────────────────
+
+  async getStickerSet(shortName: string): Promise<{
+    title: string;
+    shortName: string;
+    count: number;
+    stickers: Array<{
+      id: string;
+      accessHash: string;
+      emoji: string;
+    }>;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(
+      new Api.messages.GetStickerSet({
+        stickerset: new Api.InputStickerSetShortName({ shortName }),
+        hash: 0,
+      }),
+    );
+    if (result instanceof Api.messages.StickerSetNotModified) {
+      throw new Error("Sticker set was not modified");
+    }
+    const set = result.set;
+    const packs = result.packs;
+    // Build emoji map: document id -> emoji
+    const emojiMap = new Map<string, string>();
+    for (const pack of packs) {
+      for (const docId of pack.documents) {
+        emojiMap.set(docId.toString(), pack.emoticon);
+      }
+    }
+    return {
+      title: set.title,
+      shortName: set.shortName,
+      count: set.count,
+      stickers: result.documents.map((doc) => ({
+        id: (doc as Api.Document).id.toString(),
+        accessHash: (doc as Api.Document).accessHash.toString(),
+        emoji: emojiMap.get((doc as Api.Document).id.toString()) || "",
+      })),
+    };
+  }
+
+  async searchStickerSets(query: string): Promise<
+    Array<{
+      title: string;
+      shortName: string;
+      count: number;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(
+      new Api.messages.SearchStickerSets({
+        q: query,
+        hash: bigInt(0),
+      }),
+    );
+    if (result instanceof Api.messages.FoundStickerSetsNotModified) {
+      return [];
+    }
+    return result.sets.map((covered) => {
+      const set = covered.set;
+      return {
+        title: set.title,
+        shortName: set.shortName,
+        count: set.count,
+      };
+    });
+  }
+
+  async getInstalledStickerSets(): Promise<
+    Array<{
+      title: string;
+      shortName: string;
+      count: number;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(new Api.messages.GetAllStickers({ hash: bigInt(0) }));
+    if (result instanceof Api.messages.AllStickersNotModified) {
+      return [];
+    }
+    return result.sets.map((set) => ({
+      title: set.title,
+      shortName: set.shortName,
+      count: set.count,
+    }));
+  }
+
+  async sendSticker(
+    chatId: string,
+    stickerSetShortName: string,
+    stickerIndex: number,
+    replyTo?: number,
+  ): Promise<Api.Message | Api.UpdateShortSentMessage | undefined> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return await this.rateLimiter.execute(async () => {
+      if (!Number.isInteger(stickerIndex)) {
+        throw new Error(`Sticker index must be an integer, got ${stickerIndex}`);
+      }
+      // Fetch raw sticker set to get the actual Api.Document with valid fileReference
+      const rawResult = await this.client?.invoke(
+        new Api.messages.GetStickerSet({
+          stickerset: new Api.InputStickerSetShortName({ shortName: stickerSetShortName }),
+          hash: 0,
+        }),
+      );
+      if (!rawResult || rawResult instanceof Api.messages.StickerSetNotModified) {
+        throw new Error("Sticker set not found");
+      }
+      const stickerSet = rawResult as Api.messages.StickerSet;
+      if (stickerIndex < 0 || stickerIndex >= stickerSet.documents.length) {
+        throw new Error(`Sticker index ${stickerIndex} out of range (0-${stickerSet.documents.length - 1})`);
+      }
+      const sticker = stickerSet.documents[stickerIndex];
+      if (!(sticker instanceof Api.Document)) {
+        throw new Error("Selected sticker is not a valid document");
+      }
+      const resolved = await this.resolvePeer(chatId);
+      return await this.client?.sendFile(resolved, {
+        file: sticker,
+        ...(replyTo ? { replyTo } : {}),
+      });
+    }, `sendSticker to ${chatId}`);
+  }
+
+  async getRecentStickers(): Promise<Array<{ id: string; accessHash: string; emoji: string }>> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(new Api.messages.GetRecentStickers({ hash: bigInt(0) }));
+    if (result instanceof Api.messages.RecentStickersNotModified) {
+      return [];
+    }
+    const emojiMap = new Map<string, string>();
+    for (const pack of result.packs) {
+      for (const docId of pack.documents) {
+        emojiMap.set(docId.toString(), pack.emoticon);
+      }
+    }
+    return result.stickers.map((doc) => ({
+      id: (doc as Api.Document).id.toString(),
+      accessHash: (doc as Api.Document).accessHash.toString(),
+      emoji: emojiMap.get((doc as Api.Document).id.toString()) || "",
+    }));
+  }
 }

@@ -8,6 +8,7 @@ import { registerExtraTools } from "./extras.js";
 import { registerMediaTools } from "./media.js";
 import { registerMessageTools } from "./messages.js";
 import { registerReactionTools } from "./reactions.js";
+import { registerStickerTools } from "./stickers.js";
 
 export function registerTools(server: McpServer, telegram: TelegramService) {
   registerAuthTools(server, telegram);
@@ -18,4 +19,5 @@ export function registerTools(server: McpServer, telegram: TelegramService) {
   registerReactionTools(server, telegram);
   registerExtraTools(server, telegram);
   registerAccountTools(server, telegram);
+  registerStickerTools(server, telegram);
 }

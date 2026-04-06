@@ -159,7 +159,7 @@ export default defineConfig({
       {
         rel: "icon",
         type: "image/svg+xml",
-        href: "/mcp-telegram/logo.svg",
+        href: "/logo.svg",
       },
     ],
     [

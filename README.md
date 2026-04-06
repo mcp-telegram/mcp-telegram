@@ -130,6 +130,31 @@ mcp-telegram          # run server
 mcp-telegram login    # QR login
 ```
 
+### Pre-built binary (no runtime needed)
+
+Download from [Releases](https://github.com/overpod/mcp-telegram/releases) — single file, zero dependencies:
+
+| Platform | Server | Login CLI |
+|----------|--------|-----------|
+| Linux x64 | `mcp-telegram-linux-x64` | `mcp-telegram-login-linux-x64` |
+| Linux ARM64 | `mcp-telegram-linux-arm64` | `mcp-telegram-login-linux-arm64` |
+| macOS x64 | `mcp-telegram-darwin-x64` | `mcp-telegram-login-darwin-x64` |
+| macOS ARM64 | `mcp-telegram-darwin-arm64` | `mcp-telegram-login-darwin-arm64` |
+| Windows x64 | `mcp-telegram-windows-x64.exe` | `mcp-telegram-login-windows-x64.exe` |
+
+```bash
+# Download (example for Linux x64)
+curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
+curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
+chmod +x mcp-telegram mcp-telegram-login
+
+# Login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
+
+# Run
+./mcp-telegram
+```
+
 ### From source
 
 ```bash
@@ -207,6 +232,24 @@ claude mcp add telegram -s user \
 5. Ask Claude: **"Run telegram-status"** to verify the connection.
 
 > **Note**: No terminal required! Login works entirely through Claude Desktop.
+
+### Claude Desktop (Binary)
+
+Same setup, but using the pre-built binary instead of npx:
+
+```json
+{
+  "mcpServers": {
+    "telegram": {
+      "command": "/path/to/mcp-telegram",
+      "env": {
+        "TELEGRAM_API_ID": "YOUR_ID",
+        "TELEGRAM_API_HASH": "YOUR_HASH"
+      }
+    }
+  }
+}
+```
 
 ### Claude Desktop (Docker)
 

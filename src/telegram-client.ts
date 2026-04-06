@@ -2196,8 +2196,6 @@ export class TelegramService {
     title: string;
     shortName: string;
     count: number;
-    animated: boolean;
-    video: boolean;
     stickers: Array<{
       id: string;
       accessHash: string;
@@ -2212,7 +2210,7 @@ export class TelegramService {
       }),
     );
     if (result instanceof Api.messages.StickerSetNotModified) {
-      throw new Error("Sticker set not found");
+      throw new Error("Sticker set was not modified");
     }
     const set = result.set;
     const packs = result.packs;
@@ -2227,8 +2225,6 @@ export class TelegramService {
       title: set.title,
       shortName: set.shortName,
       count: set.count,
-      animated: !!set.animated,
-      video: !!set.videos,
       stickers: result.documents.map((doc) => ({
         id: (doc as Api.Document).id.toString(),
         accessHash: (doc as Api.Document).accessHash.toString(),
@@ -2242,7 +2238,6 @@ export class TelegramService {
       title: string;
       shortName: string;
       count: number;
-      animated: boolean;
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -2261,7 +2256,6 @@ export class TelegramService {
         title: set.title,
         shortName: set.shortName,
         count: set.count,
-        animated: !!set.animated,
       };
     });
   }
@@ -2271,7 +2265,6 @@ export class TelegramService {
       title: string;
       shortName: string;
       count: number;
-      animated: boolean;
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -2283,7 +2276,6 @@ export class TelegramService {
       title: set.title,
       shortName: set.shortName,
       count: set.count,
-      animated: !!set.animated,
     }));
   }
 
@@ -2295,19 +2287,29 @@ export class TelegramService {
   ): Promise<Api.Message | Api.UpdateShortSentMessage | undefined> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     return await this.rateLimiter.execute(async () => {
-      // Get the sticker set to find the document
-      const stickerSet = await this.getStickerSet(stickerSetShortName);
-      if (stickerIndex < 0 || stickerIndex >= stickerSet.stickers.length) {
-        throw new Error(`Sticker index ${stickerIndex} out of range (0-${stickerSet.stickers.length - 1})`);
+      if (!Number.isInteger(stickerIndex)) {
+        throw new Error(`Sticker index must be an integer, got ${stickerIndex}`);
       }
-      const sticker = stickerSet.stickers[stickerIndex];
+      // Fetch raw sticker set to get the actual Api.Document with valid fileReference
+      const rawResult = await this.client?.invoke(
+        new Api.messages.GetStickerSet({
+          stickerset: new Api.InputStickerSetShortName({ shortName: stickerSetShortName }),
+          hash: 0,
+        }),
+      );
+      if (rawResult instanceof Api.messages.StickerSetNotModified) {
+        throw new Error("Sticker set was not modified");
+      }
+      if (stickerIndex < 0 || stickerIndex >= rawResult.documents.length) {
+        throw new Error(`Sticker index ${stickerIndex} out of range (0-${rawResult.documents.length - 1})`);
+      }
+      const sticker = rawResult.documents[stickerIndex];
+      if (!(sticker instanceof Api.Document)) {
+        throw new Error("Selected sticker is not a valid document");
+      }
       const resolved = await this.resolvePeer(chatId);
       return await this.client?.sendFile(resolved, {
-        file: new Api.InputDocument({
-          id: bigInt(sticker.id),
-          accessHash: bigInt(sticker.accessHash),
-          fileReference: Buffer.alloc(0),
-        }),
+        file: sticker,
         ...(replyTo ? { replyTo } : {}),
       });
     }, `sendSticker to ${chatId}`);

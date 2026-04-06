@@ -1,14 +1,14 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
 
 export function registerStickerTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
     "telegram-get-sticker-set",
     {
       description:
-        "Get all stickers from a sticker set by its short name. Returns each sticker with index, emoji, and ID. Use the index with telegram-send-sticker to send a specific sticker",
+        "Get all stickers from a sticker set by its short name. Returns each sticker with index and emoji. Use the index with telegram-send-sticker to send a specific sticker",
       inputSchema: {
         shortName: z
           .string()
@@ -26,7 +26,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         const set = await telegram.getStickerSet(shortName);
         const lines: string[] = [];
         lines.push(`📦 ${set.title} (${set.shortName})`);
-        lines.push(`${set.count} stickers${set.animated ? " • animated" : ""}${set.video ? " • video" : ""}`);
+        lines.push(`${set.count} stickers`);
         lines.push("");
 
         for (let i = 0; i < set.stickers.length; i++) {
@@ -36,7 +36,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
 
         lines.push("");
         lines.push(`Send a sticker: telegram-send-sticker(chatId, stickerSet="${set.shortName}", index=N)`);
-        return ok(lines.join("\n"));
+        return ok(sanitize(lines.join("\n")));
       } catch (e) {
         return fail(e);
       }
@@ -65,13 +65,13 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         const lines: string[] = [];
         lines.push(`Found ${sets.length} sticker set(s) for "${query}":\n`);
         for (const set of sets) {
-          const flags = set.animated ? " (animated)" : "";
+          const flags = "";
           lines.push(`• ${set.title}${flags} — ${set.count} stickers`);
           lines.push(`  Short name: ${set.shortName}`);
         }
         lines.push("");
         lines.push("Use telegram-get-sticker-set(shortName) to see individual stickers.");
-        return ok(lines.join("\n"));
+        return ok(sanitize(lines.join("\n")));
       } catch (e) {
         return fail(e);
       }
@@ -98,11 +98,11 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         const lines: string[] = [];
         lines.push(`${sets.length} installed sticker set(s):\n`);
         for (const set of sets) {
-          const flags = set.animated ? " (animated)" : "";
+          const flags = "";
           lines.push(`• ${set.title}${flags} — ${set.count} stickers`);
           lines.push(`  Short name: ${set.shortName}`);
         }
-        return ok(lines.join("\n"));
+        return ok(sanitize(lines.join("\n")));
       } catch (e) {
         return fail(e);
       }
@@ -117,8 +117,12 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
         stickerSet: z.string().describe("Short name of the sticker set (e.g. 'HotCherry')"),
-        index: z.number().describe("Index of the sticker in the set (0-based, get from telegram-get-sticker-set)"),
-        replyTo: z.number().optional().describe("Message ID to reply to"),
+        index: z
+          .number()
+          .int()
+          .nonnegative()
+          .describe("Index of the sticker in the set (0-based, get from telegram-get-sticker-set)"),
+        replyTo: z.number().int().optional().describe("Message ID to reply to"),
       },
       annotations: WRITE,
     },
@@ -138,7 +142,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-get-recent-stickers",
     {
-      description: "Get recently used stickers. Returns sticker IDs and associated emojis",
+      description: "Get recently used stickers. Returns each sticker with its list index and associated emoji",
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -156,7 +160,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         for (let i = 0; i < stickers.length; i++) {
           lines.push(`[${i}] ${stickers[i].emoji}`);
         }
-        return ok(lines.join("\n"));
+        return ok(sanitize(lines.join("\n")));
       } catch (e) {
         return fail(e);
       }

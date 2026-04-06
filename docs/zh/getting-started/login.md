@@ -1,13 +1,11 @@
 # 二维码登录
 
-MCP Telegram 使用**二维码认证** — 无需手机号。您只需用 Telegram 应用扫描二维码，就像连接桌面客户端一样。
+MCP Telegram 使用**二维码认证** — 无需手机号。
 
-## 终端登录
-
-运行登录命令：
+## 使用二进制文件登录
 
 ```bash
-TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 终端将显示二维码：
@@ -18,9 +16,15 @@ TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram lo
 
 会话保存在 `~/.mcp-telegram/session`，自动复用。只需登录一次。
 
+## 使用 npx 登录
+
+```bash
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
+```
+
 ## 通过 Claude Desktop 登录
 
-如果使用 Claude Desktop，无需终端：
+无需终端：
 
 1. 将 MCP 服务器添加到配置（见 [Claude Desktop 设置](/zh/platforms/claude-desktop)）
 2. 重启 Claude Desktop
@@ -31,24 +35,22 @@ TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram lo
 
 ## 验证连接
 
-登录后，让助手执行 `telegram-status` 验证。应返回您的账户信息。
+登录后，让助手执行 `telegram-status` 验证。
 
 ## 自定义会话路径
 
-默认会话存储在 `~/.mcp-telegram/session`。使用其他位置：
-
 ```bash
-TELEGRAM_SESSION_PATH=/path/to/session npx @overpod/mcp-telegram login
+TELEGRAM_SESSION_PATH=/path/to/session ./mcp-telegram-login
 ```
 
-这在[使用多个账户](/zh/guides/multiple-accounts)时很有用。
+在[使用多个账户](/zh/guides/multiple-accounts)时很有用。
 
 ## 会话安全
 
 - 会话文件权限为 `0600`（仅所有者可访问）
 - 会话目录权限为 `0700`
-- 会话提供对您 Telegram 账户的完全访问 — 请像对待密码一样保管
-- 每个进程一个会话 — 在多个进程中使用同一会话文件会导致 `AUTH_KEY_DUPLICATED` 错误
+- 会话提供完全访问权限 — 请像对待密码一样保管
+- 每个进程一个会话 — 多进程使用同一会话导致 `AUTH_KEY_DUPLICATED` 错误
 
 ## 下一步
 

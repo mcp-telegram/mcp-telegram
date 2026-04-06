@@ -6,9 +6,22 @@ ChatGPT supports MCP servers through its desktop app.
 
 1. Open **ChatGPT Desktop** settings
 2. Navigate to the MCP/tools section
-3. Add MCP Telegram with the same configuration:
+3. Add MCP Telegram:
 
-```json
+::: code-group
+```json [Binary (recommended)]
+{
+  "telegram": {
+    "command": "/path/to/mcp-telegram",
+    "env": {
+      "TELEGRAM_API_ID": "YOUR_ID",
+      "TELEGRAM_API_HASH": "YOUR_HASH"
+    }
+  }
+}
+```
+
+```json [npx (requires Node.js)]
 {
   "telegram": {
     "command": "npx",
@@ -20,6 +33,7 @@ ChatGPT supports MCP servers through its desktop app.
   }
 }
 ```
+:::
 
 4. [Login via terminal first](/getting-started/login)
 5. Restart ChatGPT Desktop

@@ -1,8 +1,17 @@
 # Claude Code (CLI)
 
-## 设置
+## 使用二进制文件设置（推荐）
 
-一条命令添加 MCP Telegram：
+```bash
+claude mcp add telegram -s user \\
+  -e TELEGRAM_API_ID=YOUR_ID \\
+  -e TELEGRAM_API_HASH=YOUR_HASH \\
+  -- /path/to/mcp-telegram
+```
+
+完成！无需 Node.js。
+
+## 使用 npx（替代方案）
 
 ```bash
 claude mcp add telegram -s user \\
@@ -11,21 +20,13 @@ claude mcp add telegram -s user \\
   -- npx @overpod/mcp-telegram
 ```
 
-完成！`-s user` 使其在所有项目中可用。
-
 ## 登录
 
-如果尚未登录：
-
 ```bash
-TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
-在 Telegram 中扫描二维码（**设置 → 设备 → 连接桌面设备**）。
-
-## 验证
-
-让 Claude：*"执行 telegram-status"* — 应返回您的账户信息。
+在 Telegram 中扫描二维码。
 
 ## 试试看
 

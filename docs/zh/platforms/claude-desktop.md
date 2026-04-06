@@ -1,12 +1,61 @@
 # Claude Desktop
 
-## 设置
+## 使用二进制文件设置（推荐）
 
-1. 打开 Claude Desktop 配置文件：
+1. [下载二进制文件](/zh/getting-started/installation)。
+
+2. 打开 Claude Desktop 配置文件：
    - **macOS：** `~/Library/Application Support/Claude/claude_desktop_config.json`
    - **Windows：** `%APPDATA%\\Claude\\claude_desktop_config.json`
 
-2. 添加 Telegram 服务器：
+3. 添加 Telegram 服务器（使用二进制文件的完整路径）：
+
+::: code-group
+```json [macOS / Linux]
+{
+  "mcpServers": {
+    "telegram": {
+      "command": "/path/to/mcp-telegram",
+      "env": {
+        "TELEGRAM_API_ID": "YOUR_ID",
+        "TELEGRAM_API_HASH": "YOUR_HASH"
+      }
+    }
+  }
+}
+```
+
+```json [Windows]
+{
+  "mcpServers": {
+    "telegram": {
+      "command": "C:\\path\\to\\mcp-telegram-windows-x64.exe",
+      "env": {
+        "TELEGRAM_API_ID": "YOUR_ID",
+        "TELEGRAM_API_HASH": "YOUR_HASH"
+      }
+    }
+  }
+}
+```
+:::
+
+4. **重启 Claude Desktop**。
+
+5. 在 MCP 工具列表中可以看到 "telegram"。
+
+## 登录
+
+直接通过 Claude Desktop 登录：
+
+1. 让 Claude：**"执行 telegram-login"**
+2. 如果图片不可见，它保存在 `~/.mcp-telegram/qr-login.png`
+3. 在 Telegram 中扫描
+4. **"执行 telegram-status"** 验证
+
+## 使用 npx（替代方案）
+
+如果已安装 Node.js 18+：
 
 ```json
 {
@@ -22,59 +71,6 @@
   }
 }
 ```
-
-3. **重启 Claude Desktop**（完全退出后重新打开）。
-
-4. 您应该能在 MCP 工具列表中看到 "telegram"（聊天输入框中的 🔧 图标）。
-
-## 登录
-
-可以直接通过 Claude Desktop 登录 — 无需终端：
-
-1. 让 Claude：**"执行 telegram-login"**
-2. 将生成二维码。如果图片不可见，它保存在 `~/.mcp-telegram/qr-login.png`
-3. 在 Telegram 中扫描（**设置 → 设备 → 连接桌面设备**）
-4. 让 Claude：**"执行 telegram-status"** 验证
-
-## 使用二进制文件
-
-```json
-{
-  "mcpServers": {
-    "telegram": {
-      "command": "/path/to/mcp-telegram",
-      "env": {
-        "TELEGRAM_API_ID": "YOUR_ID",
-        "TELEGRAM_API_HASH": "YOUR_HASH"
-      }
-    }
-  }
-}
-```
-
-## 使用 Docker
-
-1. 先[通过终端登录](/zh/getting-started/login)
-2. 添加到配置：
-
-```json
-{
-  "mcpServers": {
-    "telegram": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "TELEGRAM_API_ID=YOUR_ID",
-        "-e", "TELEGRAM_API_HASH=YOUR_HASH",
-        "-v", "~/.mcp-telegram:/root/.mcp-telegram",
-        "mcp-telegram"
-      ]
-    }
-  }
-}
-```
-
-3. 重启 Claude Desktop。
 
 ## 试试看
 

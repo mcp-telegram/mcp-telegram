@@ -1,13 +1,11 @@
 # Вход по QR-коду
 
-MCP Telegram использует **аутентификацию по QR-коду** — номер телефона не нужен. Вы сканируете код в приложении Telegram, как при подключении десктопного клиента.
+MCP Telegram использует **аутентификацию по QR-коду** — номер телефона не нужен.
 
-## Вход через терминал
-
-Запустите команду:
+## Вход через бинарник
 
 ```bash
-TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 В терминале появится QR-код:
@@ -17,6 +15,12 @@ TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram lo
 3. Отсканируйте QR-код
 
 Сессия сохраняется в `~/.mcp-telegram/session` и используется автоматически. Вход нужен только один раз.
+
+## Вход через npx
+
+```bash
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
+```
 
 ## Вход через Claude Desktop
 
@@ -31,14 +35,12 @@ TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram lo
 
 ## Проверка подключения
 
-После входа проверьте, что всё работает — попросите ассистента выполнить `telegram-status`. Он должен вернуть информацию о вашем аккаунте.
+После входа попросите ассистента выполнить `telegram-status` — должна вернуться информация о вашем аккаунте.
 
 ## Пользовательский путь к сессии
 
-По умолчанию сессия хранится в `~/.mcp-telegram/session`. Для другого расположения:
-
 ```bash
-TELEGRAM_SESSION_PATH=/path/to/session npx @overpod/mcp-telegram login
+TELEGRAM_SESSION_PATH=/path/to/session ./mcp-telegram-login
 ```
 
 Это полезно при [использовании нескольких аккаунтов](/ru/guides/multiple-accounts).
@@ -47,8 +49,8 @@ TELEGRAM_SESSION_PATH=/path/to/session npx @overpod/mcp-telegram login
 
 - Файл сессии имеет права `0600` (доступ только владельцу)
 - Директория сессии имеет права `0700`
-- Сессия даёт полный доступ к вашему аккаунту Telegram — обращайтесь как с паролем
-- Одна сессия на процесс — использование одного файла сессии в нескольких процессах вызывает ошибку `AUTH_KEY_DUPLICATED`
+- Сессия даёт полный доступ к вашему аккаунту — обращайтесь как с паролем
+- Одна сессия на процесс — использование одного файла в нескольких процессах вызывает `AUTH_KEY_DUPLICATED`
 
 ## Следующий шаг
 

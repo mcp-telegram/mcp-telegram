@@ -2,12 +2,10 @@
 
 MCP Telegram uses **QR code authentication** — no phone number needed. You scan a code with your Telegram app, just like linking a desktop client.
 
-## Terminal Login
-
-Run the login command:
+## Login with Binary
 
 ```bash
-TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 A QR code will appear in the terminal:
@@ -17,6 +15,12 @@ A QR code will appear in the terminal:
 3. Scan the QR code
 
 The session is saved to `~/.mcp-telegram/session` and reused automatically. You only need to login once.
+
+## Login with npx
+
+```bash
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
+```
 
 ## Login via Claude Desktop
 
@@ -28,12 +32,6 @@ If you're using Claude Desktop, you don't need a terminal at all:
 4. A QR code image will be generated
 5. If the image isn't visible in Claude, it's saved to `~/.mcp-telegram/qr-login.png`
 6. Scan it in Telegram (**Settings → Devices → Link Desktop Device**)
-
-## Login with Binary
-
-```bash
-TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
-```
 
 ## Verify Connection
 
@@ -48,7 +46,7 @@ After login, verify everything works:
 By default, the session is stored in `~/.mcp-telegram/session`. To use a different location:
 
 ```bash
-TELEGRAM_SESSION_PATH=/path/to/session npx @overpod/mcp-telegram login
+TELEGRAM_SESSION_PATH=/path/to/session ./mcp-telegram-login
 ```
 
 This is useful for [running multiple accounts](/guides/multiple-accounts).

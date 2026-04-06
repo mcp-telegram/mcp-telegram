@@ -9,12 +9,15 @@ hero:
       text: 快速开始
       link: /zh/getting-started/credentials
     - theme: alt
-      text: GitHub
-      link: https://github.com/overpod/mcp-telegram
+      text: 下载二进制文件
+      link: https://github.com/overpod/mcp-telegram/releases/latest
     - theme: alt
       text: 云版本
       link: https://mcp-telegram.com
 features:
+  - icon: 📦
+    title: 单文件，零依赖
+    details: 下载一个文件即可运行。无需 Node.js、npm 或包管理器。支持 Linux、macOS 和 Windows。
   - icon: ⚡
     title: MTProto 协议
     details: 通过 GramJS 直接访问 Telegram 原生协议。完整的个人账户功能 — 无机器人限制。
@@ -27,13 +30,46 @@ features:
   - icon: 📱
     title: 二维码登录
     details: 无需手机号。用 Telegram 应用扫描二维码即可。会话在重启后保持。
-  - icon: 🗂️
-    title: 论坛和话题
-    details: 完整支持 Telegram 论坛群组 — 列出话题、按话题阅读消息、发送到指定话题。
   - icon: 🔒
     title: 隐私优先
     details: 所有通信直接发送到 Telegram 服务器。无第三方服务。会话以受限权限存储在本地。
 ---
+
+## 快速开始
+
+从 [GitHub Releases](https://github.com/overpod/mcp-telegram/releases/latest) 下载您平台的二进制文件，获取 [API 凭证](/zh/getting-started/credentials)，然后连接：
+
+::: code-group
+```bash [macOS (Apple Silicon)]
+curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
+curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
+chmod +x mcp-telegram mcp-telegram-login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
+```
+
+```bash [macOS (Intel)]
+curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
+curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
+chmod +x mcp-telegram mcp-telegram-login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
+```
+
+```bash [Linux x64]
+curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
+curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
+chmod +x mcp-telegram mcp-telegram-login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
+```
+
+```powershell [Windows]
+# 从 https://github.com/overpod/mcp-telegram/releases/latest 下载
+# mcp-telegram-windows-x64.exe
+# mcp-telegram-login-windows-x64.exe
+$env:TELEGRAM_API_ID="YOUR_ID"; $env:TELEGRAM_API_HASH="YOUR_HASH"; .\mcp-telegram-login-windows-x64.exe
+```
+:::
+
+在 Telegram 中扫描二维码（**设置 → 设备 → 连接桌面设备**），然后[添加到 MCP 客户端](/zh/platforms/claude-desktop)。
 
 ## 使用示例
 
@@ -45,10 +81,8 @@ features:
 
 > **你：** 发送"下午3点开会"到工程师群
 
-> **你：** 我安装了哪些贴纸包？
-
 AI 助手在后台使用 MCP Telegram 工具 — 无需记忆任何命令。
 
 ## 不想自建？
 
-使用**[云版本](https://mcp-telegram.com)** — 30 秒内通过二维码将 Telegram 连接到 Claude.ai 或 ChatGPT。无需 API 密钥、终端或配置。
+使用**[云版本](https://mcp-telegram.com)** — 30 秒内通过二维码连接。无需 API 密钥、终端或配置。

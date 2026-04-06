@@ -3,9 +3,9 @@
 ## 使用二进制文件设置（推荐）
 
 ```bash
-claude mcp add telegram -s user \\
-  -e TELEGRAM_API_ID=YOUR_ID \\
-  -e TELEGRAM_API_HASH=YOUR_HASH \\
+claude mcp add telegram -s user \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
   -- /path/to/mcp-telegram
 ```
 
@@ -14,9 +14,9 @@ claude mcp add telegram -s user \\
 ## 使用 npx（替代方案）
 
 ```bash
-claude mcp add telegram -s user \\
-  -e TELEGRAM_API_ID=YOUR_ID \\
-  -e TELEGRAM_API_HASH=YOUR_HASH \\
+claude mcp add telegram -s user \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
   -- npx @overpod/mcp-telegram
 ```
 

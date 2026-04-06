@@ -6,7 +6,7 @@
 
 2. Open your Claude Desktop config file:
    - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows:** `%APPDATA%\\Claude\\claude_desktop_config.json`
+   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 3. Add the Telegram server (use the full path to where you saved the binary):
 

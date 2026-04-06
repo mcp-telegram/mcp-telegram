@@ -6,7 +6,7 @@
 
 2. Откройте конфигурационный файл Claude Desktop:
    - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows:** `%APPDATA%\\Claude\\claude_desktop_config.json`
+   - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 3. Добавьте сервер Telegram (укажите полный путь к бинарнику):
 

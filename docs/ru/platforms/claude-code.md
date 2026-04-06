@@ -3,9 +3,9 @@
 ## Настройка с бинарником (рекомендуется)
 
 ```bash
-claude mcp add telegram -s user \\
-  -e TELEGRAM_API_ID=YOUR_ID \\
-  -e TELEGRAM_API_HASH=YOUR_HASH \\
+claude mcp add telegram -s user \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
   -- /path/to/mcp-telegram
 ```
 
@@ -14,9 +14,9 @@ claude mcp add telegram -s user \\
 ## Настройка с npx (альтернатива)
 
 ```bash
-claude mcp add telegram -s user \\
-  -e TELEGRAM_API_ID=YOUR_ID \\
-  -e TELEGRAM_API_HASH=YOUR_HASH \\
+claude mcp add telegram -s user \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
   -- npx @overpod/mcp-telegram
 ```
 

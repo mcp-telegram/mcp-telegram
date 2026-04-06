@@ -6,7 +6,7 @@
 
 2. 打开 Claude Desktop 配置文件：
    - **macOS：** `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows：** `%APPDATA%\\Claude\\claude_desktop_config.json`
+   - **Windows：** `%APPDATA%\Claude\claude_desktop_config.json`
 
 3. 添加 Telegram 服务器（使用二进制文件的完整路径）：
 

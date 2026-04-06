@@ -6,13 +6,13 @@
 
 ```bash
 # Рабочий аккаунт
-TELEGRAM_API_ID=ID1 TELEGRAM_API_HASH=HASH1 \\
-  TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-work \\
+TELEGRAM_API_ID=ID1 TELEGRAM_API_HASH=HASH1 \
+  TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-work \
   npx @overpod/mcp-telegram login
 
 # Личный аккаунт
-TELEGRAM_API_ID=ID2 TELEGRAM_API_HASH=HASH2 \\
-  TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-personal \\
+TELEGRAM_API_ID=ID2 TELEGRAM_API_HASH=HASH2 \
+  TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-personal \
   npx @overpod/mcp-telegram login
 ```
 
@@ -21,16 +21,16 @@ TELEGRAM_API_ID=ID2 TELEGRAM_API_HASH=HASH2 \\
 ### Claude Code
 
 ```bash
-claude mcp add telegram-work -s user \\
-  -e TELEGRAM_API_ID=ID1 \\
-  -e TELEGRAM_API_HASH=HASH1 \\
-  -e TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-work \\
+claude mcp add telegram-work -s user \
+  -e TELEGRAM_API_ID=ID1 \
+  -e TELEGRAM_API_HASH=HASH1 \
+  -e TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-work \
   -- npx @overpod/mcp-telegram
 
-claude mcp add telegram-personal -s user \\
-  -e TELEGRAM_API_ID=ID2 \\
-  -e TELEGRAM_API_HASH=HASH2 \\
-  -e TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-personal \\
+claude mcp add telegram-personal -s user \
+  -e TELEGRAM_API_ID=ID2 \
+  -e TELEGRAM_API_HASH=HASH2 \
+  -e TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-personal \
   -- npx @overpod/mcp-telegram
 ```
 

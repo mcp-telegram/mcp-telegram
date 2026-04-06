@@ -3,9 +3,9 @@
 ## Setup with Binary (Recommended)
 
 ```bash
-claude mcp add telegram -s user \\
-  -e TELEGRAM_API_ID=YOUR_ID \\
-  -e TELEGRAM_API_HASH=YOUR_HASH \\
+claude mcp add telegram -s user \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
   -- /path/to/mcp-telegram
 ```
 
@@ -16,9 +16,9 @@ That's it! The `-s user` flag makes it available across all your projects. No No
 If you have Node.js 18+:
 
 ```bash
-claude mcp add telegram -s user \\
-  -e TELEGRAM_API_ID=YOUR_ID \\
-  -e TELEGRAM_API_HASH=YOUR_HASH \\
+claude mcp add telegram -s user \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
   -- npx @overpod/mcp-telegram
 ```
 

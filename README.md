@@ -18,10 +18,14 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 
 ## Features
 
+- **59 tools** -- the most comprehensive Telegram MCP server available
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API
 - **Userbot** -- operates as your personal account, not a bot
-- **Full-featured** -- messaging, reactions, polls, scheduled messages, media, contacts, and more
+- **Full-featured** -- messaging, reactions, polls, scheduled messages, stickers, media, contacts, and more
 - **Forum Topics** -- list topics, read per-topic messages, send to specific topics, per-topic unread counts
+- **Stickers** -- search sticker sets, browse installed/recent stickers, send stickers to any chat
+- **Account management** -- update profile, manage privacy settings, sessions, auto-delete timers
+- **Global search** -- search messages across all chats at once
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
@@ -300,13 +304,31 @@ const telegramMcp = new MCPClient({
 });
 ```
 
-## Tools
+## Tools (59)
 
 All tools are auto-discoverable via MCP — your AI client will see the full list with parameters and descriptions when connected.
 
-**Categories:** authentication, messaging (send, edit, delete, forward, schedule, polls), reading (chats, messages, search, unread), forum topics, group management (create, edit, invite, kick, ban, admin, leave), contacts & moderation, user profiles, reactions, media.
+| Category | Tools |
+|----------|-------|
+| **Auth** | `telegram-status`, `telegram-login` |
+| **Messaging** | `telegram-send-message`, `telegram-edit-message`, `telegram-delete-message`, `telegram-forward-message`, `telegram-send-scheduled` |
+| **Reading** | `telegram-list-chats`, `telegram-read-messages`, `telegram-search-messages`, `telegram-search-global`, `telegram-search-chats`, `telegram-get-unread`, `telegram-mark-as-read` |
+| **Forum Topics** | `telegram-list-topics`, `telegram-read-topic-messages` |
+| **Polls** | `telegram-create-poll` |
+| **Reactions** | `telegram-send-reaction`, `telegram-get-reactions` |
+| **Stickers** | `telegram-send-sticker`, `telegram-get-installed-stickers`, `telegram-get-recent-stickers`, `telegram-get-sticker-set`, `telegram-search-sticker-sets` |
+| **Media** | `telegram-send-file`, `telegram-download-media`, `telegram-get-profile-photo` |
+| **Groups** | `telegram-create-group`, `telegram-edit-group`, `telegram-invite-to-group`, `telegram-join-chat`, `telegram-leave-group`, `telegram-kick-user`, `telegram-ban-user`, `telegram-unban-user`, `telegram-set-admin`, `telegram-remove-admin`, `telegram-get-my-role` |
+| **Chat Info** | `telegram-get-chat-info`, `telegram-get-chat-members`, `telegram-get-chat-folders` |
+| **Invite Links** | `telegram-create-invite-link`, `telegram-get-invite-links`, `telegram-revoke-invite-link` |
+| **Contacts** | `telegram-get-contacts`, `telegram-add-contact`, `telegram-get-contact-requests` |
+| **Moderation** | `telegram-block-user`, `telegram-unblock-user`, `telegram-report-spam` |
+| **Profiles** | `telegram-get-profile`, `telegram-update-profile` |
+| **Account** | `telegram-get-sessions`, `telegram-terminate-session`, `telegram-set-privacy`, `telegram-set-auto-delete` |
+| **Pinning** | `telegram-pin-message`, `telegram-unpin-message` |
+| **Chat Settings** | `telegram-mute-chat` |
 
-> **Tip**: Ask your AI assistant *"What Telegram tools are available?"* to get the current list with parameters.
+> **Tip**: Ask your AI assistant *"What Telegram tools are available?"* to get the full list with parameters and descriptions.
 
 ## Development
 
@@ -332,9 +354,11 @@ src/
     messages.ts       -- Send, read, search, edit, delete, forward
     chats.ts          -- Chat listing, group management, admin
     contacts.ts       -- Contacts, profiles, moderation
-    media.ts          -- Files, photos
+    media.ts          -- Files, photos, downloads
     reactions.ts      -- Reactions
     extras.ts         -- Pin, schedule, polls, topics
+    stickers.ts       -- Sticker sets, send, search, browse
+    account.ts        -- Sessions, privacy, auto-delete, profile
     shared.ts         -- Shared utilities
 ```
 

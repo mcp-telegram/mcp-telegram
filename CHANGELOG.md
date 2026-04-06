@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-04-06
+
+### Added
+- **Sticker tools** — 5 new tools (59 total): `telegram-get-sticker-set`, `telegram-search-sticker-sets`, `telegram-get-installed-stickers`, `telegram-send-sticker`, `telegram-get-recent-stickers`
+- **Pre-built binaries** — zero-dependency standalone executables for Linux (x64/ARM64), macOS (x64/ARM64), Windows (x64)
+- **Documentation site** — VitePress-based docs at overpod.github.io/mcp-telegram with i18n (English, Russian, Chinese)
+
+## [1.23.0] - 2026-04-05
+
+### Added
+- 11 new tools (22 total): `send-reaction`, `edit-message`, `delete-message`, `forward-message`, `mark-as-read`, `get-dialogs`, `get-chat-info`, `send-file`, `add-contact`, `create-poll`, `manage-topics`
+- Account management tools: `telegram-get-sessions`, `telegram-terminate-session`, `telegram-set-privacy`, `telegram-set-auto-delete`, `telegram-update-profile`
+- Better entity resolution for channels and supergroups
+
 ## [1.22.0] - 2026-04-01
 
 ### Added

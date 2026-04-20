@@ -19,3 +19,6 @@ mcp-telegram-login-*
 # Bun
 
 docs/.vitepress/dist\ndocs/.vitepress/cache
+
+# Ralphex (autonomous execution loop) — local only
+.ralphex/

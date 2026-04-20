@@ -1,8 +1,33 @@
 # Changelog
 
-<VersionBadge version="1.25.0" /> Current version
+<VersionBadge version="1.26.0" /> Current version
 
 All notable changes to MCP Telegram. For full diff between versions, see [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases).
+
+## 1.26.0 — 2026-04-20 {#v1-26-0}
+
+### Added (29 new tools)
+
+**Phase 2 — Admin Toggles, Customization, Stats (8)**
+- `telegram-toggle-channel-signatures`, `telegram-toggle-anti-spam`, `telegram-toggle-forum-mode` (destructive on disable; requires `confirm: true`)
+- `telegram-toggle-prehistory-hidden`, `telegram-set-chat-reactions`
+- `telegram-approve-join-request`
+- `telegram-get-broadcast-stats`, `telegram-get-megagroup-stats`
+
+**Phase 3 — Inline Bots, Buttons, Real-Time Updates (7)**
+- `telegram-inline-query`, `telegram-inline-query-send`
+- `telegram-press-button`, `telegram-get-message-buttons`
+- `telegram-get-state`, `telegram-get-updates`, `telegram-get-channel-updates` (cursors are client-owned)
+
+**Phase 4 — Stories, Boosts, Business (8)**
+- `telegram-get-all-stories`, `telegram-get-peer-stories`, `telegram-get-stories-by-id`, `telegram-get-story-views`
+- `telegram-get-my-boosts`, `telegram-get-boosts-status`, `telegram-get-boosts-list`
+- `telegram-get-business-chat-links`
+
+**Phase 4 opt-in (6, env-gated)**
+- `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` → `telegram-get-group-call`, `telegram-get-group-call-participants`
+- `MCP_TELEGRAM_ENABLE_STARS=1` → `telegram-get-stars-status`, `telegram-get-stars-transactions`
+- `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` → `telegram-get-quick-replies`, `telegram-get-quick-reply-messages`
 
 ## 1.25.0 — 2026-04-20 {#v1-25-0}
 

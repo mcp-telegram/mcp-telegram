@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] - 2026-04-20
+
+### Added
+- **Phase 2 — Admin Toggles, Customization, Stats (8 tools)**
+  - `telegram-toggle-channel-signatures` — toggle post signatures on a channel
+  - `telegram-toggle-anti-spam` — toggle native anti-spam in a supergroup (`ban_users` admin)
+  - `telegram-toggle-forum-mode` — enable/disable forum mode on a supergroup (disable requires `confirm: true` — destructive, removes all topics)
+  - `telegram-approve-join-request` — approve or reject a single chat join request
+  - `telegram-toggle-prehistory-hidden` — show/hide pre-history for new supergroup members
+  - `telegram-set-chat-reactions` — set allowed reactions on a chat (`all` / `some` / `none`)
+  - `telegram-get-broadcast-stats` — channel stats overview (Premium admin may be required; pass `includeGraphs: true` for raw series)
+  - `telegram-get-megagroup-stats` — supergroup stats overview (rate-limited by Telegram to ~1 req/30 min per channel)
+- **Phase 3 — Inline Bots, Buttons, Real-Time Updates (7 tools)**
+  - `telegram-inline-query` — query an inline bot in a chat context (queryId TTL ≈ 1 min)
+  - `telegram-inline-query-send` — send an inline bot result by queryId + result id
+  - `telegram-press-button` — press a callback button on a message by row/col or raw data
+  - `telegram-get-message-buttons` — list a message's reply-markup buttons with indices and types
+  - `telegram-get-state` — initialize a polling cursor (`pts`, `qts`, `date`, `seq`)
+  - `telegram-get-updates` — fetch global updates since a known cursor via `updates.GetDifference`; returns `{newMessages, deletedMessageIds, otherUpdates, state, isFinal}` and surfaces `DifferenceTooLong` as a history-fallback hint
+  - `telegram-get-channel-updates` — per-channel polling via `updates.GetChannelDifference`
+  - Cursors are client-owned (stateless server) — the agent stores `{pts, qts, date}` between calls
+- **Phase 4 ship — Stories, Boosts, Business (8 tools)**
+  - `telegram-get-all-stories` — list stories across peers with pagination state
+  - `telegram-get-peer-stories` — list stories posted by one peer (compact, media refs only)
+  - `telegram-get-stories-by-id` — fetch specific story items by id
+  - `telegram-get-story-views` — list views on your own stories (Premium for full stats)
+  - `telegram-get-my-boosts` — list boost slots assigned by your account
+  - `telegram-get-boosts-status` — boost status for a channel/supergroup
+  - `telegram-get-boosts-list` — list boosters for a channel (admin)
+  - `telegram-get-business-chat-links` — list your Telegram Business chat links
+- **Phase 4 opt-in (env-gated, 6 tools)** — registered only when the corresponding flag is set:
+  - `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` → `telegram-get-group-call`, `telegram-get-group-call-participants`
+  - `MCP_TELEGRAM_ENABLE_STARS=1` → `telegram-get-stars-status`, `telegram-get-stars-transactions`
+  - `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` → `telegram-get-quick-replies`, `telegram-get-quick-reply-messages`
+
 ## [1.25.0] - 2026-04-20
 
 ### Added

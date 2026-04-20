@@ -489,4 +489,229 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       }
     },
   );
+
+  server.registerTool(
+    "telegram-inline-query",
+    {
+      description:
+        "Query an inline bot (like @gif, @bing) in a chat context and return the compact result list. Returns queryId, cacheTime, and results[{id,type,title?,description?,url?}]. The queryId is typically valid for ~60s and can be passed to telegram-inline-query-send to deliver a chosen result. Bot must be a real bot account",
+      inputSchema: {
+        bot: z.string().describe("Inline bot username (e.g. @gif) or numeric user ID"),
+        chatId: z.string().describe("Chat ID or username providing context for the inline query"),
+        query: z.string().describe("Query text the bot should resolve (may be empty string)"),
+        offset: z
+          .string()
+          .optional()
+          .describe("Pagination offset returned by a previous call as nextOffset (empty string on first call)"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ bot, chatId, query, offset }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const res = await telegram.getInlineBotResults(bot, chatId, query, offset);
+        return ok(sanitize(JSON.stringify(res)));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-inline-query-send",
+    {
+      description:
+        "Send an inline bot result to a chat by queryId + resultId (as returned by telegram-inline-query). The queryId is valid for ~60s after the original query, so call this soon after telegram-inline-query. Returns the sent messageId (0 if not extractable from the update).",
+      inputSchema: {
+        chatId: z.string().describe("Target chat ID or username to send the result into"),
+        queryId: z
+          .string()
+          .regex(/^\d+$/, "queryId must be a numeric string")
+          .describe("queryId from a prior telegram-inline-query call (valid ~60s)"),
+        resultId: z.string().describe("id of the chosen result from telegram-inline-query results[]"),
+        replyTo: z.number().optional().describe("Message ID to reply to"),
+        silent: z.boolean().optional().describe("Send without notification"),
+        hideVia: z.boolean().optional().describe("Hide the 'via @bot' label on the sent message"),
+        clearDraft: z.boolean().optional().describe("Clear the chat draft after sending"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, queryId, resultId, replyTo, silent, hideVia, clearDraft }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const { messageId } = await telegram.sendInlineBotResult(chatId, queryId, resultId, {
+          replyTo,
+          silent,
+          hideVia,
+          clearDraft,
+        });
+        const idInfo = messageId ? ` [#${messageId}]` : "";
+        return ok(`Inline result ${resultId} sent to ${chatId}${idInfo}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-message-buttons",
+    {
+      description:
+        "List the inline/reply keyboard buttons on a Telegram message with their (row, col) indices, type (e.g. KeyboardButtonCallback, KeyboardButtonUrl), label and type-specific fields (callback data as base64, url, switchQuery, userId, copyText, etc). Helper for telegram-press-button — call this first to discover indices and filter by type before pressing. Returns markupType='none' and empty buttons when the message has no keyboard",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username where the message lives"),
+        messageId: z.number().describe("Message ID whose keyboard to inspect"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, messageId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const result = await telegram.getMessageButtons(chatId, messageId);
+        return ok(sanitize(JSON.stringify(result)));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-press-button",
+    {
+      description:
+        "Press an inline keyboard callback button on a message. Identify the button by (row, column) from its replyMarkup, or pass raw callback_data as base64. URL, switch-inline, game and 2FA-password buttons are rejected with a clear error. Returns the bot's callback answer: {alert?, hasUrl?, nativeUi?, message?, url?, cacheTime}",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username where the message lives"),
+        messageId: z.number().describe("Message ID whose inline button to press"),
+        row: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe("Button row index (0-based) — required unless data is provided"),
+        column: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe("Button column index (0-based) — required unless data is provided"),
+        data: z.string().optional().describe("Raw callback_data as base64 string (escape hatch — prefer row/column)"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, messageId, row, column, data }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      const hasIndex = row !== undefined && column !== undefined;
+      if (!hasIndex && data === undefined) {
+        return fail(new Error("Provide either both row+column, or data (base64 callback_data)"));
+      }
+      if (hasIndex && data !== undefined) {
+        return fail(new Error("Provide either row+column OR data, not both"));
+      }
+
+      try {
+        const answer = await telegram.pressButton(chatId, messageId, {
+          buttonIndex: hasIndex ? { row: row as number, column: column as number } : undefined,
+          data,
+        });
+        return ok(sanitize(JSON.stringify(answer)));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-state",
+    {
+      description:
+        "Initialize the polling cursor by fetching the current Telegram updates state {pts, qts, date, seq, unreadCount}. Call once before telegram-get-updates; then persist {pts, qts, date} in your agent state and feed them into telegram-get-updates. The MCP server does NOT store the cursor — you do.",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const state = await telegram.getUpdatesState();
+        return ok(sanitize(JSON.stringify(state)));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-updates",
+    {
+      description:
+        "Fetch new messages, deleted messages, and other updates since a previously-known {pts, qts, date} cursor (from telegram-get-state or a prior call). Returns compact newMessages[], deletedMessageIds[], otherUpdates[] (className only), and the new cursor state. isFinal=false means more updates are queued — call again with the returned state. If Telegram reports the gap is too long, a fallback hint is returned suggesting to resync via telegram-read-messages per chat. Cursor is stateless — the agent must persist {pts, qts, date} between calls.",
+      inputSchema: {
+        pts: z.number().int().describe("Last known pts (from telegram-get-state or prior telegram-get-updates)"),
+        qts: z.number().int().describe("Last known qts (secret-chat / encrypted stream cursor; 0 if unknown)"),
+        date: z.number().int().describe("Last known date (unix seconds from prior state)"),
+        ptsLimit: z
+          .number()
+          .int()
+          .positive()
+          .max(1000)
+          .optional()
+          .describe("Max updates per batch (default 100, capped at 1000)"),
+        ptsTotalLimit: z
+          .number()
+          .int()
+          .positive()
+          .max(1000)
+          .optional()
+          .describe("Max total updates across paginated slices (default 1000, capped at 1000)"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ pts, qts, date, ptsLimit, ptsTotalLimit }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const diff = await telegram.getUpdates({ pts, qts, date, ptsLimit, ptsTotalLimit });
+        return ok(sanitize(JSON.stringify(diff)));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-channel-updates",
+    {
+      description:
+        "Fetch new messages and updates for a single channel/supergroup since a known per-channel pts cursor. Separate from the global cursor used by telegram-get-updates. Returns compact newMessages[], otherUpdates[], and new {pts, isFinal, timeout?}. If the channel gap is too long, Telegram returns a dialog snapshot — this tool forwards it and hints to resync via telegram-read-messages. Cursor is stateless — the agent stores pts.",
+      inputSchema: {
+        chatId: z.string().describe("Channel or supergroup ID or username"),
+        pts: z.number().int().describe("Last known per-channel pts"),
+        limit: z.number().int().positive().optional().describe("Max updates per batch (default 100)"),
+        force: z
+          .boolean()
+          .optional()
+          .describe("Force request updates even if the client hasn't processed previous ones (rarely needed)"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, pts, limit, force }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const diff = await telegram.getChannelUpdates(chatId, { pts, limit, force });
+        return ok(sanitize(JSON.stringify(diff)));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
 }

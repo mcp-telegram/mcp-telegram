@@ -181,6 +181,74 @@ MCP Telegram предоставляет расширенный набор инс
 | `telegram-pin-chat` | Закрепить или открепить диалог в списке чатов |
 | `telegram-mark-dialog-unread` | Отметить диалог непрочитанным или снять пометку |
 
+## Настройки администратора и кастомизация
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-toggle-channel-signatures` | Включить/выключить подписи постов в канале |
+| `telegram-toggle-anti-spam` | Включить/выключить встроенный антиспам в супергруппе (админ с `ban_users`) |
+| `telegram-toggle-forum-mode` | Включить/выключить режим форума (отключение удаляет все темы; требуется `confirm: true`) |
+| `telegram-toggle-prehistory-hidden` | Скрыть или показать предысторию для новых участников супергруппы |
+| `telegram-set-chat-reactions` | Настроить разрешённые реакции в чате (`all` / `some` / `none`) |
+| `telegram-approve-join-request` | Одобрить или отклонить заявку на вступление |
+
+## Статистика
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-get-broadcast-stats` | Статистика канала (`includeGraphs: true` для сырых графиков; может требоваться Premium-админ) |
+| `telegram-get-megagroup-stats` | Статистика супергруппы (Telegram ограничивает до ~1 запроса/30 мин на канал) |
+
+## Инлайн-боты и кнопки
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-inline-query` | Инлайн-запрос к боту в контексте чата (TTL queryId ≈ 1 мин) |
+| `telegram-inline-query-send` | Отправить результат инлайн-бота по queryId + id результата |
+| `telegram-press-button` | Нажать callback-кнопку на сообщении по row/col или raw data |
+| `telegram-get-message-buttons` | Перечислить кнопки reply-markup сообщения с индексами и типами |
+
+## Обновления в реальном времени (polling)
+
+Курсоры хранятся на стороне клиента — агент сохраняет `{pts, qts, date}` между вызовами и передаёт их обратно.
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-get-state` | Инициализировать курсор опроса (`pts`, `qts`, `date`, `seq`) |
+| `telegram-get-updates` | Получить глобальные обновления по известному курсору (на `DifferenceTooLong` возвращает подсказку про history) |
+| `telegram-get-channel-updates` | Получить обновления конкретного канала по его курсору |
+
+## Истории (Stories)
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-get-all-stories` | Список историй по всем контактам с состоянием пагинации |
+| `telegram-get-peer-stories` | Список историй одного пира |
+| `telegram-get-stories-by-id` | Получить конкретные истории по id |
+| `telegram-get-story-views` | Список просмотров ваших историй (для полной статистики нужен Premium) |
+
+## Бусты и Business
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-get-my-boosts` | Список бустов, выданных вашим аккаунтом |
+| `telegram-get-boosts-status` | Статус бустов канала/супергруппы |
+| `telegram-get-boosts-list` | Список бустеров канала (админ) |
+| `telegram-get-business-chat-links` | Список ваших Business chat links |
+
+## Opt-in (по env-флагам)
+
+Регистрируются только при выставленном флаге окружения.
+
+| Инструмент | Env-флаг |
+|------------|----------|
+| `telegram-get-group-call` | `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` |
+| `telegram-get-group-call-participants` | `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` |
+| `telegram-get-stars-status` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-get-stars-transactions` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-get-quick-replies` | `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` |
+| `telegram-get-quick-reply-messages` | `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` |
+
 ---
 
 ::: tip

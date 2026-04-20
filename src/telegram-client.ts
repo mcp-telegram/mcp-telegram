@@ -145,6 +145,170 @@ export function reactionToEmoji(reaction: Api.TypeReaction): string | null {
   return null;
 }
 
+export type CompactStatsGraph =
+  | { type: "async"; token: string }
+  | { type: "error"; error: string }
+  | { type: "data"; data: unknown; zoomToken?: string };
+
+export type StatsValue = { current: number; previous: number };
+
+export type BroadcastStatsSummary = {
+  period: { minDate: number; maxDate: number };
+  followers: StatsValue;
+  viewsPerPost: StatsValue;
+  sharesPerPost: StatsValue;
+  reactionsPerPost: StatsValue;
+  viewsPerStory: StatsValue;
+  sharesPerStory: StatsValue;
+  reactionsPerStory: StatsValue;
+  enabledNotifications: { part: number; total: number; percent: number };
+  recentPostsInteractions: Array<
+    | { kind: "message"; msgId: number; views: number; forwards: number; reactions: number }
+    | { kind: "story"; storyId: number; views: number; forwards: number; reactions: number }
+  >;
+  graphs?: Record<string, CompactStatsGraph>;
+};
+
+function absValue(v: { current: number; previous: number } | undefined): StatsValue {
+  return { current: v?.current ?? 0, previous: v?.previous ?? 0 };
+}
+
+function compactGraph(g: Api.TypeStatsGraph): CompactStatsGraph {
+  if (g instanceof Api.StatsGraphAsync) return { type: "async", token: g.token };
+  if (g instanceof Api.StatsGraphError) return { type: "error", error: g.error };
+  if (g instanceof Api.StatsGraph) {
+    let parsed: unknown = g.json?.data;
+    if (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        // leave raw string
+      }
+    }
+    return { type: "data", data: parsed, zoomToken: g.zoomToken };
+  }
+  const any = g as { token?: string; error?: string; json?: { data?: string }; zoomToken?: string };
+  if (typeof any.token === "string") return { type: "async", token: any.token };
+  if (typeof any.error === "string") return { type: "error", error: any.error };
+  return { type: "data", data: any.json?.data, zoomToken: any.zoomToken };
+}
+
+export type MegagroupStatsSummary = {
+  period: { minDate: number; maxDate: number };
+  members: StatsValue;
+  messages: StatsValue;
+  viewers: StatsValue;
+  posters: StatsValue;
+  topPosters: Array<{ userId: string; messages: number; avgChars: number }>;
+  topAdmins: Array<{ userId: string; deleted: number; kicked: number; banned: number }>;
+  topInviters: Array<{ userId: string; invitations: number }>;
+  graphs?: Record<string, CompactStatsGraph>;
+};
+
+export function summarizeMegagroupStats(
+  stats: Api.stats.MegagroupStats,
+  includeGraphs: boolean,
+): MegagroupStatsSummary {
+  const summary: MegagroupStatsSummary = {
+    period: {
+      minDate: stats.period?.minDate ?? 0,
+      maxDate: stats.period?.maxDate ?? 0,
+    },
+    members: absValue(stats.members),
+    messages: absValue(stats.messages),
+    viewers: absValue(stats.viewers),
+    posters: absValue(stats.posters),
+    topPosters: (stats.topPosters ?? []).map((p) => ({
+      userId: p.userId?.toString() ?? "",
+      messages: p.messages,
+      avgChars: p.avgChars,
+    })),
+    topAdmins: (stats.topAdmins ?? []).map((a) => ({
+      userId: a.userId?.toString() ?? "",
+      deleted: a.deleted,
+      kicked: a.kicked,
+      banned: a.banned,
+    })),
+    topInviters: (stats.topInviters ?? []).map((i) => ({
+      userId: i.userId?.toString() ?? "",
+      invitations: i.invitations,
+    })),
+  };
+  if (includeGraphs) {
+    summary.graphs = {
+      growth: compactGraph(stats.growthGraph),
+      members: compactGraph(stats.membersGraph),
+      newMembersBySource: compactGraph(stats.newMembersBySourceGraph),
+      languages: compactGraph(stats.languagesGraph),
+      messages: compactGraph(stats.messagesGraph),
+      actions: compactGraph(stats.actionsGraph),
+      topHours: compactGraph(stats.topHoursGraph),
+      weekdays: compactGraph(stats.weekdaysGraph),
+    };
+  }
+  return summary;
+}
+
+export function summarizeBroadcastStats(
+  stats: Api.stats.BroadcastStats,
+  includeGraphs: boolean,
+): BroadcastStatsSummary {
+  const enabled = stats.enabledNotifications;
+  const part = enabled?.part ?? 0;
+  const total = enabled?.total ?? 0;
+  const percent = total > 0 ? (part / total) * 100 : 0;
+  const summary: BroadcastStatsSummary = {
+    period: {
+      minDate: stats.period?.minDate ?? 0,
+      maxDate: stats.period?.maxDate ?? 0,
+    },
+    followers: absValue(stats.followers),
+    viewsPerPost: absValue(stats.viewsPerPost),
+    sharesPerPost: absValue(stats.sharesPerPost),
+    reactionsPerPost: absValue(stats.reactionsPerPost),
+    viewsPerStory: absValue(stats.viewsPerStory),
+    sharesPerStory: absValue(stats.sharesPerStory),
+    reactionsPerStory: absValue(stats.reactionsPerStory),
+    enabledNotifications: { part, total, percent },
+    recentPostsInteractions: (stats.recentPostsInteractions ?? []).map((p) => {
+      if (p instanceof Api.PostInteractionCountersStory) {
+        return {
+          kind: "story" as const,
+          storyId: p.storyId,
+          views: p.views,
+          forwards: p.forwards,
+          reactions: p.reactions,
+        };
+      }
+      const m = p as Api.PostInteractionCountersMessage;
+      return {
+        kind: "message" as const,
+        msgId: m.msgId,
+        views: m.views,
+        forwards: m.forwards,
+        reactions: m.reactions,
+      };
+    }),
+  };
+  if (includeGraphs) {
+    summary.graphs = {
+      growth: compactGraph(stats.growthGraph),
+      followers: compactGraph(stats.followersGraph),
+      mute: compactGraph(stats.muteGraph),
+      topHours: compactGraph(stats.topHoursGraph),
+      interactions: compactGraph(stats.interactionsGraph),
+      ivInteractions: compactGraph(stats.ivInteractionsGraph),
+      viewsBySource: compactGraph(stats.viewsBySourceGraph),
+      newFollowersBySource: compactGraph(stats.newFollowersBySourceGraph),
+      languages: compactGraph(stats.languagesGraph),
+      reactionsByEmotion: compactGraph(stats.reactionsByEmotionGraph),
+      storyInteractions: compactGraph(stats.storyInteractionsGraph),
+      storyReactionsByEmotion: compactGraph(stats.storyReactionsByEmotionGraph),
+    };
+  }
+  return summary;
+}
+
 export type ChatPermissions = {
   sendMessages?: boolean;
   sendMedia?: boolean;
@@ -202,6 +366,987 @@ export function mergeBannedRights(
     result[flag] = Boolean(current?.[flag]);
   }
   return result;
+}
+
+export type MessageButtonDescriptor = {
+  row: number;
+  col: number;
+  type: string;
+  label: string;
+  data?: string;
+  url?: string;
+  switchQuery?: string;
+  samePeer?: boolean;
+  userId?: string;
+  buttonId?: number;
+  copyText?: string;
+  requiresPassword?: boolean;
+  quiz?: boolean;
+};
+
+export function describeKeyboardButton(
+  button: Api.TypeKeyboardButton,
+  row: number,
+  col: number,
+): MessageButtonDescriptor {
+  const base: MessageButtonDescriptor = {
+    row,
+    col,
+    type: button.className,
+    label: "text" in button && typeof (button as { text?: unknown }).text === "string" ? button.text : "",
+  };
+  if (button instanceof Api.KeyboardButtonCallback) {
+    base.data = Buffer.from(button.data as Uint8Array).toString("base64");
+    if (button.requiresPassword) base.requiresPassword = true;
+    return base;
+  }
+  if (button instanceof Api.KeyboardButtonUrl) {
+    base.url = button.url;
+    return base;
+  }
+  if (button instanceof Api.KeyboardButtonUrlAuth) {
+    base.url = button.url;
+    base.buttonId = button.buttonId;
+    return base;
+  }
+  if (button instanceof Api.KeyboardButtonSwitchInline) {
+    base.switchQuery = button.query;
+    base.samePeer = Boolean(button.samePeer);
+    return base;
+  }
+  if (button instanceof Api.KeyboardButtonWebView || button instanceof Api.KeyboardButtonSimpleWebView) {
+    base.url = button.url;
+    return base;
+  }
+  if (button instanceof Api.KeyboardButtonUserProfile) {
+    base.userId = button.userId?.toString();
+    return base;
+  }
+  if (button instanceof Api.KeyboardButtonRequestPoll) {
+    if (button.quiz) base.quiz = true;
+    return base;
+  }
+  if (button instanceof Api.KeyboardButtonRequestPeer) {
+    base.buttonId = button.buttonId;
+    return base;
+  }
+  if (button instanceof Api.KeyboardButtonCopy) {
+    base.copyText = button.copyText;
+    return base;
+  }
+  return base;
+}
+
+export type CompactPeer = { kind: "user"; id: string } | { kind: "chat"; id: string } | { kind: "channel"; id: string };
+
+export type UpdatesMessageSummary = {
+  id: number;
+  peer: CompactPeer;
+  fromId?: CompactPeer;
+  date: number;
+  text: string;
+  isService: boolean;
+};
+
+export type UpdatesDifferenceSummary = {
+  state: { pts: number; qts: number; date: number; seq: number; unreadCount?: number };
+  isFinal: boolean;
+  newMessages: UpdatesMessageSummary[];
+  deletedMessageIds: Array<{ peer?: CompactPeer; messageIds: number[] }>;
+  otherUpdates: Array<{ type: string }>;
+  fallback?: { kind: "tooLong"; suggestedAction: string };
+};
+
+export type ChannelDifferenceSummary = {
+  channelId: string;
+  pts: number;
+  isFinal: boolean;
+  timeout?: number;
+  newMessages: UpdatesMessageSummary[];
+  otherUpdates: Array<{ type: string }>;
+  fallback?: { kind: "tooLong"; suggestedAction: string };
+};
+
+export function peerToCompact(peer: Api.TypePeer | undefined): CompactPeer | undefined {
+  if (!peer) return undefined;
+  if (peer instanceof Api.PeerUser) return { kind: "user", id: peer.userId.toString() };
+  if (peer instanceof Api.PeerChat) return { kind: "chat", id: peer.chatId.toString() };
+  if (peer instanceof Api.PeerChannel) return { kind: "channel", id: peer.channelId.toString() };
+  return undefined;
+}
+
+function summarizeMessageForUpdates(msg: Api.TypeMessage): UpdatesMessageSummary | null {
+  if (msg instanceof Api.MessageEmpty) return null;
+  const peer = peerToCompact((msg as Api.Message | Api.MessageService).peerId);
+  if (!peer) return null;
+  const fromId = peerToCompact((msg as Api.Message | Api.MessageService).fromId);
+  const date = (msg as Api.Message | Api.MessageService).date ?? 0;
+  if (msg instanceof Api.Message) {
+    return { id: msg.id, peer, fromId, date, text: msg.message ?? "", isService: false };
+  }
+  if (msg instanceof Api.MessageService) {
+    return {
+      id: msg.id,
+      peer,
+      fromId,
+      date,
+      text: `[${msg.action?.className ?? "service"}]`,
+      isService: true,
+    };
+  }
+  return null;
+}
+
+function collectDeletedMessageIds(updates: Api.TypeUpdate[]): Array<{ peer?: CompactPeer; messageIds: number[] }> {
+  const out: Array<{ peer?: CompactPeer; messageIds: number[] }> = [];
+  for (const u of updates) {
+    if (u instanceof Api.UpdateDeleteMessages) {
+      out.push({ messageIds: u.messages });
+    } else if (u instanceof Api.UpdateDeleteChannelMessages) {
+      out.push({
+        peer: { kind: "channel", id: u.channelId.toString() },
+        messageIds: u.messages,
+      });
+    }
+  }
+  return out;
+}
+
+export function summarizeUpdatesDifference(
+  diff: Api.updates.TypeDifference,
+  cursor: { pts: number; qts: number; date: number },
+): UpdatesDifferenceSummary {
+  if (diff instanceof Api.updates.DifferenceEmpty) {
+    return {
+      state: { pts: cursor.pts, qts: cursor.qts, date: diff.date, seq: diff.seq },
+      isFinal: true,
+      newMessages: [],
+      deletedMessageIds: [],
+      otherUpdates: [],
+    };
+  }
+  if (diff instanceof Api.updates.DifferenceTooLong) {
+    return {
+      state: { pts: diff.pts, qts: cursor.qts, date: cursor.date, seq: 0 },
+      isFinal: true,
+      newMessages: [],
+      deletedMessageIds: [],
+      otherUpdates: [],
+      fallback: {
+        kind: "tooLong",
+        suggestedAction: "gap too large — call telegram-read-messages per chat or telegram-get-state to resync",
+      },
+    };
+  }
+  const isFinal = diff instanceof Api.updates.Difference;
+  const state = isFinal
+    ? (diff as Api.updates.Difference).state
+    : (diff as Api.updates.DifferenceSlice).intermediateState;
+  const newMessages = (diff.newMessages ?? [])
+    .map(summarizeMessageForUpdates)
+    .filter((m): m is UpdatesMessageSummary => m !== null);
+  const otherUpdates = diff.otherUpdates ?? [];
+  return {
+    state: {
+      pts: state.pts,
+      qts: state.qts,
+      date: state.date,
+      seq: state.seq,
+      unreadCount: state.unreadCount,
+    },
+    isFinal,
+    newMessages,
+    deletedMessageIds: collectDeletedMessageIds(otherUpdates),
+    otherUpdates: otherUpdates.map((u) => ({ type: u.className })),
+  };
+}
+
+export function summarizeChannelDifference(
+  diff: Api.updates.TypeChannelDifference,
+  channelId: string,
+  fallbackPts: number,
+): ChannelDifferenceSummary {
+  if (diff instanceof Api.updates.ChannelDifferenceEmpty) {
+    return {
+      channelId,
+      pts: diff.pts,
+      isFinal: Boolean(diff.final),
+      timeout: diff.timeout,
+      newMessages: [],
+      otherUpdates: [],
+    };
+  }
+  if (diff instanceof Api.updates.ChannelDifferenceTooLong) {
+    const freshPts = diff.dialog instanceof Api.Dialog ? (diff.dialog.pts ?? fallbackPts) : fallbackPts;
+    return {
+      channelId,
+      pts: freshPts,
+      isFinal: Boolean(diff.final),
+      timeout: diff.timeout,
+      newMessages: (diff.messages ?? [])
+        .map(summarizeMessageForUpdates)
+        .filter((m): m is UpdatesMessageSummary => m !== null),
+      otherUpdates: [],
+      fallback: {
+        kind: "tooLong",
+        suggestedAction:
+          "channel gap too large — dialog snapshot returned; call telegram-read-messages for full history",
+      },
+    };
+  }
+  if (diff instanceof Api.updates.ChannelDifference) {
+    return {
+      channelId,
+      pts: diff.pts,
+      isFinal: Boolean(diff.final),
+      timeout: diff.timeout,
+      newMessages: (diff.newMessages ?? [])
+        .map(summarizeMessageForUpdates)
+        .filter((m): m is UpdatesMessageSummary => m !== null),
+      otherUpdates: (diff.otherUpdates ?? []).map((u) => ({ type: u.className })),
+    };
+  }
+  return {
+    channelId,
+    pts: fallbackPts,
+    isFinal: false,
+    newMessages: [],
+    otherUpdates: [],
+  };
+}
+
+export type StoryItemSummary = {
+  id: number;
+  kind: "active" | "deleted" | "skipped";
+  date?: number;
+  expireDate?: number;
+  caption?: string;
+  mediaType?: string;
+  pinned?: boolean;
+  public?: boolean;
+  closeFriends?: boolean;
+  edited?: boolean;
+  noforwards?: boolean;
+  fromId?: CompactPeer;
+  viewsCount?: number;
+  reactionsCount?: number;
+};
+
+export type PeerStoriesSummary = {
+  peer: CompactPeer;
+  maxReadId?: number;
+  stories: StoryItemSummary[];
+};
+
+export type AllStoriesSummary = {
+  modified: boolean;
+  state: string;
+  hasMore?: boolean;
+  count?: number;
+  peerStories: PeerStoriesSummary[];
+  stealthMode?: { activeUntilDate?: number; cooldownUntilDate?: number };
+};
+
+export type StoriesByIdSummary = {
+  count: number;
+  stories: StoryItemSummary[];
+  pinnedToTop?: number[];
+};
+
+export type StoryViewSummary =
+  | {
+      kind: "user";
+      userId: string;
+      date: number;
+      reaction?: string | null;
+      blocked?: boolean;
+      blockedMyStoriesFrom?: boolean;
+    }
+  | {
+      kind: "publicForward";
+      messageId?: number;
+      peer?: CompactPeer;
+      blocked?: boolean;
+      blockedMyStoriesFrom?: boolean;
+    }
+  | {
+      kind: "publicRepost";
+      peer?: CompactPeer;
+      storyId?: number;
+      blocked?: boolean;
+      blockedMyStoriesFrom?: boolean;
+    };
+
+export type StoryViewsListSummary = {
+  count: number;
+  viewsCount: number;
+  forwardsCount: number;
+  reactionsCount: number;
+  views: StoryViewSummary[];
+  nextOffset?: string;
+};
+
+export type MyBoostSummary = {
+  slot: number;
+  peer?: CompactPeer;
+  date: number;
+  expires: number;
+  cooldownUntilDate?: number;
+};
+
+export type MyBoostsSummary = {
+  count: number;
+  myBoosts: MyBoostSummary[];
+};
+
+export function summarizeMyBoost(boost: Api.TypeMyBoost): MyBoostSummary {
+  const b = boost as Api.MyBoost;
+  return {
+    slot: b.slot,
+    peer: peerToCompact(b.peer),
+    date: b.date,
+    expires: b.expires,
+    cooldownUntilDate: b.cooldownUntilDate,
+  };
+}
+
+export function summarizeMyBoosts(result: Api.premium.TypeMyBoosts): MyBoostsSummary {
+  const boosts = result.myBoosts ?? [];
+  return {
+    count: boosts.length,
+    myBoosts: boosts.map(summarizeMyBoost),
+  };
+}
+
+export type PrepaidGiveawaySummary = {
+  kind: "premium" | "stars";
+  id: string;
+  quantity: number;
+  date: number;
+  months?: number;
+  stars?: string;
+  boosts?: number;
+};
+
+export type BoostsStatusSummary = {
+  level: number;
+  boosts: number;
+  currentLevelBoosts: number;
+  nextLevelBoosts?: number;
+  giftBoosts?: number;
+  premiumAudience?: { part: number; total: number };
+  boostUrl: string;
+  myBoost?: boolean;
+  myBoostSlots?: number[];
+  prepaidGiveaways?: PrepaidGiveawaySummary[];
+};
+
+export function summarizePrepaidGiveaway(g: Api.TypePrepaidGiveaway): PrepaidGiveawaySummary {
+  if (g instanceof Api.PrepaidStarsGiveaway) {
+    return {
+      kind: "stars",
+      id: g.id.toString(),
+      quantity: g.quantity,
+      date: g.date,
+      stars: g.stars.toString(),
+      boosts: g.boosts,
+    };
+  }
+  const p = g as Api.PrepaidGiveaway;
+  return {
+    kind: "premium",
+    id: p.id.toString(),
+    quantity: p.quantity,
+    date: p.date,
+    months: p.months,
+  };
+}
+
+export function summarizeBoostsStatus(result: Api.premium.TypeBoostsStatus): BoostsStatusSummary {
+  const r = result as Api.premium.BoostsStatus;
+  const out: BoostsStatusSummary = {
+    level: r.level,
+    boosts: r.boosts,
+    currentLevelBoosts: r.currentLevelBoosts,
+    nextLevelBoosts: r.nextLevelBoosts,
+    giftBoosts: r.giftBoosts,
+    boostUrl: r.boostUrl,
+    myBoost: r.myBoost,
+    myBoostSlots: r.myBoostSlots,
+  };
+  if (r.premiumAudience) {
+    out.premiumAudience = { part: r.premiumAudience.part, total: r.premiumAudience.total };
+  }
+  if (r.prepaidGiveaways && r.prepaidGiveaways.length > 0) {
+    out.prepaidGiveaways = r.prepaidGiveaways.map(summarizePrepaidGiveaway);
+  }
+  return out;
+}
+
+export type BoostSummary = {
+  id: string;
+  userId?: string;
+  date: number;
+  expires: number;
+  gift?: boolean;
+  giveaway?: boolean;
+  unclaimed?: boolean;
+  giveawayMsgId?: number;
+  usedGiftSlug?: string;
+  multiplier?: number;
+  stars?: string;
+};
+
+export type BoostsListSummary = {
+  count: number;
+  boosts: BoostSummary[];
+  nextOffset?: string;
+};
+
+export function summarizeBoost(boost: Api.TypeBoost): BoostSummary {
+  const b = boost as Api.Boost;
+  return {
+    id: b.id,
+    userId: b.userId?.toString(),
+    date: b.date,
+    expires: b.expires,
+    gift: b.gift,
+    giveaway: b.giveaway,
+    unclaimed: b.unclaimed,
+    giveawayMsgId: b.giveawayMsgId,
+    usedGiftSlug: b.usedGiftSlug,
+    multiplier: b.multiplier,
+    stars: b.stars?.toString(),
+  };
+}
+
+export function summarizeBoostsList(result: Api.premium.TypeBoostsList): BoostsListSummary {
+  const r = result as Api.premium.BoostsList;
+  return {
+    count: r.count,
+    boosts: (r.boosts ?? []).map(summarizeBoost),
+    nextOffset: r.nextOffset,
+  };
+}
+
+export type BusinessChatLinkSummary = {
+  link: string;
+  message: string;
+  title?: string;
+  views: number;
+  entityCount: number;
+};
+
+export type BusinessChatLinksSummary = {
+  count: number;
+  links: BusinessChatLinkSummary[];
+};
+
+export function summarizeBusinessChatLink(link: Api.TypeBusinessChatLink): BusinessChatLinkSummary {
+  const l = link as Api.BusinessChatLink;
+  return {
+    link: l.link,
+    message: l.message,
+    title: l.title,
+    views: l.views,
+    entityCount: l.entities?.length ?? 0,
+  };
+}
+
+export function summarizeBusinessChatLinks(result: Api.account.TypeBusinessChatLinks): BusinessChatLinksSummary {
+  const r = result as Api.account.BusinessChatLinks;
+  const links = r.links ?? [];
+  return {
+    count: links.length,
+    links: links.map(summarizeBusinessChatLink),
+  };
+}
+
+export type GroupCallInfoSummary =
+  | {
+      kind: "active";
+      id: string;
+      accessHash: string;
+      participantsCount: number;
+      title?: string;
+      scheduleDate?: number;
+      recordStartDate?: number;
+      streamDcId?: number;
+      unmutedVideoCount?: number;
+      unmutedVideoLimit: number;
+      version: number;
+      joinMuted?: boolean;
+      canChangeJoinMuted?: boolean;
+      joinDateAsc?: boolean;
+      scheduleStartSubscribed?: boolean;
+      canStartVideo?: boolean;
+      recordVideoActive?: boolean;
+      rtmpStream?: boolean;
+      listenersHidden?: boolean;
+    }
+  | {
+      kind: "discarded";
+      id: string;
+      accessHash: string;
+      duration: number;
+    };
+
+export type GroupCallParticipantSummary = {
+  peer: CompactPeer | undefined;
+  date: number;
+  activeDate?: number;
+  source: number;
+  volume?: number;
+  muted?: boolean;
+  left?: boolean;
+  canSelfUnmute?: boolean;
+  justJoined?: boolean;
+  self?: boolean;
+  mutedByYou?: boolean;
+  volumeByAdmin?: boolean;
+  videoJoined?: boolean;
+  about?: string;
+  raiseHandRating?: string;
+  hasVideo?: boolean;
+  hasPresentation?: boolean;
+};
+
+export type GroupCallSummary = {
+  call: GroupCallInfoSummary;
+  participants: GroupCallParticipantSummary[];
+  participantsNextOffset?: string;
+};
+
+export type GroupCallParticipantsSummary = {
+  count: number;
+  participants: GroupCallParticipantSummary[];
+  nextOffset?: string;
+  version: number;
+};
+
+export function summarizeGroupCallInfo(call: Api.TypeGroupCall): GroupCallInfoSummary {
+  if (call instanceof Api.GroupCallDiscarded) {
+    return {
+      kind: "discarded",
+      id: call.id.toString(),
+      accessHash: call.accessHash.toString(),
+      duration: call.duration,
+    };
+  }
+  const c = call as Api.GroupCall;
+  return {
+    kind: "active",
+    id: c.id.toString(),
+    accessHash: c.accessHash.toString(),
+    participantsCount: c.participantsCount,
+    title: c.title,
+    scheduleDate: c.scheduleDate,
+    recordStartDate: c.recordStartDate,
+    streamDcId: c.streamDcId,
+    unmutedVideoCount: c.unmutedVideoCount,
+    unmutedVideoLimit: c.unmutedVideoLimit,
+    version: c.version,
+    joinMuted: c.joinMuted,
+    canChangeJoinMuted: c.canChangeJoinMuted,
+    joinDateAsc: c.joinDateAsc,
+    scheduleStartSubscribed: c.scheduleStartSubscribed,
+    canStartVideo: c.canStartVideo,
+    recordVideoActive: c.recordVideoActive,
+    rtmpStream: c.rtmpStream,
+    listenersHidden: c.listenersHidden,
+  };
+}
+
+export function summarizeGroupCallParticipant(p: Api.TypeGroupCallParticipant): GroupCallParticipantSummary {
+  const gp = p as Api.GroupCallParticipant;
+  return {
+    peer: peerToCompact(gp.peer),
+    date: gp.date,
+    activeDate: gp.activeDate,
+    source: gp.source,
+    volume: gp.volume,
+    muted: gp.muted,
+    left: gp.left,
+    canSelfUnmute: gp.canSelfUnmute,
+    justJoined: gp.justJoined,
+    self: gp.self,
+    mutedByYou: gp.mutedByYou,
+    volumeByAdmin: gp.volumeByAdmin,
+    videoJoined: gp.videoJoined,
+    about: gp.about,
+    raiseHandRating: gp.raiseHandRating?.toString(),
+    hasVideo: gp.video ? true : undefined,
+    hasPresentation: gp.presentation ? true : undefined,
+  };
+}
+
+export function summarizeGroupCall(result: Api.phone.TypeGroupCall): GroupCallSummary {
+  const r = result as Api.phone.GroupCall;
+  return {
+    call: summarizeGroupCallInfo(r.call),
+    participants: (r.participants ?? []).map(summarizeGroupCallParticipant),
+    participantsNextOffset: r.participantsNextOffset || undefined,
+  };
+}
+
+export function summarizeGroupCallParticipants(result: Api.phone.TypeGroupParticipants): GroupCallParticipantsSummary {
+  const r = result as Api.phone.GroupParticipants;
+  return {
+    count: r.count,
+    participants: (r.participants ?? []).map(summarizeGroupCallParticipant),
+    nextOffset: r.nextOffset || undefined,
+    version: r.version,
+  };
+}
+
+export type StarsAmountSummary = {
+  amount: string;
+  nanos: number;
+};
+
+export type StarsTransactionPeerSummary =
+  | { kind: "appStore" }
+  | { kind: "playMarket" }
+  | { kind: "premiumBot" }
+  | { kind: "fragment" }
+  | { kind: "ads" }
+  | { kind: "api" }
+  | { kind: "unsupported" }
+  | { kind: "peer"; peer: CompactPeer | undefined };
+
+export type StarsTransactionSummary = {
+  id: string;
+  stars: StarsAmountSummary;
+  date: number;
+  peer: StarsTransactionPeerSummary;
+  refund?: boolean;
+  pending?: boolean;
+  failed?: boolean;
+  gift?: boolean;
+  reaction?: boolean;
+  title?: string;
+  description?: string;
+  msgId?: number;
+  subscriptionPeriod?: number;
+  giveawayPostId?: number;
+  transactionDate?: number;
+  transactionUrl?: string;
+};
+
+export type StarsSubscriptionPricingSummary = {
+  period: number;
+  amount: string;
+};
+
+export type StarsSubscriptionSummary = {
+  id: string;
+  peer: CompactPeer | undefined;
+  untilDate: number;
+  pricing: StarsSubscriptionPricingSummary;
+  canceled?: boolean;
+  canRefulfill?: boolean;
+  missingBalance?: boolean;
+  botCanceled?: boolean;
+  chatInviteHash?: string;
+  title?: string;
+  invoiceSlug?: string;
+};
+
+export type StarsStatusSummary = {
+  balance: StarsAmountSummary;
+  subscriptions?: StarsSubscriptionSummary[];
+  subscriptionsNextOffset?: string;
+  subscriptionsMissingBalance?: string;
+  history?: StarsTransactionSummary[];
+  nextOffset?: string;
+};
+
+export function summarizeStarsAmount(amount: Api.TypeStarsAmount): StarsAmountSummary {
+  const a = amount as Api.StarsAmount;
+  return { amount: a.amount.toString(), nanos: a.nanos };
+}
+
+export function summarizeStarsTransactionPeer(peer: Api.TypeStarsTransactionPeer): StarsTransactionPeerSummary {
+  if (peer instanceof Api.StarsTransactionPeerAppStore) return { kind: "appStore" };
+  if (peer instanceof Api.StarsTransactionPeerPlayMarket) return { kind: "playMarket" };
+  if (peer instanceof Api.StarsTransactionPeerPremiumBot) return { kind: "premiumBot" };
+  if (peer instanceof Api.StarsTransactionPeerFragment) return { kind: "fragment" };
+  if (peer instanceof Api.StarsTransactionPeerAds) return { kind: "ads" };
+  if (peer instanceof Api.StarsTransactionPeerAPI) return { kind: "api" };
+  if (peer instanceof Api.StarsTransactionPeer) return { kind: "peer", peer: peerToCompact(peer.peer) };
+  return { kind: "unsupported" };
+}
+
+export function summarizeStarsTransaction(tx: Api.TypeStarsTransaction): StarsTransactionSummary {
+  const t = tx as Api.StarsTransaction;
+  return {
+    id: t.id,
+    stars: summarizeStarsAmount(t.stars),
+    date: t.date,
+    peer: summarizeStarsTransactionPeer(t.peer),
+    refund: t.refund,
+    pending: t.pending,
+    failed: t.failed,
+    gift: t.gift,
+    reaction: t.reaction,
+    title: t.title,
+    description: t.description,
+    msgId: t.msgId,
+    subscriptionPeriod: t.subscriptionPeriod,
+    giveawayPostId: t.giveawayPostId,
+    transactionDate: t.transactionDate,
+    transactionUrl: t.transactionUrl,
+  };
+}
+
+export function summarizeStarsSubscription(sub: Api.TypeStarsSubscription): StarsSubscriptionSummary {
+  const s = sub as Api.StarsSubscription;
+  const pricing = s.pricing as Api.StarsSubscriptionPricing;
+  return {
+    id: s.id,
+    peer: peerToCompact(s.peer),
+    untilDate: s.untilDate,
+    pricing: { period: pricing.period, amount: pricing.amount.toString() },
+    canceled: s.canceled,
+    canRefulfill: s.canRefulfill,
+    missingBalance: s.missingBalance,
+    botCanceled: s.botCanceled,
+    chatInviteHash: s.chatInviteHash,
+    title: s.title,
+    invoiceSlug: s.invoiceSlug,
+  };
+}
+
+export type QuickReplySummary = {
+  shortcutId: number;
+  shortcut: string;
+  topMessage: number;
+  count: number;
+};
+
+export type QuickRepliesSummary = {
+  notModified?: boolean;
+  quickReplies?: QuickReplySummary[];
+};
+
+export function summarizeQuickReply(reply: Api.TypeQuickReply): QuickReplySummary {
+  const r = reply as Api.QuickReply;
+  return {
+    shortcutId: r.shortcutId,
+    shortcut: r.shortcut,
+    topMessage: r.topMessage,
+    count: r.count,
+  };
+}
+
+export function summarizeQuickReplies(result: Api.messages.TypeQuickReplies): QuickRepliesSummary {
+  if (result instanceof Api.messages.QuickRepliesNotModified) {
+    return { notModified: true };
+  }
+  const r = result as Api.messages.QuickReplies;
+  return { quickReplies: r.quickReplies.map(summarizeQuickReply) };
+}
+
+export type QuickReplyMessageSummary = {
+  id: number;
+  date: number;
+  text: string;
+  isService: boolean;
+  fromId?: CompactPeer;
+  replyToMsgId?: number;
+};
+
+export type QuickReplyMessagesSummary = {
+  notModified?: boolean;
+  count?: number;
+  messages?: QuickReplyMessageSummary[];
+};
+
+export function summarizeQuickReplyMessage(msg: Api.TypeMessage): QuickReplyMessageSummary | null {
+  if (msg instanceof Api.MessageEmpty) return null;
+  const base = msg as Api.Message | Api.MessageService;
+  const fromId = peerToCompact(base.fromId);
+  const replyHeader = (base as Api.Message).replyTo;
+  const replyToMsgId = replyHeader instanceof Api.MessageReplyHeader ? replyHeader.replyToMsgId : undefined;
+  if (msg instanceof Api.Message) {
+    return {
+      id: msg.id,
+      date: msg.date,
+      text: msg.message ?? "",
+      isService: false,
+      fromId,
+      replyToMsgId,
+    };
+  }
+  if (msg instanceof Api.MessageService) {
+    return {
+      id: msg.id,
+      date: msg.date,
+      text: `[${msg.action?.className ?? "service"}]`,
+      isService: true,
+      fromId,
+    };
+  }
+  return null;
+}
+
+export function summarizeQuickReplyMessages(result: Api.messages.TypeMessages): QuickReplyMessagesSummary {
+  if (result instanceof Api.messages.MessagesNotModified) {
+    return { notModified: true, count: result.count };
+  }
+  const rawMessages = (result as Api.messages.Messages | Api.messages.MessagesSlice | Api.messages.ChannelMessages)
+    .messages;
+  const messages = rawMessages.map(summarizeQuickReplyMessage).filter((m): m is QuickReplyMessageSummary => m !== null);
+  const count =
+    result instanceof Api.messages.Messages
+      ? messages.length
+      : (result as Api.messages.MessagesSlice | Api.messages.ChannelMessages).count;
+  return { count, messages };
+}
+
+export function summarizeStarsStatus(result: Api.payments.TypeStarsStatus): StarsStatusSummary {
+  const r = result as Api.payments.StarsStatus;
+  const out: StarsStatusSummary = {
+    balance: summarizeStarsAmount(r.balance),
+    subscriptionsNextOffset: r.subscriptionsNextOffset || undefined,
+    subscriptionsMissingBalance: r.subscriptionsMissingBalance?.toString(),
+    nextOffset: r.nextOffset || undefined,
+  };
+  if (r.subscriptions && r.subscriptions.length > 0) {
+    out.subscriptions = r.subscriptions.map(summarizeStarsSubscription);
+  }
+  if (r.history && r.history.length > 0) {
+    out.history = r.history.map(summarizeStarsTransaction);
+  }
+  return out;
+}
+
+export function summarizeStoryItem(item: Api.TypeStoryItem): StoryItemSummary {
+  if (item instanceof Api.StoryItemDeleted) {
+    return { id: item.id, kind: "deleted" };
+  }
+  if (item instanceof Api.StoryItemSkipped) {
+    return {
+      id: item.id,
+      kind: "skipped",
+      date: item.date,
+      expireDate: item.expireDate,
+      closeFriends: item.closeFriends,
+    };
+  }
+  const story = item as Api.StoryItem;
+  return {
+    id: story.id,
+    kind: "active",
+    date: story.date,
+    expireDate: story.expireDate,
+    caption: story.caption,
+    mediaType: story.media?.className,
+    pinned: story.pinned,
+    public: story.public,
+    closeFriends: story.closeFriends,
+    edited: story.edited,
+    noforwards: story.noforwards,
+    fromId: peerToCompact(story.fromId),
+    viewsCount: story.views?.viewsCount,
+    reactionsCount: story.views?.reactionsCount,
+  };
+}
+
+export function summarizePeerStories(ps: Api.TypePeerStories): PeerStoriesSummary | null {
+  const peer = peerToCompact(ps.peer);
+  if (!peer) return null;
+  return {
+    peer,
+    maxReadId: ps.maxReadId,
+    stories: (ps.stories ?? []).map(summarizeStoryItem),
+  };
+}
+
+export function summarizeStoriesById(result: Api.stories.TypeStories): StoriesByIdSummary {
+  return {
+    count: result.count,
+    stories: (result.stories ?? []).map(summarizeStoryItem),
+    pinnedToTop: result.pinnedToTop,
+  };
+}
+
+export function summarizeStoryView(view: Api.TypeStoryView): StoryViewSummary {
+  if (view instanceof Api.StoryViewPublicForward) {
+    const msg = view.message as Api.Message | Api.MessageService | Api.MessageEmpty | undefined;
+    const messageId = msg instanceof Api.MessageEmpty ? undefined : msg?.id;
+    const peer =
+      msg instanceof Api.MessageEmpty
+        ? undefined
+        : peerToCompact((msg as Api.Message | Api.MessageService | undefined)?.peerId);
+    return {
+      kind: "publicForward",
+      messageId,
+      peer,
+      blocked: view.blocked,
+      blockedMyStoriesFrom: view.blockedMyStoriesFrom,
+    };
+  }
+  if (view instanceof Api.StoryViewPublicRepost) {
+    const story = view.story as Api.StoryItem | Api.StoryItemDeleted | Api.StoryItemSkipped | undefined;
+    return {
+      kind: "publicRepost",
+      peer: peerToCompact(view.peerId),
+      storyId: story?.id,
+      blocked: view.blocked,
+      blockedMyStoriesFrom: view.blockedMyStoriesFrom,
+    };
+  }
+  const v = view as Api.StoryView;
+  return {
+    kind: "user",
+    userId: v.userId.toString(),
+    date: v.date,
+    reaction: v.reaction ? reactionToEmoji(v.reaction) : undefined,
+    blocked: v.blocked,
+    blockedMyStoriesFrom: v.blockedMyStoriesFrom,
+  };
+}
+
+export function summarizeStoryViewsList(result: Api.stories.TypeStoryViewsList): StoryViewsListSummary {
+  const list = result as Api.stories.StoryViewsList;
+  return {
+    count: list.count,
+    viewsCount: list.viewsCount,
+    forwardsCount: list.forwardsCount,
+    reactionsCount: list.reactionsCount,
+    views: (list.views ?? []).map(summarizeStoryView),
+    nextOffset: list.nextOffset,
+  };
+}
+
+export function summarizeAllStories(result: Api.stories.TypeAllStories): AllStoriesSummary {
+  const stealthMode = result.stealthMode
+    ? {
+        activeUntilDate: result.stealthMode.activeUntilDate,
+        cooldownUntilDate: result.stealthMode.cooldownUntilDate,
+      }
+    : undefined;
+  if (result instanceof Api.stories.AllStoriesNotModified) {
+    return {
+      modified: false,
+      state: result.state,
+      peerStories: [],
+      stealthMode,
+    };
+  }
+  const all = result as Api.stories.AllStories;
+  const peerStories = (all.peerStories ?? [])
+    .map(summarizePeerStories)
+    .filter((p): p is PeerStoriesSummary => p !== null);
+  return {
+    modified: true,
+    state: all.state,
+    hasMore: all.hasMore,
+    count: all.count,
+    peerStories,
+    stealthMode,
+  };
 }
 
 export class TelegramService {
@@ -1093,6 +2238,8 @@ export class TelegramService {
    */
   // biome-ignore lint: GramJS has no proper entity union type
   private async resolvePeer(chatId: string): Promise<any> {
+    // Normalize '@me' — GramJS only intercepts the plain 'me' string as InputPeerSelf
+    if (chatId === "@me") return "me";
     // Numeric IDs and @usernames work directly
     if (/^-?\d+$/.test(chatId) || chatId.startsWith("@")) return chatId;
     // Everything else — resolve via dialogs
@@ -2553,6 +3700,446 @@ export class TelegramService {
     }, `setSlowMode ${chatId}`);
   }
 
+  async toggleChannelSignatures(chatId: string, enabled: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Channel signatures are only available for broadcast channels (not groups or supergroups)");
+      }
+      if (entity.megagroup) {
+        throw new Error("Channel signatures are only available for broadcast channels, not supergroups");
+      }
+      await this.client?.invoke(new Api.channels.ToggleSignatures({ channel: entity, signaturesEnabled: enabled }));
+    }, `toggleChannelSignatures ${chatId}`);
+  }
+
+  async toggleAntiSpam(chatId: string, enabled: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Aggressive anti-spam is only available for supergroups");
+      }
+      if (!entity.megagroup) {
+        throw new Error("Aggressive anti-spam is only available for supergroups, not broadcast channels");
+      }
+      await this.client?.invoke(new Api.channels.ToggleAntiSpam({ channel: entity, enabled }));
+    }, `toggleAntiSpam ${chatId}`);
+  }
+
+  async toggleForumMode(chatId: string, enabled: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Forum mode is only available for supergroups");
+      }
+      if (!entity.megagroup) {
+        throw new Error("Forum mode is only available for supergroups, not broadcast channels");
+      }
+      await this.client?.invoke(new Api.channels.ToggleForum({ channel: entity, enabled }));
+    }, `toggleForumMode ${chatId}`);
+  }
+
+  async togglePrehistoryHidden(chatId: string, hidden: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Prehistory visibility is only available for supergroups");
+      }
+      if (!entity.megagroup) {
+        throw new Error("Prehistory visibility is only available for supergroups, not broadcast channels");
+      }
+      await this.client?.invoke(new Api.channels.TogglePreHistoryHidden({ channel: entity, enabled: hidden }));
+    }, `togglePrehistoryHidden ${chatId}`);
+  }
+
+  async setChatAvailableReactions(
+    chatId: string,
+    reactions: { type: "all"; allowCustom?: boolean } | { type: "some"; emoji: string[] } | { type: "none" },
+  ): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel) && !(entity instanceof Api.Chat)) {
+        throw new Error("Chat reactions can only be configured for groups, supergroups, and channels");
+      }
+      let availableReactions: Api.TypeChatReactions;
+      if (reactions.type === "all") {
+        availableReactions = new Api.ChatReactionsAll({ allowCustom: reactions.allowCustom });
+      } else if (reactions.type === "none") {
+        availableReactions = new Api.ChatReactionsNone();
+      } else {
+        if (reactions.emoji.length === 0) {
+          throw new Error('reactions.emoji must be non-empty when type is "some" (use type:"none" to disable)');
+        }
+        availableReactions = new Api.ChatReactionsSome({
+          reactions: reactions.emoji.map((emoticon) => new Api.ReactionEmoji({ emoticon })),
+        });
+      }
+      await this.client?.invoke(new Api.messages.SetChatAvailableReactions({ peer: entity, availableReactions }));
+    }, `setChatAvailableReactions ${chatId}`);
+  }
+
+  async approveChatJoinRequest(chatId: string, userId: string, approved: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Join request approval is only supported for supergroups and channels, not basic groups");
+      }
+      const user = await this.client?.getEntity(userId);
+      if (!(user instanceof Api.User)) {
+        throw new Error("Target is not a user");
+      }
+      const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
+      await this.client?.invoke(new Api.messages.HideChatJoinRequest({ peer: entity, userId: inputUser, approved }));
+    }, `approveChatJoinRequest ${chatId}/${userId}`);
+  }
+
+  async getInlineBotResults(
+    bot: string,
+    chatId: string,
+    query: string,
+    offset?: string,
+  ): Promise<{
+    queryId: string;
+    nextOffset?: string;
+    cacheTime: number;
+    gallery: boolean;
+    results: Array<{ id: string; type: string; title?: string; description?: string; url?: string }>;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const peer = await this.resolveChat(chatId);
+      const botEntity = await this.client?.getEntity(bot);
+      if (!(botEntity instanceof Api.User)) {
+        throw new Error(`'${bot}' is not a user/bot`);
+      }
+      if (!botEntity.bot) {
+        throw new Error(`'${bot}' is not a bot (inline queries require a bot account)`);
+      }
+      const inputBot = new Api.InputUser({
+        userId: botEntity.id,
+        accessHash: botEntity.accessHash ?? bigInt.zero,
+      });
+      const result = await this.client?.invoke(
+        new Api.messages.GetInlineBotResults({
+          bot: inputBot,
+          peer,
+          query,
+          offset: offset ?? "",
+        }),
+      );
+      if (!result) throw new Error("No inline bot results returned");
+      return {
+        queryId: result.queryId.toString(),
+        nextOffset: result.nextOffset,
+        cacheTime: result.cacheTime,
+        gallery: result.gallery === true,
+        results: result.results.map((r) => {
+          if (r instanceof Api.BotInlineResult) {
+            return { id: r.id, type: r.type, title: r.title, description: r.description, url: r.url };
+          }
+          const mr = r as Api.BotInlineMediaResult;
+          return { id: mr.id, type: mr.type, title: mr.title, description: mr.description };
+        }),
+      };
+    }, `getInlineBotResults via ${bot}`);
+  }
+
+  async sendInlineBotResult(
+    chatId: string,
+    queryId: string,
+    resultId: string,
+    options?: { replyTo?: number; silent?: boolean; hideVia?: boolean; clearDraft?: boolean },
+  ): Promise<{ messageId: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const peer = await this.resolveChat(chatId);
+      const randomId = bigInt(Math.floor(Math.random() * 1e15));
+      const replyTo = options?.replyTo ? new Api.InputReplyToMessage({ replyToMsgId: options.replyTo }) : undefined;
+      const result = await this.client?.invoke(
+        new Api.messages.SendInlineBotResult({
+          peer,
+          queryId: bigInt(queryId),
+          id: resultId,
+          randomId,
+          ...(replyTo ? { replyTo } : {}),
+          ...(options?.silent ? { silent: true } : {}),
+          ...(options?.hideVia ? { hideVia: true } : {}),
+          ...(options?.clearDraft ? { clearDraft: true } : {}),
+        }),
+      );
+      if (!result) throw new Error("No response from SendInlineBotResult");
+      if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+        for (const update of result.updates) {
+          if (update instanceof Api.UpdateMessageID && update.randomId?.equals(randomId)) {
+            return { messageId: update.id };
+          }
+        }
+      }
+      if (result instanceof Api.UpdateShortSentMessage) {
+        return { messageId: result.id };
+      }
+      return { messageId: 0 };
+    }, `sendInlineBotResult ${resultId} to ${chatId}`);
+  }
+
+  async pressButton(
+    chatId: string,
+    messageId: number,
+    options: { buttonIndex?: { row: number; column: number }; data?: string },
+  ): Promise<{
+    alert?: boolean;
+    hasUrl?: boolean;
+    nativeUi?: boolean;
+    message?: string;
+    url?: string;
+    cacheTime: number;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+
+      let data: Buffer;
+      if (options.buttonIndex) {
+        const { row, column } = options.buttonIndex;
+        const messages = await this.client?.getMessages(entity, { ids: [messageId] });
+        const msg = messages?.[0];
+        if (!msg) throw new Error(`Message ${messageId} not found in ${chatId}`);
+        const markup = (msg as Api.Message).replyMarkup;
+        if (!markup) throw new Error(`Message ${messageId} has no reply markup`);
+        if (!(markup instanceof Api.ReplyInlineMarkup)) {
+          throw new Error(
+            `Message ${messageId} reply markup is ${markup.className} (only ReplyInlineMarkup has callable buttons)`,
+          );
+        }
+        const rowEntry = markup.rows[row];
+        if (!rowEntry) throw new Error(`Row ${row} out of bounds (message has ${markup.rows.length} rows)`);
+        const button = rowEntry.buttons[column];
+        if (!button) {
+          throw new Error(`Column ${column} out of bounds in row ${row} (row has ${rowEntry.buttons.length} buttons)`);
+        }
+        if (!(button instanceof Api.KeyboardButtonCallback)) {
+          throw new Error(
+            `Button at (${row},${column}) is ${button.className}, not callable — use the appropriate tool for URL/switch-inline/game buttons`,
+          );
+        }
+        if (button.requiresPassword) {
+          throw new Error(
+            `Button at (${row},${column}) requires 2FA password confirmation — not supported by telegram-press-button`,
+          );
+        }
+        data = Buffer.from(button.data as Uint8Array);
+      } else if (options.data !== undefined) {
+        data = Buffer.from(options.data, "base64");
+      } else {
+        throw new Error("Either buttonIndex or data must be provided");
+      }
+
+      const answer = await this.client?.invoke(
+        new Api.messages.GetBotCallbackAnswer({
+          peer: entity,
+          msgId: messageId,
+          data,
+        }),
+      );
+      if (!answer) throw new Error("No callback answer returned");
+      return {
+        alert: answer.alert,
+        hasUrl: answer.hasUrl,
+        nativeUi: answer.nativeUi,
+        message: answer.message,
+        url: answer.url,
+        cacheTime: answer.cacheTime,
+      };
+    }, `pressButton ${chatId}/${messageId}`);
+  }
+
+  async getMessageButtons(
+    chatId: string,
+    messageId: number,
+  ): Promise<{
+    markupType: string;
+    buttons: MessageButtonDescriptor[];
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      const messages = await this.client?.getMessages(entity, { ids: [messageId] });
+      const msg = messages?.[0];
+      if (!msg) throw new Error(`Message ${messageId} not found in ${chatId}`);
+      const markup = (msg as Api.Message).replyMarkup;
+      if (!markup) {
+        return { markupType: "none", buttons: [] };
+      }
+      if (!(markup instanceof Api.ReplyInlineMarkup) && !(markup instanceof Api.ReplyKeyboardMarkup)) {
+        return { markupType: markup.className, buttons: [] };
+      }
+      const buttons: MessageButtonDescriptor[] = [];
+      markup.rows.forEach((rowEntry, row) => {
+        rowEntry.buttons.forEach((button, col) => {
+          buttons.push(describeKeyboardButton(button, row, col));
+        });
+      });
+      return { markupType: markup.className, buttons };
+    }, `getMessageButtons ${chatId}/${messageId}`);
+  }
+
+  async getBroadcastStats(
+    chatId: string,
+    options?: { dark?: boolean; includeGraphs?: boolean },
+  ): Promise<BroadcastStatsSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Broadcast stats are only available for channels");
+      }
+      if (entity.megagroup) {
+        throw new Error(
+          "Broadcast stats are only available for broadcast channels, not supergroups (use telegram-get-megagroup-stats)",
+        );
+      }
+      let result: Api.stats.BroadcastStats;
+      try {
+        const response = await this.client?.invoke(
+          new Api.stats.GetBroadcastStats({ channel: entity, dark: options?.dark }),
+        );
+        if (!response) {
+          throw new Error("channel has no stats (may require Telegram Premium admin)");
+        }
+        result = response as Api.stats.BroadcastStats;
+      } catch (e) {
+        const msg = (e as Error).message ?? String(e);
+        if (/CHAT_ADMIN_REQUIRED|ADMIN_RANK_INVALID/i.test(msg)) {
+          throw new Error("Access denied: channel stats require admin rights (and may require Telegram Premium)");
+        }
+        if (/STATS_UNAVAILABLE|BROADCAST_REQUIRED|PARTICIPANTS_TOO_FEW/i.test(msg)) {
+          throw new Error("channel has no stats (may require Telegram Premium admin)");
+        }
+        throw e;
+      }
+      return summarizeBroadcastStats(result, options?.includeGraphs === true);
+    }, `getBroadcastStats ${chatId}`);
+  }
+
+  async getMegagroupStats(
+    chatId: string,
+    options?: { dark?: boolean; includeGraphs?: boolean },
+  ): Promise<MegagroupStatsSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(
+      async () => {
+        const entity = await this.resolveChat(chatId);
+        if (!(entity instanceof Api.Channel)) {
+          throw new Error("Megagroup stats are only available for supergroups");
+        }
+        if (!entity.megagroup) {
+          throw new Error(
+            "Megagroup stats are only available for supergroups, not broadcast channels (use telegram-get-broadcast-stats)",
+          );
+        }
+        let result: Api.stats.MegagroupStats;
+        try {
+          const response = await this.client?.invoke(
+            new Api.stats.GetMegagroupStats({ channel: entity, dark: options?.dark }),
+          );
+          if (!response) {
+            throw new Error("supergroup has no stats yet (needs more activity/members)");
+          }
+          result = response as Api.stats.MegagroupStats;
+        } catch (e) {
+          const msg = (e as Error).message ?? String(e);
+          if (/CHAT_ADMIN_REQUIRED|ADMIN_RANK_INVALID/i.test(msg)) {
+            throw new Error("Access denied: supergroup stats require admin rights");
+          }
+          if (/STATS_UNAVAILABLE|PARTICIPANTS_TOO_FEW|MEGAGROUP_REQUIRED/i.test(msg)) {
+            throw new Error("supergroup has no stats yet (needs more activity/members)");
+          }
+          throw e;
+        }
+        return summarizeMegagroupStats(result, options?.includeGraphs === true);
+      },
+      `getMegagroupStats ${chatId}`,
+      { throwOnFloodWait: true },
+    );
+  }
+
+  async getUpdatesState(): Promise<{
+    pts: number;
+    qts: number;
+    date: number;
+    seq: number;
+    unreadCount: number;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const state = await this.client?.invoke(new Api.updates.GetState());
+      if (!state) throw new Error("updates.GetState returned no state");
+      return {
+        pts: state.pts,
+        qts: state.qts,
+        date: state.date,
+        seq: state.seq,
+        unreadCount: state.unreadCount,
+      };
+    }, "getUpdatesState");
+  }
+
+  async getUpdates(cursor: {
+    pts: number;
+    date: number;
+    qts: number;
+    ptsLimit?: number;
+    ptsTotalLimit?: number;
+  }): Promise<UpdatesDifferenceSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const ptsLimit = Math.min(cursor.ptsLimit ?? 100, 1000);
+    const ptsTotalLimit = Math.min(cursor.ptsTotalLimit ?? 1000, 1000);
+    return this.rateLimiter.execute(async () => {
+      const diff = await this.client?.invoke(
+        new Api.updates.GetDifference({
+          pts: cursor.pts,
+          date: cursor.date,
+          qts: cursor.qts,
+          ptsLimit,
+          ptsTotalLimit,
+        }),
+      );
+      if (!diff) throw new Error("updates.GetDifference returned nothing");
+      return summarizeUpdatesDifference(diff, cursor);
+    }, "getUpdates");
+  }
+
+  async getChannelUpdates(
+    chatId: string,
+    cursor: { pts: number; limit?: number; force?: boolean },
+  ): Promise<ChannelDifferenceSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const limit = Math.min(cursor.limit ?? 100, 1_000);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Channel updates are only available for channels/supergroups");
+      }
+      const diff = await this.client?.invoke(
+        new Api.updates.GetChannelDifference({
+          channel: entity,
+          filter: new Api.ChannelMessagesFilterEmpty(),
+          pts: cursor.pts,
+          limit,
+          force: cursor.force,
+        }),
+      );
+      if (!diff) throw new Error("updates.GetChannelDifference returned nothing");
+      return summarizeChannelDifference(diff, entity.id.toString(), cursor.pts);
+    }, `getChannelUpdates ${chatId}`);
+  }
+
   async createForumTopic(
     chatId: string,
     title: string,
@@ -3195,5 +4782,246 @@ export class TelegramService {
       accessHash: (doc as Api.Document).accessHash.toString(),
       emoji: emojiMap.get((doc as Api.Document).id.toString()) || "",
     }));
+  }
+
+  async getAllStories(options?: { next?: boolean; hidden?: boolean; state?: string }): Promise<AllStoriesSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(
+        new Api.stories.GetAllStories({
+          next: options?.next,
+          hidden: options?.hidden,
+          state: options?.state,
+        }),
+      );
+      if (!response) throw new Error("stories.GetAllStories returned nothing");
+      return summarizeAllStories(response);
+    }, "getAllStories");
+  }
+
+  async getPeerStories(chatId: string): Promise<PeerStoriesSummary | null> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(new Api.stories.GetPeerStories({ peer }));
+      if (!response) throw new Error("stories.GetPeerStories returned nothing");
+      return summarizePeerStories(response.stories);
+    }, `getPeerStories ${chatId}`);
+  }
+
+  async getStoriesById(chatId: string, ids: number[]): Promise<StoriesByIdSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(new Api.stories.GetStoriesByID({ peer, id: ids }));
+      if (!response) throw new Error("stories.GetStoriesByID returned nothing");
+      return summarizeStoriesById(response);
+    }, `getStoriesById ${chatId}`);
+  }
+
+  async getStoryViewsList(
+    chatId: string,
+    options: {
+      id: number;
+      q?: string;
+      justContacts?: boolean;
+      reactionsFirst?: boolean;
+      forwardsFirst?: boolean;
+      offset?: string;
+      limit?: number;
+    },
+  ): Promise<StoryViewsListSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(
+        new Api.stories.GetStoryViewsList({
+          peer,
+          id: options.id,
+          q: options.q,
+          justContacts: options.justContacts,
+          reactionsFirst: options.reactionsFirst,
+          forwardsFirst: options.forwardsFirst,
+          offset: options.offset ?? "",
+          limit: options.limit ?? 50,
+        }),
+      );
+      if (!response) throw new Error("stories.GetStoryViewsList returned nothing");
+      return summarizeStoryViewsList(response);
+    }, `getStoryViewsList ${chatId}/${options.id}`);
+  }
+
+  async getMyBoosts(): Promise<MyBoostsSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(new Api.premium.GetMyBoosts());
+      if (!response) throw new Error("premium.GetMyBoosts returned nothing");
+      return summarizeMyBoosts(response);
+    }, "getMyBoosts");
+  }
+
+  async getBoostsStatus(chatId: string): Promise<BoostsStatusSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(new Api.premium.GetBoostsStatus({ peer }));
+      if (!response) throw new Error("premium.GetBoostsStatus returned nothing");
+      return summarizeBoostsStatus(response);
+    }, `getBoostsStatus ${chatId}`);
+  }
+
+  async getBoostsList(
+    chatId: string,
+    options: { gifts?: boolean; offset?: string; limit?: number } = {},
+  ): Promise<BoostsListSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(
+        new Api.premium.GetBoostsList({
+          peer,
+          gifts: options.gifts,
+          offset: options.offset ?? "",
+          limit: options.limit ?? 50,
+        }),
+      );
+      if (!response) throw new Error("premium.GetBoostsList returned nothing");
+      return summarizeBoostsList(response);
+    }, `getBoostsList ${chatId}`);
+  }
+
+  async getBusinessChatLinks(): Promise<BusinessChatLinksSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(new Api.account.GetBusinessChatLinks());
+      if (!response) throw new Error("account.GetBusinessChatLinks returned nothing");
+      return summarizeBusinessChatLinks(response);
+    }, "getBusinessChatLinks");
+  }
+
+  async getGroupCall(chatId: string, options: { limit?: number } = {}): Promise<GroupCallSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const call = await this.resolveInputGroupCall(chatId);
+      const response = await this.client?.invoke(new Api.phone.GetGroupCall({ call, limit: options.limit ?? 0 }));
+      if (!response) throw new Error("phone.GetGroupCall returned nothing");
+      return summarizeGroupCall(response);
+    }, `getGroupCall ${chatId}`);
+  }
+
+  async getGroupCallParticipants(
+    chatId: string,
+    options: { ids?: string[]; sources?: number[]; offset?: string; limit?: number } = {},
+  ): Promise<GroupCallParticipantsSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const call = await this.resolveInputGroupCall(chatId);
+      const ids: Api.TypeEntityLike[] = [];
+      for (const id of options.ids ?? []) {
+        ids.push(await this.resolvePeer(id));
+      }
+      const response = await this.client?.invoke(
+        new Api.phone.GetGroupParticipants({
+          call,
+          ids,
+          sources: options.sources ?? [],
+          offset: options.offset ?? "",
+          limit: options.limit ?? 100,
+        }),
+      );
+      if (!response) throw new Error("phone.GetGroupParticipants returned nothing");
+      return summarizeGroupCallParticipants(response);
+    }, `getGroupCallParticipants ${chatId}`);
+  }
+
+  async getStarsStatus(chatId: string): Promise<StarsStatusSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(new Api.payments.GetStarsStatus({ peer }));
+      if (!response) throw new Error("payments.GetStarsStatus returned nothing");
+      return summarizeStarsStatus(response);
+    }, `getStarsStatus ${chatId}`);
+  }
+
+  async getStarsTransactions(
+    chatId: string,
+    options: {
+      inbound?: boolean;
+      outbound?: boolean;
+      ascending?: boolean;
+      subscriptionId?: string;
+      offset?: string;
+      limit?: number;
+    } = {},
+  ): Promise<StarsStatusSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(
+        new Api.payments.GetStarsTransactions({
+          peer,
+          inbound: options.inbound,
+          outbound: options.outbound,
+          ascending: options.ascending,
+          subscriptionId: options.subscriptionId,
+          offset: options.offset ?? "",
+          limit: options.limit ?? 50,
+        }),
+      );
+      if (!response) throw new Error("payments.GetStarsTransactions returned nothing");
+      return summarizeStarsStatus(response);
+    }, `getStarsTransactions ${chatId}`);
+  }
+
+  async getQuickReplies(hash?: string): Promise<QuickRepliesSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(
+        new Api.messages.GetQuickReplies({ hash: hash ? bigInt(hash) : bigInt(0) }),
+      );
+      if (!response) throw new Error("messages.GetQuickReplies returned nothing");
+      return summarizeQuickReplies(response);
+    }, "getQuickReplies");
+  }
+
+  async getQuickReplyMessages(
+    shortcutId: number,
+    options: { ids?: number[]; hash?: string } = {},
+  ): Promise<QuickReplyMessagesSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const response = await this.client?.invoke(
+        new Api.messages.GetQuickReplyMessages({
+          shortcutId,
+          id: options.ids,
+          hash: options.hash ? bigInt(options.hash) : bigInt(0),
+        }),
+      );
+      if (!response) throw new Error("messages.GetQuickReplyMessages returned nothing");
+      return summarizeQuickReplyMessages(response);
+    }, `getQuickReplyMessages ${shortcutId}`);
+  }
+
+  private async resolveInputGroupCall(chatId: string): Promise<Api.TypeInputGroupCall> {
+    const entity = await this.resolveChat(chatId);
+    let call: Api.TypeInputGroupCall | undefined;
+    if (entity instanceof Api.Channel) {
+      const full = await this.client?.invoke(new Api.channels.GetFullChannel({ channel: entity }));
+      if (full?.fullChat instanceof Api.ChannelFull) {
+        call = full.fullChat.call;
+      }
+    } else if (entity instanceof Api.Chat) {
+      const full = await this.client?.invoke(new Api.messages.GetFullChat({ chatId: entity.id }));
+      if (full?.fullChat instanceof Api.ChatFull) {
+        call = full.fullChat.call;
+      }
+    } else {
+      throw new Error("Group calls are only available for groups/supergroups/channels");
+    }
+    if (!call) {
+      throw new Error(`No active group call in chat ${chatId}`);
+    }
+    return call;
   }
 }

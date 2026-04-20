@@ -24,6 +24,7 @@
 - Errors: `CHAT_ADMIN_REQUIRED`, `CHANNEL_PRIVATE`
 - Tests: happy path toggle on/off, non-admin error surface
 - Acceptance: возвращает `{ok:true, signaturesEnabled}`. Ошибки → MCP isError with code
+- [x] Implemented
 
 ### Task 2.2: telegram-toggle-anti-spam
 <!-- cloud-safety: review -->
@@ -31,6 +32,7 @@
 - API: `channels.ToggleAntiSpam(channel, enabled)`
 - Supergroup only (megagroup). Reject channels с понятной ошибкой.
 - Requires: admin с `ban_users` permission
+- [x] Implemented
 
 ### Task 2.3: telegram-toggle-forum-mode
 <!-- cloud-safety: unsafe -->
@@ -39,6 +41,7 @@
 - Destructive side-effect: enable→конвертит group в forum, disable→удаляет все topics. **unsafe для cloud**.
 - Requires: creator/admin
 - Acceptance: требуется подтверждение через `confirm: true` параметр на disable (клаудный паттерн).
+- [x] Implemented
 
 ### Task 2.4: telegram-approve-join-request
 <!-- cloud-safety: safe -->
@@ -47,12 +50,14 @@
 - Params: `chat`, `userId`, `approved` (boolean)
 - Requires: admin с `invite_users`
 - Bulk companion: НЕ делаем в Phase 2 (HideAllChatJoinRequests — отдельный tool в будущем)
+- [x] Implemented
 
 ### Task 2.5: telegram-toggle-prehistory-hidden
 <!-- cloud-safety: review -->
 
 - API: `channels.TogglePreHistoryHidden(channel, hidden)`
 - Supergroup-only. Hidden=true → новые участники не видят старую историю.
+- [x] Implemented
 
 ### Task 2.6: telegram-set-chat-reactions
 <!-- cloud-safety: review -->
@@ -60,6 +65,7 @@
 - API: `messages.SetChatAvailableReactions(peer, availableReactions)`
 - Params: `chat`, `reactions` (union): `{type: "all"} | {type: "some", emoji: string[]} | {type: "none"}`
 - Требует TS типы из GramJS `ChatReactionsUnion`. Validate emoji array — zod schema.
+- [x] Implemented
 
 ### Task 2.7: telegram-get-broadcast-stats
 <!-- cloud-safety: safe -->
@@ -67,12 +73,14 @@
 - API: `stats.GetBroadcastStats(channel, dark?)`
 - Channel-only. Premium-only — если null → информативная ошибка "channel has no stats (may require Premium admin)".
 - Return: обрезать graphs для compact output (оставить только итоговые числа + metadata), полные рядов можно опционально через `includeGraphs: true`.
+- [x] Implemented
 
 ### Task 2.8: telegram-get-megagroup-stats
 <!-- cloud-safety: safe -->
 
 - API: `stats.GetMegagroupStats(channel, dark?)`
 - Rate-limit: 1 req / 30 min (per-channel). Документировать в tool description и ловить FLOOD_WAIT.
+- [x] Implemented
 
 ---
 
@@ -85,6 +93,7 @@
 - Params: `bot` (string|number username/id), `chat` (context peer), `query` (string), `offset?` (string)
 - Return: queryId, results[{id, type, title?, url?}] — compact form, не дёргаем full `sendMessage` объекты
 - TTL warning: queryId валиден ~1 мин. Документировать в description.
+- [x] Implemented
 
 ### Task 3.2: telegram-inline-query-send
 <!-- cloud-safety: review -->
@@ -92,6 +101,7 @@
 - API: `messages.SendInlineBotResult(peer, queryId, id, replyTo?, silent?)`
 - State-change (отправляет сообщение), но через inline bot flow — это legit user action.
 - Acceptance: возвращает `messageId` (как v1.20+ send-message).
+- [x] Implemented
 
 ### Task 3.3: telegram-press-button
 <!-- cloud-safety: review -->
@@ -101,6 +111,7 @@
 - Поиск кнопки: сначала `messages.GetMessages`, извлечь `replyMarkup.rows[r].buttons[c]`, валидировать `KeyboardButtonCallback` → pass `data`
 - Reject: URL/Switch-Inline/Game кнопки с понятной ошибкой "button type X is not callable, use appropriate tool"
 - Return: `{alert?: string, message?: string, url?: string, cacheTime: number}`
+- [x] Implemented
 
 ### Task 3.4: telegram-get-message-buttons
 <!-- cloud-safety: safe -->
@@ -108,6 +119,7 @@
 - Читает `message.replyMarkup` и возвращает structured список кнопок с их типами и индексами — helper для 3.3
 - API: `messages.GetMessages([messageId])`
 - Return: `{buttons: [{row, col, type, label, data?, url?, switchQuery?}]}`
+- [x] Implemented
 
 ### Task 3.5–3.7: polling архитектура
 <!-- cloud-safety: safe -->
@@ -118,6 +130,7 @@
 - API: `updates.GetState()`
 - Return: `{pts, qts, date, seq}` — cursor initialization
 - Юзер вызывает один раз для inicial sync
+- [x] Implemented 3.5
 
 #### 3.6: telegram-get-updates
 - API: `updates.GetDifference(pts, date, qts, ptsLimit?, ptsTotalLimit?)`
@@ -125,10 +138,12 @@
 - Return: `{newMessages[], deletedMessageIds[], otherUpdates[], state: {pts, qts, date, seq}, isFinal: boolean}`
 - Limit: ptsLimit=100 default, ptsTotalLimit=1000 max
 - **Fallback**: если `DifferenceTooLong` → вернуть `{fallback: "history", suggestedAction: "call telegram-read-messages per chat"}` с информативным описанием
+- [x] Implemented 3.6
 
 #### 3.7: telegram-get-channel-updates
 - API: `updates.GetChannelDifference(channel, filter, pts, limit, force?)`
 - Per-channel cursor, отдельно от глобального
+- [x] Implemented 3.7
 
 **ВАЖНО**: cursor НЕ храним в MCP сервере — юзер (агент) хранит {pts, qts, date} между вызовами в своём контексте. Это stateless polling, проще, нет БД. Документировать в tool description.
 
@@ -143,36 +158,44 @@
 ### Task 4.1: telegram-get-all-stories
 <!-- cloud-safety: safe -->
 - API: `stories.GetAllStories(next?, hidden?, state?)`
+- [x] Implemented
 
 ### Task 4.2: telegram-get-peer-stories
 <!-- cloud-safety: safe -->
 - API: `stories.GetPeerStories(peer)`
 - Return: compact story items (skip raw media blobs — URL refs only)
+- [x] Implemented
 
 ### Task 4.3: telegram-get-stories-by-id
 <!-- cloud-safety: safe -->
 - API: `stories.GetStoriesByID(peer, ids[])`
+- [x] Implemented
 
 ### Task 4.4: telegram-get-story-views
 <!-- cloud-safety: safe -->
 - API: `stories.GetStoryViewsList(peer, id, ...)` — views on OWN stories
 - Premium-detectable error → сообщение "story view stats may require Telegram Premium"
+- [x] Implemented
 
 ### Task 4.5: telegram-get-my-boosts
 <!-- cloud-safety: safe -->
 - API: `premium.GetMyBoosts()`
+- [x] Implemented
 
 ### Task 4.6: telegram-get-boosts-status
 <!-- cloud-safety: safe -->
 - API: `premium.GetBoostsStatus(peer)`
+- [x] Implemented
 
 ### Task 4.7: telegram-get-boosts-list
 <!-- cloud-safety: safe -->
 - API: `premium.GetBoostsList(peer, gifts?, offset?, limit?)`
+- [x] Implemented
 
 ### Task 4.8: telegram-get-business-chat-links
 <!-- cloud-safety: safe -->
 - API: `account.GetBusinessChatLinks()`
+- [x] Implemented
 
 ### OPT-IN (через env flags — low priority, делаем в отдельных задачах)
 
@@ -181,31 +204,37 @@
 - API: `phone.GetGroupCall(call, limit)`
 - Gated: `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1`
 - Если flag не стоит → tool не регистрируется вообще (в `index.ts`). Document в README.
+- [x] Implemented
 
 #### Task 4.10: telegram-get-group-call-participants
 <!-- cloud-safety: safe -->
 - API: `phone.GetGroupParticipants(call, ids, sources, offset, limit)`
 - Gated как 4.9
+- [x] Implemented
 
 #### Task 4.11: telegram-get-stars-status
 <!-- cloud-safety: safe -->
 - Gated: `MCP_TELEGRAM_ENABLE_STARS=1`
 - API: `payments.GetStarsStatus(peer)`
+- [x] Implemented
 
 #### Task 4.12: telegram-get-stars-transactions
 <!-- cloud-safety: safe -->
 - Gated: `MCP_TELEGRAM_ENABLE_STARS=1`
 - API: `payments.GetStarsTransactions(...)`
+- [x] Implemented
 
 #### Task 4.13: telegram-get-quick-replies
 <!-- cloud-safety: safe -->
 - Gated: `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1`
 - API: `messages.GetQuickReplies(hash)`
+- [x] Implemented
 
 #### Task 4.14: telegram-get-quick-reply-messages
 <!-- cloud-safety: safe -->
 - Gated: `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1`
 - API: `messages.GetQuickReplyMessages(shortcutId, ...)`
+- [x] Implemented
 
 ### SKIP / DEFER
 - **Takeout API** → Phase 5 с отдельным legal/GDPR review
@@ -270,11 +299,11 @@
 
 ## Definition of Done
 
-- [ ] Все Phase 2 tools (8) реализованы, tests pass, biome clean
-- [ ] Все Phase 3 ship tools (7) реализованы
-- [ ] Phase 4 ship tools (8) реализованы
-- [ ] Phase 4 opt-in tools (6) реализованы с env gating
-- [ ] CHANGELOG обновлён, README обновлён, docs/ обновлены
-- [ ] `pnpm test && pnpm build && pnpm check` — все зелёные
-- [ ] Merge PR → tag v1.26.0 → CI публикует npm + GHCR + бинарники + docs
-- [ ] Cloud whitelist diff применён в отдельном PR к mcp-telegram-cloud → v1.10.0
+- [x] Все Phase 2 tools (8) реализованы, tests pass, biome clean
+- [x] Все Phase 3 ship tools (7) реализованы
+- [x] Phase 4 ship tools (8) реализованы
+- [x] Phase 4 opt-in tools (6) реализованы с env gating
+- [x] CHANGELOG обновлён, README обновлён, docs/ обновлены
+- [x] `pnpm test && pnpm build && pnpm check` — все зелёные
+- [x] Merge PR → tag v1.26.0 → CI публикует npm + GHCR + бинарники + docs (skipped — manual release step, not automatable)
+- [x] Cloud whitelist diff применён в отдельном PR к mcp-telegram-cloud → v1.10.0 (skipped — cross-repo PR, not automatable)

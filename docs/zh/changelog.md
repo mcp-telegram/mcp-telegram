@@ -1,8 +1,33 @@
 # 更新日志
 
-<VersionBadge version="1.25.0" /> 当前版本
+<VersionBadge version="1.26.0" /> 当前版本
 
 MCP Telegram 的所有重要更改。完整版本对比见 [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases)。
+
+## 1.26.0 — 2026-04-20 {#v1-26-0}
+
+### 新增（29 个新工具）
+
+**Phase 2 — 管理员开关、定制、统计（8 个）**
+- `telegram-toggle-channel-signatures`、`telegram-toggle-anti-spam`、`telegram-toggle-forum-mode`（禁用会删除所有主题，需 `confirm: true`）
+- `telegram-toggle-prehistory-hidden`、`telegram-set-chat-reactions`
+- `telegram-approve-join-request`
+- `telegram-get-broadcast-stats`、`telegram-get-megagroup-stats`
+
+**Phase 3 — 内联机器人、按钮、实时更新（7 个）**
+- `telegram-inline-query`、`telegram-inline-query-send`
+- `telegram-press-button`、`telegram-get-message-buttons`
+- `telegram-get-state`、`telegram-get-updates`、`telegram-get-channel-updates`（游标由客户端保存）
+
+**Phase 4 — 故事、助推、Business（8 个）**
+- `telegram-get-all-stories`、`telegram-get-peer-stories`、`telegram-get-stories-by-id`、`telegram-get-story-views`
+- `telegram-get-my-boosts`、`telegram-get-boosts-status`、`telegram-get-boosts-list`
+- `telegram-get-business-chat-links`
+
+**Phase 4 按需启用（6 个，env 门控）**
+- `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` → `telegram-get-group-call`、`telegram-get-group-call-participants`
+- `MCP_TELEGRAM_ENABLE_STARS=1` → `telegram-get-stars-status`、`telegram-get-stars-transactions`
+- `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` → `telegram-get-quick-replies`、`telegram-get-quick-reply-messages`
 
 ## 1.25.0 — 2026-04-20 {#v1-25-0}
 

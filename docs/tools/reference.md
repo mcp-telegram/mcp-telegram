@@ -181,6 +181,74 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 | `telegram-pin-chat` | Pin or unpin a dialog in the chat list |
 | `telegram-mark-dialog-unread` | Mark a dialog as unread or clear the unread flag |
 
+## Admin Toggles & Customization
+
+| Tool | Description |
+|------|-------------|
+| `telegram-toggle-channel-signatures` | Toggle post signatures on a channel |
+| `telegram-toggle-anti-spam` | Toggle native anti-spam in a supergroup (admin with `ban_users`) |
+| `telegram-toggle-forum-mode` | Enable/disable forum mode (disabling removes all topics; requires `confirm: true`) |
+| `telegram-toggle-prehistory-hidden` | Hide or show pre-history for new supergroup members |
+| `telegram-set-chat-reactions` | Configure allowed reactions on a chat (`all` / `some` / `none`) |
+| `telegram-approve-join-request` | Approve or reject a chat join request |
+
+## Stats
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-broadcast-stats` | Get channel stats (pass `includeGraphs: true` for raw series; Premium admin may be required) |
+| `telegram-get-megagroup-stats` | Get supergroup stats (Telegram rate-limits to ~1 req/30 min per channel) |
+
+## Inline Bots & Buttons
+
+| Tool | Description |
+|------|-------------|
+| `telegram-inline-query` | Query an inline bot in a chat context (queryId TTL ≈ 1 min) |
+| `telegram-inline-query-send` | Send an inline bot result by queryId + result id |
+| `telegram-press-button` | Press a callback button on a message by row/col or raw data |
+| `telegram-get-message-buttons` | List a message's reply-markup buttons with indices and types |
+
+## Real-Time Updates (Polling)
+
+Cursors are client-owned — the agent stores `{pts, qts, date}` between calls and passes them in.
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-state` | Initialize a polling cursor (`pts`, `qts`, `date`, `seq`) |
+| `telegram-get-updates` | Fetch global updates since a known cursor (falls back to history hint on `DifferenceTooLong`) |
+| `telegram-get-channel-updates` | Fetch per-channel updates since a known channel cursor |
+
+## Stories
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-all-stories` | List stories across peers with pagination state |
+| `telegram-get-peer-stories` | List stories posted by one peer |
+| `telegram-get-stories-by-id` | Fetch specific story items by id |
+| `telegram-get-story-views` | List views on your own stories (Premium for full stats) |
+
+## Boosts & Business
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-my-boosts` | List boost slots assigned by your account |
+| `telegram-get-boosts-status` | Boost status for a channel/supergroup |
+| `telegram-get-boosts-list` | List boosters for a channel (admin) |
+| `telegram-get-business-chat-links` | List your Telegram Business chat links |
+
+## Opt-In (env-gated)
+
+These tools are only registered when the corresponding environment flag is set.
+
+| Tool | Env flag |
+|------|----------|
+| `telegram-get-group-call` | `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` |
+| `telegram-get-group-call-participants` | `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` |
+| `telegram-get-stars-status` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-get-stars-transactions` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-get-quick-replies` | `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` |
+| `telegram-get-quick-reply-messages` | `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` |
+
 ---
 
 ::: tip

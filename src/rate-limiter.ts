@@ -29,12 +29,21 @@ export class RateLimiter {
     this.maxRetryDelay = options.maxRetryDelay ?? 60000;
   }
 
-  /** Execute a function with rate limiting and automatic retry */
-  async execute<T>(fn: () => Promise<T>, context = "API call"): Promise<T> {
-    return this.executeWithRetry(fn, context, 0);
+  /**
+   * Execute a function with rate limiting and automatic retry.
+   * @param throwOnFloodWait If true, throw immediately on FLOOD_WAIT instead of sleeping (use for
+   *   endpoints with very long rate-limit windows like stats APIs).
+   */
+  async execute<T>(fn: () => Promise<T>, context = "API call", options?: { throwOnFloodWait?: boolean }): Promise<T> {
+    return this.executeWithRetry(fn, context, 0, options);
   }
 
-  private async executeWithRetry<T>(fn: () => Promise<T>, context: string, attempt: number): Promise<T> {
+  private async executeWithRetry<T>(
+    fn: () => Promise<T>,
+    context: string,
+    attempt: number,
+    options?: { throwOnFloodWait?: boolean },
+  ): Promise<T> {
     await this.waitForSlot();
 
     try {
@@ -43,10 +52,15 @@ export class RateLimiter {
       const errorMessage =
         (error as { errorMessage?: string }).errorMessage || (error as Error).message || String(error);
 
-      // FLOOD_WAIT — wait the exact time Telegram requires
+      // FLOOD_WAIT — wait the exact time Telegram requires (or throw immediately if requested)
       const floodMatch = errorMessage.match(/FLOOD_WAIT[_]?(\d+)/i);
       if (floodMatch) {
         const waitSeconds = Number.parseInt(floodMatch[1], 10);
+        if (options?.throwOnFloodWait) {
+          throw new Error(
+            `Rate limit: Telegram requires a ${waitSeconds}s wait for ${context}. Try again in ${Math.ceil(waitSeconds / 60)} minute(s).`,
+          );
+        }
         if (attempt >= this.maxRetries) {
           throw new Error(
             `Rate limit exceeded after ${this.maxRetries} retries. Telegram requires ${waitSeconds}s wait. Try again later.`,
@@ -56,7 +70,7 @@ export class RateLimiter {
           `[rate-limiter] FLOOD_WAIT for ${context}. Waiting ${waitSeconds}s (attempt ${attempt + 1}/${this.maxRetries})`,
         );
         await sleep(waitSeconds * 1000);
-        return this.executeWithRetry(fn, context, attempt + 1);
+        return this.executeWithRetry(fn, context, attempt + 1, options);
       }
 
       // Network/timeout errors — exponential backoff
@@ -69,7 +83,7 @@ export class RateLimiter {
           `[rate-limiter] Network error for ${context}. Retrying in ${delay}ms (attempt ${attempt + 1}/${this.maxRetries})`,
         );
         await sleep(delay);
-        return this.executeWithRetry(fn, context, attempt + 1);
+        return this.executeWithRetry(fn, context, attempt + 1, options);
       }
 
       // Temporary server errors (5xx) — exponential backoff
@@ -79,7 +93,7 @@ export class RateLimiter {
         }
         const delay = Math.min(this.initialRetryDelay * 2 ** attempt, this.maxRetryDelay);
         await sleep(delay);
-        return this.executeWithRetry(fn, context, attempt + 1);
+        return this.executeWithRetry(fn, context, attempt + 1, options);
       }
 
       // Non-retryable — throw immediately

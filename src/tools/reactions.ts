@@ -118,6 +118,55 @@ export function registerReactionTools(server: McpServer, telegram: TelegramServi
   );
 
   server.registerTool(
+    "telegram-set-chat-reactions",
+    {
+      description:
+        "Set which reactions are available in a chat. type='all' allows all standard emoji (set allowCustom=true to also permit custom emoji for Premium users), type='some' restricts to a specific emoji list, type='none' disables reactions entirely. Requires admin",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username (group, supergroup, or channel)"),
+        reactions: z
+          .discriminatedUnion("type", [
+            z.object({
+              type: z.literal("all"),
+              allowCustom: z
+                .boolean()
+                .optional()
+                .describe("If true, also allow custom emoji reactions (requires Premium users)"),
+            }),
+            z.object({
+              type: z.literal("some"),
+              emoji: z
+                .array(z.string().min(1).max(8))
+                .min(1)
+                .max(100)
+                .describe("List of allowed reaction emoji (e.g. ['👍','❤️','🔥'])"),
+            }),
+            z.object({ type: z.literal("none") }),
+          ])
+          .describe("Reaction policy for the chat"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, reactions }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.setChatAvailableReactions(chatId, reactions);
+        const summary =
+          reactions.type === "all"
+            ? `all reactions${reactions.allowCustom ? " (incl. custom)" : ""}`
+            : reactions.type === "none"
+              ? "no reactions"
+              : `${reactions.emoji.length} reaction(s): ${sanitize(reactions.emoji.join(" "))}`;
+        return ok(`Set ${summary} for ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "telegram-get-recent-reactions",
     {
       description: "Get the list of emoji reactions the current account used recently",

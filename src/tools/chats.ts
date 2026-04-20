@@ -569,6 +569,140 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
   );
 
   server.registerTool(
+    "telegram-toggle-channel-signatures",
+    {
+      description:
+        "Enable or disable author signatures on broadcast channel posts. Channel admin required; not supported for supergroups",
+      inputSchema: {
+        chatId: z.string().describe("Channel ID or username"),
+        enabled: z.boolean().describe("true to enable author signatures, false to disable"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, enabled }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.toggleChannelSignatures(chatId, enabled);
+        return ok(JSON.stringify({ ok: true, signaturesEnabled: enabled }));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-toggle-anti-spam",
+    {
+      description:
+        "Enable or disable aggressive anti-spam filtering in a supergroup. Supergroup only (not broadcast channels); requires admin with ban_users permission",
+      inputSchema: {
+        chatId: z.string().describe("Supergroup ID or username"),
+        enabled: z.boolean().describe("true to enable aggressive anti-spam, false to disable"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, enabled }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.toggleAntiSpam(chatId, enabled);
+        return ok(`${enabled ? "Enabled" : "Disabled"} aggressive anti-spam in ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-toggle-forum-mode",
+    {
+      description:
+        "Enable or disable forum/topics mode in a supergroup. Supergroup only; requires creator or admin. " +
+        "WARNING: disabling removes ALL existing topics — pass confirm=true to proceed with disable",
+      inputSchema: {
+        chatId: z.string().describe("Supergroup ID or username"),
+        enabled: z.boolean().describe("true to enable forum mode, false to disable"),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe("Must be true when disabling (enabled=false) — disabling deletes all existing topics"),
+      },
+      annotations: DESTRUCTIVE,
+    },
+    async ({ chatId, enabled, confirm }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      if (!enabled && confirm !== true) {
+        return fail(
+          new Error(
+            "Disabling forum mode deletes all existing topics. Pass confirm=true to proceed with this destructive action.",
+          ),
+        );
+      }
+
+      try {
+        await telegram.toggleForumMode(chatId, enabled);
+        return ok(`${enabled ? "Enabled" : "Disabled"} forum mode in ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-toggle-prehistory-hidden",
+    {
+      description:
+        "Toggle pre-history visibility for new members in a supergroup. When hidden=true, new joiners cannot see messages posted before they joined. Supergroup only; requires admin",
+      inputSchema: {
+        chatId: z.string().describe("Supergroup ID or username"),
+        hidden: z.boolean().describe("true to hide prior history from new members, false to make it visible"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, hidden }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.togglePrehistoryHidden(chatId, hidden);
+        return ok(`${hidden ? "Hid" : "Revealed"} prehistory for new members in ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-approve-join-request",
+    {
+      description:
+        "Approve or deny a pending join request for a supergroup or channel (basic groups are not supported). Admin with invite_users permission required",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username where the join request is pending"),
+        userId: z.string().describe("User ID or username of the requesting user"),
+        approved: z.boolean().describe("true to approve the join request, false to deny"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, userId, approved }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.approveChatJoinRequest(chatId, userId, approved);
+        return ok(`${approved ? "Approved" : "Denied"} join request from ${userId} in ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "telegram-create-topic",
     {
       description: "Create a new forum topic in a forum-enabled supergroup",
@@ -643,6 +777,66 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
               : `No changes for topic ${topicId} in ${chatId}`,
           ),
         );
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-broadcast-stats",
+    {
+      description:
+        "Get broadcast channel statistics: followers, views/shares/reactions per post & story, notification percent, recent post interactions. Broadcast channels only (use telegram-get-megagroup-stats for supergroups). Admin rights required; some channels may require Telegram Premium to expose stats",
+      inputSchema: {
+        chatId: z.string().describe("Broadcast channel ID or username"),
+        includeGraphs: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Include raw graph data for each series (growth, followers, interactions, etc.). Default false — returns only aggregate numbers + metadata",
+          ),
+        dark: z.boolean().default(false).describe("Prefer dark-theme palette when Telegram renders graphs"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, includeGraphs, dark }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const stats = await telegram.getBroadcastStats(chatId, { dark, includeGraphs });
+        return ok(sanitize(JSON.stringify(stats)));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-megagroup-stats",
+    {
+      description:
+        "Get supergroup statistics: members, messages, viewers, posters (current vs previous period), top posters/admins/inviters. Supergroups only (use telegram-get-broadcast-stats for broadcast channels). Admin rights required. Telegram rate-limits this endpoint to roughly 1 request per 30 minutes per channel — expect FLOOD_WAIT on rapid repeat calls",
+      inputSchema: {
+        chatId: z.string().describe("Supergroup ID or username"),
+        includeGraphs: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Include raw graph data for each series (growth, members, messages, actions, top hours, weekdays, etc.). Default false — returns only aggregate numbers + top lists",
+          ),
+        dark: z.boolean().default(false).describe("Prefer dark-theme palette when Telegram renders graphs"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, includeGraphs, dark }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const stats = await telegram.getMegagroupStats(chatId, { dark, includeGraphs });
+        return ok(sanitize(JSON.stringify(stats)));
       } catch (e) {
         return fail(e);
       }

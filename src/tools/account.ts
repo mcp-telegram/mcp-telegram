@@ -446,4 +446,24 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
       }
     },
   );
+
+  server.registerTool(
+    "telegram-get-business-chat-links",
+    {
+      description:
+        "List Telegram Business chat links configured for the account (account.GetBusinessChatLinks). Each entry includes the t.me/... link, the prefilled message, optional title (admin-facing label), views count, and entityCount (number of formatting entities in the message). Requires a Telegram Business-enabled account — returns an empty list when the account has none configured. Read-only.",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.getBusinessChatLinks();
+        return ok(sanitize(JSON.stringify(result)));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
 }

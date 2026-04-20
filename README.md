@@ -18,7 +18,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 
 ## Features
 
-- **Comprehensive tool coverage** -- the most full-featured Telegram MCP server available
+- **Comprehensive tool coverage** -- the most full-featured Telegram MCP server available (80+ tools)
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API
 - **Userbot** -- operates as your personal account, not a bot
 - **Full-featured** -- messaging, reactions, polls, scheduled messages, stickers, media, contacts, and more
@@ -26,6 +26,12 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **Stickers** -- search sticker sets, browse installed/recent stickers, send stickers to any chat
 - **Account management** -- update profile, manage privacy settings, sessions, auto-delete timers
 - **Global search** -- search messages across all chats at once
+- **Real-time polling** -- fetch updates via stateless cursors; agent owns `{pts, qts, date}` state
+- **Inline bots & buttons** -- query inline bots, send results, press callback buttons
+- **Stories** -- read stories from peers, get story view stats
+- **Admin controls** -- toggle channel signatures, anti-spam, forum mode, prehistory; approve join requests
+- **Stats** -- channel and supergroup analytics (GetBroadcastStats / GetMegagroupStats)
+- **Boosts & Business** -- boost status, boosters list, Telegram Business chat links
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
@@ -329,8 +335,27 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Account** | `telegram-get-sessions`, `telegram-terminate-session`, `telegram-set-privacy`, `telegram-set-auto-delete` |
 | **Pinning** | `telegram-pin-message`, `telegram-unpin-message` |
 | **Chat Settings** | `telegram-mute-chat`, `telegram-archive-chat`, `telegram-pin-chat`, `telegram-mark-dialog-unread` |
+| **Admin Toggles** | `telegram-toggle-channel-signatures`, `telegram-toggle-anti-spam`, `telegram-toggle-forum-mode`, `telegram-toggle-prehistory-hidden`, `telegram-set-chat-reactions`, `telegram-approve-join-request` |
+| **Stats** | `telegram-get-broadcast-stats`, `telegram-get-megagroup-stats` |
+| **Inline Bots & Buttons** | `telegram-inline-query`, `telegram-inline-query-send`, `telegram-press-button`, `telegram-get-message-buttons` |
+| **Real-Time Polling** | `telegram-get-state`, `telegram-get-updates`, `telegram-get-channel-updates` |
+| **Stories** | `telegram-get-all-stories`, `telegram-get-peer-stories`, `telegram-get-stories-by-id`, `telegram-get-story-views` |
+| **Boosts & Business** | `telegram-get-my-boosts`, `telegram-get-boosts-status`, `telegram-get-boosts-list`, `telegram-get-business-chat-links` |
+| **Opt-in (env-gated)** | `telegram-get-group-call`, `telegram-get-group-call-participants` (requires `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1`), `telegram-get-stars-status`, `telegram-get-stars-transactions` (requires `MCP_TELEGRAM_ENABLE_STARS=1`), `telegram-get-quick-replies`, `telegram-get-quick-reply-messages` (requires `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1`) |
 
 > **Tip**: Ask your AI assistant *"What Telegram tools are available?"* to get the full list with parameters and descriptions.
+
+## Optional Features
+
+Some tools are disabled by default and must be opted in via environment variables:
+
+| Variable | Value | Tools enabled |
+|----------|-------|---------------|
+| `MCP_TELEGRAM_ENABLE_GROUP_CALLS` | `1` | `telegram-get-group-call`, `telegram-get-group-call-participants` |
+| `MCP_TELEGRAM_ENABLE_STARS` | `1` | `telegram-get-stars-status`, `telegram-get-stars-transactions` |
+| `MCP_TELEGRAM_ENABLE_QUICK_REPLIES` | `1` | `telegram-get-quick-replies`, `telegram-get-quick-reply-messages` |
+
+Add these to your `.env` file or MCP client config to enable them.
 
 ## Development
 
@@ -353,14 +378,19 @@ src/
   qr-login-cli.ts     -- CLI utility for QR code login
   tools/              -- Modular tool definitions
     auth.ts           -- Connection & login
-    messages.ts       -- Send, read, search, edit, delete, forward
-    chats.ts          -- Chat listing, group management, admin
+    messages.ts       -- Send, read, search, edit, delete, forward; inline bots; real-time polling
+    chats.ts          -- Chat listing, group management, admin toggles, stats
     contacts.ts       -- Contacts, profiles, moderation
     media.ts          -- Files, photos, downloads
-    reactions.ts      -- Reactions
+    reactions.ts      -- Reactions, set-chat-reactions
     extras.ts         -- Pin, schedule, polls, topics
     stickers.ts       -- Sticker sets, send, search, browse
-    account.ts        -- Sessions, privacy, auto-delete, profile, chat mute/folders, invite links
+    account.ts        -- Sessions, privacy, auto-delete, profile, chat mute/folders, invite links, business chat links
+    boosts.ts         -- Boost status, my boosts, boosters list
+    stories.ts        -- Stories: list all, peer, by-id, view stats
+    group-calls.ts    -- Group call info and participants (opt-in: MCP_TELEGRAM_ENABLE_GROUP_CALLS)
+    stars.ts          -- Stars wallet status and transactions (opt-in: MCP_TELEGRAM_ENABLE_STARS)
+    quick-replies.ts  -- Quick replies and messages (opt-in: MCP_TELEGRAM_ENABLE_QUICK_REPLIES)
     shared.ts         -- Shared utilities
 ```
 

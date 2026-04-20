@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-04-20
+
+### Changed
+- Dependencies bumped to latest: `@modelcontextprotocol/sdk` 1.28.0 → 1.29.0, `dotenv` 17.3.1 → 17.4.2, `@biomejs/biome` 2.4.9 → 2.4.12, `typescript` 6.0.2 → 6.0.3, `@types/node` 25.5.0 → 25.6.0
+- `biome.json` migrated to schema 2.4.12
+
 ## [1.24.0] - 2026-04-06
 
 ### Added

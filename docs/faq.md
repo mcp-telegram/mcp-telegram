@@ -40,7 +40,7 @@ Yes. Full support — list topics, read per-topic messages, send to specific top
 
 ## How many tools are there?
 
-**59 tools** as of v1.24.0, covering messaging, search, groups, stickers, contacts, moderation, account management, and more. See the [full reference](/tools/reference).
+**59 tools** as of v1.24.1, covering messaging, search, groups, stickers, contacts, moderation, account management, and more. See the [full reference](/tools/reference).
 
 ## Can I use it without Node.js?
 

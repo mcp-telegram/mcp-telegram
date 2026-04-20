@@ -1,10 +1,16 @@
 # Список изменений
 
-<VersionBadge version="1.24.0" /> Текущая версия
+<VersionBadge version="1.24.1" /> Текущая версия
 
 Все заметные изменения в MCP Telegram. Полные сравнения версий — на [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases).
 
-## v1.24.0 <Badge type="tip" text="актуальная" /> {#v1.24.0}
+## v1.24.1 <Badge type="tip" text="актуальная" /> {#v1.24.1}
+**2026-04-20**
+
+### Изменено
+- Зависимости обновлены до последних версий: `@modelcontextprotocol/sdk` 1.29.0, `dotenv` 17.4.2, `@biomejs/biome` 2.4.12, `typescript` 6.0.3, `@types/node` 25.6.0
+
+## v1.24.0 {#v1.24.0}
 **2026-04-06**
 
 ### Добавлено

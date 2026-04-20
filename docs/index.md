@@ -3,7 +3,7 @@ layout: home
 hero:
   name: MCP Telegram
   text: Connect AI to Your Telegram
-  tagline: 59 tools — messages, groups, stickers, contacts, search, and more. Works with Claude, ChatGPT, Cursor, and any MCP client.
+  tagline: Full-featured userbot — messages, groups, stickers, contacts, search, and more. Works with Claude, ChatGPT, Cursor, and any MCP client.
   actions:
     - theme: brand
       text: Get Started
@@ -22,7 +22,7 @@ features:
     title: MTProto, Not Bot API
     details: Direct access to Telegram's native protocol via GramJS. Full power of a real account — no bot limitations.
   - icon: 🔧
-    title: 59 Tools
+    title: Comprehensive Tool Coverage
     details: Send messages, search chats, manage groups, send stickers, handle contacts, control privacy — all through natural language.
   - icon: 🖥️
     title: Any MCP Client

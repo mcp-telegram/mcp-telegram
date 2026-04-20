@@ -1,15 +1,15 @@
 # 工具参考
 
-MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 自动发现。
+MCP Telegram 提供按类别组织的完整工具集。所有工具通过 MCP 自动发现。
 
-## 认证 (2)
+## 认证
 
 | 工具 | 说明 |
 |------|------|
 | `telegram-status` | 检查连接状态和账户信息 |
 | `telegram-login` | 生成认证二维码 |
 
-## 消息 (5)
+## 消息
 
 | 工具 | 说明 |
 |------|------|
@@ -18,8 +18,18 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-delete-message` | 删除消息 |
 | `telegram-forward-message` | 转发消息 |
 | `telegram-send-scheduled` | 定时发送消息 |
+| `telegram-send-typing` | 发送"正在输入"/上传操作指示 |
+| `telegram-translate-message` | 翻译一条或多条消息（需 Premium；会消耗翻译配额） |
+| `telegram-get-message-link` | 获取消息的公开 t.me 链接 |
 
-## 阅读 (7)
+## 定时消息
+
+| 工具 | 说明 |
+|------|------|
+| `telegram-get-scheduled` | 列出聊天中的定时消息 |
+| `telegram-delete-scheduled` | 删除一条或多条定时消息 |
+
+## 阅读
 
 | 工具 | 说明 |
 |------|------|
@@ -30,28 +40,46 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-search-chats` | 按名称搜索聊天 |
 | `telegram-get-unread` | 获取有未读消息的聊天 |
 | `telegram-mark-as-read` | 标记为已读 |
+| `telegram-get-replies` | 读取频道帖子下的评论/回复 |
+| `telegram-get-unread-mentions` | 列出聊天中未读的 @ 提及（会在服务端标为已读） |
+| `telegram-get-unread-reactions` | 列出你消息上未读的回应（会在服务端标为已读） |
+| `telegram-get-saved-dialogs` | 列出"收藏消息"内的分类文件夹 |
 
-## 论坛话题 (2)
+## 草稿
+
+| 工具 | 说明 |
+|------|------|
+| `telegram-save-draft` | 在聊天中保存文本草稿（为空则删除） |
+| `telegram-get-drafts` | 列出所有含草稿的聊天 |
+| `telegram-clear-drafts` | 清除单个聊天的草稿，或全账号清除（需 `confirmAllChats: true`） |
+
+## 论坛话题
 
 | 工具 | 说明 |
 |------|------|
 | `telegram-list-topics` | 列出论坛话题 |
 | `telegram-read-topic-messages` | 读取特定话题的消息 |
+| `telegram-create-topic` | 新建话题 |
+| `telegram-edit-topic` | 重命名、关闭、隐藏或更新话题 |
+| `telegram-delete-topic` | 删除话题及其历史 |
 
-## 投票 (1)
+## 投票
 
 | 工具 | 说明 |
 |------|------|
 | `telegram-create-poll` | 创建投票或测验 |
 
-## 回应 (2)
+## 回应
 
 | 工具 | 说明 |
 |------|------|
 | `telegram-send-reaction` | 给消息添加表情回应 |
 | `telegram-get-reactions` | 获取消息的回应 |
+| `telegram-set-default-reaction` | 设置账户默认快捷回应表情 |
+| `telegram-get-top-reactions` | 获取 Telegram 热门回应表情 |
+| `telegram-get-recent-reactions` | 获取最近使用过的回应表情 |
 
-## 贴纸 (5)
+## 贴纸
 
 | 工具 | 说明 |
 |------|------|
@@ -61,15 +89,16 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-get-sticker-set` | 浏览贴纸包 |
 | `telegram-search-sticker-sets` | 搜索贴纸包 |
 
-## 媒体 (3)
+## 媒体
 
 | 工具 | 说明 |
 |------|------|
 | `telegram-send-file` | 发送文件、图片或文档 |
 | `telegram-download-media` | 下载消息中的媒体 |
 | `telegram-get-profile-photo` | 获取头像 |
+| `telegram-get-web-preview` | 发送前预览链接的标题/描述/站点 |
 
-## 群组 (11)
+## 群组
 
 | 工具 | 说明 |
 |------|------|
@@ -84,8 +113,11 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-set-admin` | 设为管理员 |
 | `telegram-remove-admin` | 撤销管理员 |
 | `telegram-get-my-role` | 查看自己的角色和权限 |
+| `telegram-set-chat-permissions` | 为所有成员设置默认权限（未指定的标志保留当前值） |
+| `telegram-set-slow-mode` | 为超级群组设置慢速模式间隔 |
+| `telegram-get-admin-log` | 查看管理员/审核事件日志 |
 
-## 聊天信息 (3)
+## 聊天信息
 
 | 工具 | 说明 |
 |------|------|
@@ -93,7 +125,7 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-get-chat-members` | 列出群组/频道成员 |
 | `telegram-get-chat-folders` | 列出聊天文件夹 |
 
-## 邀请链接 (3)
+## 邀请链接
 
 | 工具 | 说明 |
 |------|------|
@@ -101,7 +133,7 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-get-invite-links` | 列出现有链接 |
 | `telegram-revoke-invite-link` | 撤销链接 |
 
-## 联系人 (3)
+## 联系人
 
 | 工具 | 说明 |
 |------|------|
@@ -109,7 +141,7 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-add-contact` | 添加联系人 |
 | `telegram-get-contact-requests` | 查看待处理的联系请求 |
 
-## 审核 (3)
+## 审核
 
 | 工具 | 说明 |
 |------|------|
@@ -117,14 +149,14 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-unblock-user` | 取消屏蔽 |
 | `telegram-report-spam` | 举报垃圾信息 |
 
-## 个人资料 (2)
+## 个人资料
 
 | 工具 | 说明 |
 |------|------|
 | `telegram-get-profile` | 获取用户资料 |
 | `telegram-update-profile` | 更新自己的资料（姓名、简介、用户名） |
 
-## 账户 (4)
+## 账户
 
 | 工具 | 说明 |
 |------|------|
@@ -133,18 +165,21 @@ MCP Telegram 提供 **59 个工具**，按类别组织。所有工具通过 MCP 
 | `telegram-set-privacy` | 配置隐私设置 |
 | `telegram-set-auto-delete` | 设置消息自动删除计时器 |
 
-## 置顶 (2)
+## 置顶
 
 | 工具 | 说明 |
 |------|------|
 | `telegram-pin-message` | 置顶消息 |
 | `telegram-unpin-message` | 取消置顶 |
 
-## 聊天设置 (1)
+## 聊天设置
 
 | 工具 | 说明 |
 |------|------|
 | `telegram-mute-chat` | 静音或取消静音通知 |
+| `telegram-archive-chat` | 将会话移入/移出"归档"文件夹 |
+| `telegram-pin-chat` | 在会话列表中置顶/取消置顶 |
+| `telegram-mark-dialog-unread` | 将会话标记为未读或清除未读标记 |
 
 ---
 

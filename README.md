@@ -18,7 +18,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 
 ## Features
 
-- **59 tools** -- the most comprehensive Telegram MCP server available
+- **Comprehensive tool coverage** -- the most full-featured Telegram MCP server available
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API
 - **Userbot** -- operates as your personal account, not a bot
 - **Full-featured** -- messaging, reactions, polls, scheduled messages, stickers, media, contacts, and more
@@ -304,21 +304,23 @@ const telegramMcp = new MCPClient({
 });
 ```
 
-## Tools (59)
+## Tools
 
 All tools are auto-discoverable via MCP — your AI client will see the full list with parameters and descriptions when connected.
 
 | Category | Tools |
 |----------|-------|
 | **Auth** | `telegram-status`, `telegram-login` |
-| **Messaging** | `telegram-send-message`, `telegram-edit-message`, `telegram-delete-message`, `telegram-forward-message`, `telegram-send-scheduled` |
-| **Reading** | `telegram-list-chats`, `telegram-read-messages`, `telegram-search-messages`, `telegram-search-global`, `telegram-search-chats`, `telegram-get-unread`, `telegram-mark-as-read` |
-| **Forum Topics** | `telegram-list-topics`, `telegram-read-topic-messages` |
+| **Messaging** | `telegram-send-message`, `telegram-edit-message`, `telegram-delete-message`, `telegram-forward-message`, `telegram-send-scheduled`, `telegram-send-typing`, `telegram-translate-message`, `telegram-get-message-link` |
+| **Scheduled** | `telegram-get-scheduled`, `telegram-delete-scheduled` |
+| **Reading** | `telegram-list-chats`, `telegram-read-messages`, `telegram-search-messages`, `telegram-search-global`, `telegram-search-chats`, `telegram-get-unread`, `telegram-mark-as-read`, `telegram-get-replies`, `telegram-get-unread-mentions`, `telegram-get-unread-reactions`, `telegram-get-saved-dialogs` |
+| **Drafts** | `telegram-save-draft`, `telegram-get-drafts`, `telegram-clear-drafts` |
+| **Forum Topics** | `telegram-list-topics`, `telegram-read-topic-messages`, `telegram-create-topic`, `telegram-edit-topic`, `telegram-delete-topic` |
 | **Polls** | `telegram-create-poll` |
-| **Reactions** | `telegram-send-reaction`, `telegram-get-reactions` |
+| **Reactions** | `telegram-send-reaction`, `telegram-get-reactions`, `telegram-set-default-reaction`, `telegram-get-top-reactions`, `telegram-get-recent-reactions` |
 | **Stickers** | `telegram-send-sticker`, `telegram-get-installed-stickers`, `telegram-get-recent-stickers`, `telegram-get-sticker-set`, `telegram-search-sticker-sets` |
-| **Media** | `telegram-send-file`, `telegram-download-media`, `telegram-get-profile-photo` |
-| **Groups** | `telegram-create-group`, `telegram-edit-group`, `telegram-invite-to-group`, `telegram-join-chat`, `telegram-leave-group`, `telegram-kick-user`, `telegram-ban-user`, `telegram-unban-user`, `telegram-set-admin`, `telegram-remove-admin`, `telegram-get-my-role` |
+| **Media** | `telegram-send-file`, `telegram-download-media`, `telegram-get-profile-photo`, `telegram-get-web-preview` |
+| **Groups** | `telegram-create-group`, `telegram-edit-group`, `telegram-invite-to-group`, `telegram-join-chat`, `telegram-leave-group`, `telegram-kick-user`, `telegram-ban-user`, `telegram-unban-user`, `telegram-set-admin`, `telegram-remove-admin`, `telegram-get-my-role`, `telegram-set-chat-permissions`, `telegram-set-slow-mode`, `telegram-get-admin-log` |
 | **Chat Info** | `telegram-get-chat-info`, `telegram-get-chat-members`, `telegram-get-chat-folders` |
 | **Invite Links** | `telegram-create-invite-link`, `telegram-get-invite-links`, `telegram-revoke-invite-link` |
 | **Contacts** | `telegram-get-contacts`, `telegram-add-contact`, `telegram-get-contact-requests` |
@@ -326,7 +328,7 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Profiles** | `telegram-get-profile`, `telegram-update-profile` |
 | **Account** | `telegram-get-sessions`, `telegram-terminate-session`, `telegram-set-privacy`, `telegram-set-auto-delete` |
 | **Pinning** | `telegram-pin-message`, `telegram-unpin-message` |
-| **Chat Settings** | `telegram-mute-chat` |
+| **Chat Settings** | `telegram-mute-chat`, `telegram-archive-chat`, `telegram-pin-chat`, `telegram-mark-dialog-unread` |
 
 > **Tip**: Ask your AI assistant *"What Telegram tools are available?"* to get the full list with parameters and descriptions.
 

@@ -1,8 +1,39 @@
 # Changelog
 
-<VersionBadge version="1.24.1" /> Current version
+<VersionBadge version="1.25.0" /> Current version
 
 All notable changes to MCP Telegram. For full diff between versions, see [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases).
+
+## 1.25.0 — 2026-04-20 {#v1-25-0}
+
+### Added
+- **Scheduled messages** — `telegram-get-scheduled`, `telegram-delete-scheduled`
+- **Threads & replies** — `telegram-get-replies` for channel post comments
+- **Message links** — `telegram-get-message-link` for public t.me URLs
+- **Mentions & unread reactions** — `telegram-get-unread-mentions`, `telegram-get-unread-reactions`
+- **Translate** — `telegram-translate-message` (Telegram Premium)
+- **Typing indicator** — `telegram-send-typing`
+- **Dialog management** — `telegram-archive-chat`, `telegram-pin-chat`, `telegram-mark-dialog-unread`
+- **Drafts** — `telegram-save-draft`, `telegram-get-drafts`, `telegram-clear-drafts`
+- **Saved Messages dialogs** — `telegram-get-saved-dialogs`
+- **Admin log** — `telegram-get-admin-log`
+- **Reactions catalog** — `telegram-set-default-reaction`, `telegram-get-top-reactions`, `telegram-get-recent-reactions`
+- **Chat permissions & slow mode** — `telegram-set-chat-permissions`, `telegram-set-slow-mode`
+- **Forum topics CRUD** — `telegram-create-topic`, `telegram-edit-topic`, `telegram-delete-topic`
+- **Web page preview** — `telegram-get-web-preview`
+
+### Fixed
+- `telegram-set-chat-permissions` now merges with current `defaultBannedRights` — omitted flags keep their current state
+- `telegram-clear-drafts` requires `chatId` or `confirmAllChats: true` to wipe drafts account-wide
+- `telegram-get-unread-mentions` / `-reactions` annotated as `WRITE` — they mark listed items as read on the server
+- `telegram-translate-message` annotated as `WRITE`; `toLang` validated, `messageIds` capped at 1–100
+- `telegram-delete-scheduled` caps `messageIds` at 1–100 positive integers
+- `telegram-set-default-reaction` validates emoji length (1–8 characters)
+- `telegram-get-web-preview` rejects non-`http(s)` URLs (SSRF hardening)
+- `telegram-send-typing` throttles non-`cancel` actions to once per 10 s per chat
+- `telegram-get-saved-dialogs` drops the always-zero `unreadCount` field
+- `telegram-create-topic` now reads the new topic ID from `UpdateNewChannelMessage` and fails loudly if unavailable
+- `telegram-save-draft` drops `replyTo` when text is empty, avoiding `MESSAGE_EMPTY`
 
 ## v1.24.1 <Badge type="tip" text="latest" /> {#v1.24.1}
 **2026-04-20**

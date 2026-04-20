@@ -151,7 +151,7 @@ const base = "/mcp-telegram/";
 
 export default defineConfig({
   title: "MCP Telegram",
-  description: "Connect AI assistants to Telegram — 59 tools via MTProto protocol",
+  description: "Connect AI assistants to Telegram via MTProto protocol — comprehensive userbot tool coverage",
   base,
   head: [
     [

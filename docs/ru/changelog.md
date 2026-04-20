@@ -1,8 +1,39 @@
 # Список изменений
 
-<VersionBadge version="1.24.1" /> Текущая версия
+<VersionBadge version="1.25.0" /> Текущая версия
 
 Все заметные изменения в MCP Telegram. Полные сравнения версий — на [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases).
+
+## 1.25.0 — 2026-04-20 {#v1-25-0}
+
+### Добавлено
+- **Отложенные сообщения** — `telegram-get-scheduled`, `telegram-delete-scheduled`
+- **Треды и комментарии** — `telegram-get-replies` для комментариев под постом канала
+- **Ссылка на сообщение** — `telegram-get-message-link` возвращает публичную t.me-ссылку
+- **Упоминания и непрочитанные реакции** — `telegram-get-unread-mentions`, `telegram-get-unread-reactions`
+- **Перевод** — `telegram-translate-message` (нужен Telegram Premium)
+- **Индикатор набора** — `telegram-send-typing`
+- **Управление диалогами** — `telegram-archive-chat`, `telegram-pin-chat`, `telegram-mark-dialog-unread`
+- **Черновики** — `telegram-save-draft`, `telegram-get-drafts`, `telegram-clear-drafts`
+- **Saved Messages папки** — `telegram-get-saved-dialogs`
+- **Админ-лог** — `telegram-get-admin-log`
+- **Каталог реакций** — `telegram-set-default-reaction`, `telegram-get-top-reactions`, `telegram-get-recent-reactions`
+- **Права чата и slow mode** — `telegram-set-chat-permissions`, `telegram-set-slow-mode`
+- **CRUD топиков форума** — `telegram-create-topic`, `telegram-edit-topic`, `telegram-delete-topic`
+- **Превью веб-страницы** — `telegram-get-web-preview`
+
+### Исправлено
+- `telegram-set-chat-permissions` теперь сливает новые флаги с текущими `defaultBannedRights` — опущенные флаги сохраняют текущее значение, а не сбрасываются молча
+- `telegram-clear-drafts` требует `chatId` или `confirmAllChats: true` для очистки черновиков во всех чатах
+- `telegram-get-unread-mentions` / `-reactions` переведены в annotation `WRITE` — эти методы помечают перечисленные элементы прочитанными на сервере
+- `telegram-translate-message` переведён в `WRITE`; `toLang` валидируется, `messageIds` ограничен 1–100
+- `telegram-delete-scheduled` ограничивает `messageIds` диапазоном 1–100 положительных int
+- `telegram-set-default-reaction` валидирует длину emoji (1–8 символов)
+- `telegram-get-web-preview` отвергает URL кроме `http(s)` — защита от использования Telegram как SSRF-прокси
+- `telegram-send-typing` троттлит не-`cancel` действия до одного раза в 10 с на чат
+- `telegram-get-saved-dialogs` больше не возвращает всегда-ноль `unreadCount`
+- `telegram-create-topic` берёт ID нового топика из `UpdateNewChannelMessage` (authoritative) и падает явно, если источника нет
+- `telegram-save-draft` сбрасывает `replyTo`, когда текст пустой — чтобы не получать `MESSAGE_EMPTY` при очистке черновика
 
 ## v1.24.1 <Badge type="tip" text="актуальная" /> {#v1.24.1}
 **2026-04-20**

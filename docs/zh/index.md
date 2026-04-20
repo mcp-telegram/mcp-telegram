@@ -3,7 +3,7 @@ layout: home
 hero:
   name: MCP Telegram
   text: 将 AI 连接到 Telegram
-  tagline: 59 个工具 — 消息、群组、贴纸、联系人、搜索等。支持 Claude、ChatGPT、Cursor 及任何 MCP 客户端。
+  tagline: 功能完备的 userbot — 消息、群组、贴纸、联系人、搜索等。支持 Claude、ChatGPT、Cursor 及任何 MCP 客户端。
   actions:
     - theme: brand
       text: 快速开始
@@ -22,7 +22,7 @@ features:
     title: MTProto 协议
     details: 通过 GramJS 直接访问 Telegram 原生协议。完整的个人账户功能 — 无机器人限制。
   - icon: 🔧
-    title: 59 个工具
+    title: 全面的工具集
     details: 发送消息、搜索聊天、管理群组、发送贴纸、处理联系人、控制隐私 — 全部通过自然语言。
   - icon: 🖥️
     title: 任何 MCP 客户端

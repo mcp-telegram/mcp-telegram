@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { chmod, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -52,6 +52,158 @@ function ensureSessionDir(filePath: string): void {
   }
 }
 
+export function describeAdminLogAction(action: Api.TypeChannelAdminLogEventAction): string {
+  const prefix = "ChannelAdminLogEventAction";
+  const raw = action.className.startsWith(prefix) ? action.className.slice(prefix.length) : action.className;
+  return raw
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .replace(/([a-z])([A-Z])/g, "$1_$2")
+    .toLowerCase();
+}
+
+export function describeAdminLogDetails(
+  action: Api.TypeChannelAdminLogEventAction,
+  describeUser: (userId: bigInt.BigInteger) => string,
+): string {
+  if (action instanceof Api.ChannelAdminLogEventActionChangeTitle) {
+    return `"${action.prevValue}" → "${action.newValue}"`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionChangeAbout) {
+    return `description changed`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionChangeUsername) {
+    return `@${action.prevValue || "-"} → @${action.newValue || "-"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionUpdatePinned) {
+    return `message #${action.message instanceof Api.Message ? action.message.id : "?"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionEditMessage) {
+    return `message #${action.newMessage instanceof Api.Message ? action.newMessage.id : "?"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionDeleteMessage) {
+    return `message #${action.message instanceof Api.Message ? action.message.id : "?"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionParticipantInvite) {
+    const p = action.participant;
+    return `invited user ${"userId" in p ? describeUser(p.userId) : "?"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionParticipantToggleBan) {
+    const p = action.newParticipant;
+    if (p instanceof Api.ChannelParticipantBanned) {
+      const uid = p.peer instanceof Api.PeerUser ? p.peer.userId : undefined;
+      return `banned user ${uid ? describeUser(uid) : "?"}`;
+    }
+    return `unbanned user ${"userId" in p ? describeUser((p as Api.ChannelParticipant).userId) : "?"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionParticipantToggleAdmin) {
+    const p = action.newParticipant;
+    return `admin rights changed for ${"userId" in p ? describeUser(p.userId) : "?"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionToggleSlowMode) {
+    return `${action.prevValue}s → ${action.newValue}s`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionToggleInvites) {
+    return `invites ${action.newValue ? "enabled" : "disabled"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionToggleSignatures) {
+    return `signatures ${action.newValue ? "enabled" : "disabled"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionTogglePreHistoryHidden) {
+    return `pre-history hidden: ${action.newValue}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionChangeHistoryTTL) {
+    return `${action.prevValue}s → ${action.newValue}s`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionChangeStickerSet) {
+    return `sticker set changed`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionChangeLinkedChat) {
+    return `${action.prevValue.toString()} → ${action.newValue.toString()}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionStopPoll) {
+    return `poll in message #${action.message instanceof Api.Message ? action.message.id : "?"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionSendMessage) {
+    return `message #${action.message instanceof Api.Message ? action.message.id : "?"}`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionCreateTopic) {
+    return `topic "${action.topic instanceof Api.ForumTopic ? action.topic.title : "?"}"`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionDeleteTopic) {
+    return `topic "${action.topic instanceof Api.ForumTopic ? action.topic.title : "?"}"`;
+  }
+  if (action instanceof Api.ChannelAdminLogEventActionEditTopic) {
+    return `topic "${action.newTopic instanceof Api.ForumTopic ? action.newTopic.title : "?"}"`;
+  }
+  return "";
+}
+
+export function reactionToEmoji(reaction: Api.TypeReaction): string | null {
+  if (reaction instanceof Api.ReactionEmoji) return reaction.emoticon;
+  if (reaction instanceof Api.ReactionCustomEmoji) return `custom:${reaction.documentId.toString()}`;
+  if (reaction instanceof Api.ReactionPaid) return "⭐";
+  return null;
+}
+
+export type ChatPermissions = {
+  sendMessages?: boolean;
+  sendMedia?: boolean;
+  sendStickers?: boolean;
+  sendGifs?: boolean;
+  sendPolls?: boolean;
+  sendInline?: boolean;
+  embedLinks?: boolean;
+  changeInfo?: boolean;
+  inviteUsers?: boolean;
+  pinMessages?: boolean;
+};
+
+const BANNED_RIGHT_FLAGS = [
+  "sendMessages",
+  "sendMedia",
+  "sendStickers",
+  "sendGifs",
+  "sendPolls",
+  "sendInline",
+  "embedLinks",
+  "changeInfo",
+  "inviteUsers",
+  "pinMessages",
+] as const;
+
+// Newer granular flags not exposed in ChatPermissions input but must be preserved from currentRights
+const EXTRA_BANNED_RIGHT_FLAGS = [
+  "sendGames",
+  "manageTopics",
+  "sendPhotos",
+  "sendVideos",
+  "sendRoundvideos",
+  "sendAudios",
+  "sendVoices",
+  "sendDocs",
+  "sendPlain",
+] as const;
+
+export function mergeBannedRights(
+  current: Record<string, unknown> | undefined | null,
+  permissions: ChatPermissions,
+): Record<string, boolean> {
+  const result: Record<string, boolean> = {};
+  for (const flag of BANNED_RIGHT_FLAGS) {
+    const userValue = permissions[flag];
+    if (userValue !== undefined) {
+      result[flag] = !userValue;
+    } else {
+      result[flag] = Boolean(current?.[flag]);
+    }
+  }
+  // Preserve newer granular flags from existing rights so they are not silently cleared
+  for (const flag of EXTRA_BANNED_RIGHT_FLAGS) {
+    result[flag] = Boolean(current?.[flag]);
+  }
+  return result;
+}
+
 export class TelegramService {
   private client: TelegramClient | null = null;
   private apiId: number;
@@ -60,6 +212,7 @@ export class TelegramService {
   private connected = false;
   private sessionPath: string;
   private rateLimiter = new RateLimiter();
+  private lastTypingAt = new Map<string, number>();
   lastError = "";
 
   get sessionDir(): string {
@@ -349,24 +502,12 @@ export class TelegramService {
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       if (topicId) {
-        const peer = await this.client?.getInputEntity(resolved);
-        const result = await this.client?.invoke(
-          new Api.messages.SendMessage({
-            peer,
-            message: text,
-            randomId: bigInt(Math.floor(Math.random() * 1e15)),
-            replyTo: new Api.InputReplyToMessage({
-              replyToMsgId: replyTo ?? topicId,
-              topMsgId: topicId,
-            }),
-          }),
-        );
-        if (result instanceof Api.UpdateShortSentMessage) return result;
-        if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
-          const msgUpdate = result.updates.find((u): u is Api.UpdateNewMessage => u instanceof Api.UpdateNewMessage);
-          if (msgUpdate?.message instanceof Api.Message) return msgUpdate.message;
-        }
-        return undefined;
+        return await this.client?.sendMessage(resolved, {
+          message: text,
+          topMsgId: topicId,
+          ...(replyTo ? { replyTo } : {}),
+          ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
+        });
       }
       return await this.client?.sendMessage(resolved, {
         message: text,
@@ -416,7 +557,17 @@ export class TelegramService {
     if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
     if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
     if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return "image/gif";
-    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) return "image/webp";
+    if (
+      buffer[0] === 0x52 &&
+      buffer[1] === 0x49 &&
+      buffer[2] === 0x46 &&
+      buffer[3] === 0x46 &&
+      buffer[8] === 0x57 &&
+      buffer[9] === 0x45 &&
+      buffer[10] === 0x42 &&
+      buffer[11] === 0x50
+    )
+      return "image/webp";
     // Fall back to document mimeType
     const m = media as unknown as Record<string, unknown>;
     const doc = m.document as unknown as Record<string, unknown> | undefined;
@@ -589,31 +740,6 @@ export class TelegramService {
     await this.client.markAsRead(chatId);
   }
 
-  private static TYPING_ACTIONS: Record<string, () => Api.TypeSendMessageAction> = {
-    typing: () => new Api.SendMessageTypingAction(),
-    cancel: () => new Api.SendMessageCancelAction(),
-    record_video: () => new Api.SendMessageRecordVideoAction(),
-    upload_video: () => new Api.SendMessageUploadVideoAction({ progress: 0 }),
-    record_audio: () => new Api.SendMessageRecordAudioAction(),
-    upload_audio: () => new Api.SendMessageUploadAudioAction({ progress: 0 }),
-    upload_photo: () => new Api.SendMessageUploadPhotoAction({ progress: 0 }),
-    upload_document: () => new Api.SendMessageUploadDocumentAction({ progress: 0 }),
-    choose_sticker: () => new Api.SendMessageChooseStickerAction(),
-    game_play: () => new Api.SendMessageGamePlayAction(),
-  };
-
-  async setTyping(chatId: string, action: keyof typeof TelegramService.TYPING_ACTIONS = "typing"): Promise<void> {
-    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const factory = TelegramService.TYPING_ACTIONS[action];
-    if (!factory)
-      throw new Error(
-        `Unknown typing action: ${action}. Valid: ${Object.keys(TelegramService.TYPING_ACTIONS).join(", ")}`,
-      );
-    const resolved = await this.resolvePeer(chatId);
-    const peer = await this.client.getInputEntity(resolved);
-    await this.client.invoke(new Api.messages.SetTyping({ peer, action: factory() }));
-  }
-
   async getMessageById(
     chatId: string,
     messageId: number,
@@ -661,6 +787,268 @@ export class TelegramService {
       const resolved = await this.resolvePeer(chatId);
       await this.client?.deleteMessages(resolved, messageIds, { revoke: true });
     }, `deleteMessages in ${chatId}`);
+  }
+
+  async getScheduledMessages(chatId: string): Promise<
+    Array<{
+      id: number;
+      date: string;
+      text: string;
+      media?: { type: string; fileName?: string; size?: number };
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      const result = await this.client?.invoke(new Api.messages.GetScheduledHistory({ peer, hash: bigInt(0) }));
+      if (!result || result instanceof Api.messages.MessagesNotModified) return [];
+      const messages = (result as Api.messages.Messages | Api.messages.MessagesSlice | Api.messages.ChannelMessages)
+        .messages;
+      return messages
+        .filter((m): m is Api.Message => m instanceof Api.Message)
+        .map((m) => ({
+          id: m.id,
+          date: new Date((m.date ?? 0) * 1000).toISOString(),
+          text: m.message ?? "",
+          media: this.extractMediaInfo(m.media),
+        }));
+    }, `getScheduledMessages in ${chatId}`);
+  }
+
+  async deleteScheduledMessages(chatId: string, messageIds: number[]): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      await this.client?.invoke(new Api.messages.DeleteScheduledMessages({ peer, id: messageIds }));
+    }, `deleteScheduledMessages in ${chatId}`);
+  }
+
+  async getReplies(
+    chatId: string,
+    messageId: number,
+    limit = 20,
+  ): Promise<
+    Array<{
+      id: number;
+      text: string;
+      sender: string;
+      date: string;
+      media?: { type: string; fileName?: string; size?: number };
+      reactions?: { emoji: string; count: number; me: boolean }[];
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      const result = await this.client?.invoke(
+        new Api.messages.GetReplies({ peer, msgId: messageId, limit, hash: bigInt(0) }),
+      );
+      if (!result || result instanceof Api.messages.MessagesNotModified) return [];
+      const messages = (result as Api.messages.Messages | Api.messages.MessagesSlice | Api.messages.ChannelMessages)
+        .messages;
+      return Promise.all(
+        messages
+          .filter((m): m is Api.Message => m instanceof Api.Message)
+          .map(async (m) => ({
+            id: m.id,
+            text: m.message ?? "",
+            sender: await this.resolveSenderName(m.senderId),
+            date: new Date((m.date ?? 0) * 1000).toISOString(),
+            media: this.extractMediaInfo(m.media),
+            reactions: this.extractReactions(m.reactions),
+          })),
+      );
+    }, `getReplies for ${messageId} in ${chatId}`);
+  }
+
+  async getMessageLink(chatId: string, messageId: number, thread = false): Promise<string> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Message links are only available for channels and supergroups");
+      }
+      const result = await this.client?.invoke(
+        new Api.channels.ExportMessageLink({ channel: entity, id: messageId, thread }),
+      );
+      if (!result) throw new Error("Failed to export message link");
+      return result.link;
+    }, `getMessageLink for ${messageId} in ${chatId}`);
+  }
+
+  async getUnreadMentions(
+    chatId: string,
+    limit = 20,
+  ): Promise<
+    Array<{
+      id: number;
+      text: string;
+      sender: string;
+      date: string;
+      media?: { type: string; fileName?: string; size?: number };
+      reactions?: { emoji: string; count: number; me: boolean }[];
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      const result = await this.client?.invoke(
+        new Api.messages.GetUnreadMentions({
+          peer,
+          offsetId: 0,
+          addOffset: 0,
+          limit,
+          maxId: 0,
+          minId: 0,
+        }),
+      );
+      if (!result || result instanceof Api.messages.MessagesNotModified) return [];
+      const typedResult = result as Api.messages.Messages | Api.messages.MessagesSlice | Api.messages.ChannelMessages;
+      const messages = typedResult.messages;
+      const items = await Promise.all(
+        messages
+          .filter((m): m is Api.Message => m instanceof Api.Message)
+          .map(async (m) => ({
+            id: m.id,
+            text: m.message ?? "",
+            sender: await this.resolveSenderName(m.senderId),
+            date: new Date((m.date ?? 0) * 1000).toISOString(),
+            media: this.extractMediaInfo(m.media),
+            reactions: this.extractReactions(m.reactions),
+          })),
+      );
+      // Only mark all as read when we received the complete set; if truncated, marking all
+      // would silently clear mentions the caller hasn't seen yet.
+      const totalCount = "count" in typedResult ? typedResult.count : items.length;
+      if (items.length > 0 && items.length >= totalCount) {
+        try {
+          await this.client?.invoke(new Api.messages.ReadMentions({ peer }));
+        } catch {
+          // best-effort; don't discard fetched items on mark-read failure
+        }
+      }
+      return items;
+    }, `getUnreadMentions in ${chatId}`);
+  }
+
+  async getUnreadReactions(
+    chatId: string,
+    limit = 20,
+  ): Promise<
+    Array<{
+      id: number;
+      text: string;
+      sender: string;
+      date: string;
+      media?: { type: string; fileName?: string; size?: number };
+      reactions?: { emoji: string; count: number; me: boolean }[];
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      const result = await this.client?.invoke(
+        new Api.messages.GetUnreadReactions({
+          peer,
+          offsetId: 0,
+          addOffset: 0,
+          limit,
+          maxId: 0,
+          minId: 0,
+        }),
+      );
+      if (!result || result instanceof Api.messages.MessagesNotModified) return [];
+      const typedResult = result as Api.messages.Messages | Api.messages.MessagesSlice | Api.messages.ChannelMessages;
+      const messages = typedResult.messages;
+      const items = await Promise.all(
+        messages
+          .filter((m): m is Api.Message => m instanceof Api.Message)
+          .map(async (m) => ({
+            id: m.id,
+            text: m.message ?? "",
+            sender: await this.resolveSenderName(m.senderId),
+            date: new Date((m.date ?? 0) * 1000).toISOString(),
+            media: this.extractMediaInfo(m.media),
+            reactions: this.extractReactions(m.reactions),
+          })),
+      );
+      // Only mark all as read when we received the complete set; if truncated, marking all
+      // would silently clear reactions the caller hasn't seen yet.
+      const totalCount = "count" in typedResult ? typedResult.count : items.length;
+      if (items.length > 0 && items.length >= totalCount) {
+        try {
+          await this.client?.invoke(new Api.messages.ReadReactions({ peer }));
+        } catch {
+          // best-effort; don't discard fetched items on mark-read failure
+        }
+      }
+      return items;
+    }, `getUnreadReactions in ${chatId}`);
+  }
+
+  async translateText(chatId: string, messageIds: number[], toLang: string): Promise<string[]> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      const result = await this.client?.invoke(new Api.messages.TranslateText({ peer, id: messageIds, toLang }));
+      if (!result) return [];
+      return result.result.map((t) => (t instanceof Api.TextWithEntities ? t.text : ""));
+    }, `translateText in ${chatId}`);
+  }
+
+  async sendTyping(
+    chatId: string,
+    action: "typing" | "upload_photo" | "upload_document" | "cancel" = "typing",
+  ): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      let stamped = false;
+      if (action !== "cancel") {
+        const now = Date.now();
+        const last = this.lastTypingAt.get(chatId) ?? 0;
+        if (now - last < 10_000) return;
+        this.lastTypingAt.set(chatId, now);
+        stamped = true;
+      }
+      try {
+        const resolved = await this.resolvePeer(chatId);
+        const peer = await this.client?.getInputEntity(resolved);
+        if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+        let sendAction: Api.TypeSendMessageAction;
+        switch (action) {
+          case "cancel":
+            sendAction = new Api.SendMessageCancelAction();
+            break;
+          case "upload_photo":
+            sendAction = new Api.SendMessageUploadPhotoAction({ progress: 0 });
+            break;
+          case "upload_document":
+            sendAction = new Api.SendMessageUploadDocumentAction({ progress: 0 });
+            break;
+          default:
+            sendAction = new Api.SendMessageTypingAction();
+        }
+        await this.client?.invoke(new Api.messages.SetTyping({ peer, action: sendAction }));
+        if (action === "cancel") {
+          this.lastTypingAt.delete(chatId);
+        }
+      } catch (err) {
+        if (stamped) this.lastTypingAt.delete(chatId);
+        throw err;
+      }
+    }, `sendTyping in ${chatId}`);
   }
 
   /**
@@ -1297,7 +1685,17 @@ export class TelegramService {
     if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
     if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
     if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return "image/gif";
-    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) return "image/webp";
+    if (
+      buffer[0] === 0x52 &&
+      buffer[1] === 0x49 &&
+      buffer[2] === 0x46 &&
+      buffer[3] === 0x46 &&
+      buffer[8] === 0x57 &&
+      buffer[9] === 0x45 &&
+      buffer[10] === 0x42 &&
+      buffer[11] === 0x50
+    )
+      return "image/webp";
     return "image/jpeg"; // Telegram profile photos are almost always JPEG
   }
 
@@ -1433,7 +1831,7 @@ export class TelegramService {
             for (const r of list.reactions) {
               const userId = r.peerId instanceof Api.PeerUser ? r.peerId.userId.toString() : "";
               if (userId) {
-                const name = await this.resolveSenderName(bigInt(Number.parseInt(userId, 10)));
+                const name = await this.resolveSenderName(bigInt(userId));
                 users.push({ id: userId, name });
               }
             }
@@ -1448,6 +1846,45 @@ export class TelegramService {
 
     const total = reactionsOut.reduce((sum, r) => sum + r.count, 0);
     return { reactions: reactionsOut, total };
+  }
+
+  async setDefaultReaction(emoji: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.rateLimiter.execute(async () => {
+      await this.client?.invoke(
+        new Api.messages.SetDefaultReaction({
+          reaction: new Api.ReactionEmoji({ emoticon: emoji }),
+        }),
+      );
+    }, `setDefaultReaction ${emoji}`);
+  }
+
+  async getTopReactions(limit: number): Promise<Array<{ emoji: string }>> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.messages.GetTopReactions({ limit, hash: bigInt(0) }));
+      if (!result || result instanceof Api.messages.ReactionsNotModified) return [];
+      const out: Array<{ emoji: string }> = [];
+      for (const r of result.reactions) {
+        const emoji = reactionToEmoji(r);
+        if (emoji) out.push({ emoji });
+      }
+      return out;
+    }, "getTopReactions");
+  }
+
+  async getRecentReactions(limit: number): Promise<Array<{ emoji: string }>> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.messages.GetRecentReactions({ limit, hash: bigInt(0) }));
+      if (!result || result instanceof Api.messages.ReactionsNotModified) return [];
+      const out: Array<{ emoji: string }> = [];
+      for (const r of result.reactions) {
+        const emoji = reactionToEmoji(r);
+        if (emoji) out.push({ emoji });
+      }
+      return out;
+    }, "getRecentReactions");
   }
 
   async sendScheduledMessage(
@@ -1580,7 +2017,8 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const peer = await this.client.getInputEntity(chatId);
+    const resolved = await this.resolvePeer(chatId);
+    const peer = await this.client.getInputEntity(resolved);
     const result = await this.client.invoke(
       new Api.messages.GetReplies({
         peer,
@@ -1643,12 +2081,11 @@ export class TelegramService {
     const username = target.replace(/^@/, "").replace(/^https?:\/\/t\.me\//, "");
     const entity = await this.client.getEntity(username);
 
-    if (entity instanceof Api.Channel || entity instanceof Api.Chat) {
-      await this.client.invoke(
-        new Api.channels.JoinChannel({
-          channel: entity as Api.Channel,
-        }),
-      );
+    if (entity instanceof Api.Chat) {
+      throw new Error("Basic groups cannot be joined by username; use an invite link instead.");
+    }
+    if (entity instanceof Api.Channel) {
+      await this.client.invoke(new Api.channels.JoinChannel({ channel: entity }));
       return {
         id: entity.id.toString(),
         title: entity.title ?? "Unknown",
@@ -1870,7 +2307,7 @@ export class TelegramService {
     }
 
     if (options.photoPath) {
-      const fileData = readFileSync(options.photoPath);
+      const fileData = await readFile(options.photoPath);
       const uploaded = await this.client.uploadFile({
         file: new CustomFile(options.photoPath, fileData.length, options.photoPath, fileData),
         workers: 1,
@@ -1974,6 +2411,238 @@ export class TelegramService {
     );
   }
 
+  async archiveChat(chatId: string, archive: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      await this.client?.invoke(
+        new Api.folders.EditPeerFolders({
+          folderPeers: [new Api.InputFolderPeer({ peer, folderId: archive ? 1 : 0 })],
+        }),
+      );
+    }, `archiveChat ${chatId}`);
+  }
+
+  async pinDialog(chatId: string, pin: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      await this.client?.invoke(
+        new Api.messages.ToggleDialogPin({
+          peer: new Api.InputDialogPeer({ peer }),
+          pinned: pin,
+        }),
+      );
+    }, `pinDialog ${chatId}`);
+  }
+
+  async markDialogUnread(chatId: string, unread: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      await this.client?.invoke(
+        new Api.messages.MarkDialogUnread({
+          peer: new Api.InputDialogPeer({ peer }),
+          unread,
+        }),
+      );
+    }, `markDialogUnread ${chatId}`);
+  }
+
+  async getAdminLog(
+    chatId: string,
+    limit = 20,
+    q?: string,
+  ): Promise<
+    Array<{
+      id: string;
+      date: string;
+      userId: string;
+      userName: string;
+      action: string;
+      details: string;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Admin log is only available for supergroups and channels");
+      }
+      const result = await this.client?.invoke(
+        new Api.channels.GetAdminLog({
+          channel: entity,
+          q: q ?? "",
+          maxId: bigInt(0),
+          minId: bigInt(0),
+          limit,
+        }),
+      );
+      if (!result) return [];
+
+      const userMap = new Map<string, Api.User>();
+      for (const u of result.users) {
+        if (u instanceof Api.User) userMap.set(u.id.toString(), u);
+      }
+
+      const describeUser = (userId: bigInt.BigInteger): string => {
+        const user = userMap.get(userId.toString());
+        if (!user) return userId.toString();
+        const parts = [user.firstName, user.lastName].filter(Boolean);
+        const name = parts.join(" ") || "Unknown";
+        return user.username ? `${name} (@${user.username})` : name;
+      };
+
+      return result.events.map((event) => ({
+        id: event.id.toString(),
+        date: new Date((event.date ?? 0) * 1000).toISOString(),
+        userId: event.userId.toString(),
+        userName: describeUser(event.userId),
+        action: describeAdminLogAction(event.action),
+        details: describeAdminLogDetails(event.action, describeUser),
+      }));
+    }, `getAdminLog for ${chatId}`);
+  }
+
+  async setChatPermissions(chatId: string, permissions: ChatPermissions): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    if (Object.values(permissions).every((v) => v === undefined)) return;
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      let currentRights: Record<string, unknown> | undefined;
+      if (entity instanceof Api.Channel) {
+        const full = await this.client?.invoke(new Api.channels.GetFullChannel({ channel: entity }));
+        const fullChannel = full?.chats?.find(
+          (c): c is Api.Channel => c instanceof Api.Channel && c.id.equals(entity.id),
+        );
+        currentRights = (fullChannel?.defaultBannedRights as unknown as Record<string, unknown>) ?? undefined;
+      } else if (entity instanceof Api.Chat) {
+        const full = await this.client?.invoke(new Api.messages.GetFullChat({ chatId: entity.id }));
+        const fullChat = full?.chats?.find((c): c is Api.Chat => c instanceof Api.Chat && c.id.equals(entity.id));
+        currentRights = (fullChat?.defaultBannedRights as unknown as Record<string, unknown>) ?? undefined;
+      }
+      const peer = await this.client?.getInputEntity(entity);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      await this.client?.invoke(
+        new Api.messages.EditChatDefaultBannedRights({
+          peer,
+          bannedRights: new Api.ChatBannedRights({ untilDate: 0, ...mergeBannedRights(currentRights, permissions) }),
+        }),
+      );
+    }, `setChatPermissions ${chatId}`);
+  }
+
+  async setSlowMode(chatId: string, seconds: number): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const allowed = [0, 10, 30, 60, 300, 900, 3600];
+    if (!allowed.includes(seconds)) {
+      throw new Error(`Invalid slow mode interval. Allowed values: ${allowed.join(", ")} (seconds)`);
+    }
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel)) {
+        throw new Error("Slow mode is only available for supergroups");
+      }
+      await this.client?.invoke(new Api.channels.ToggleSlowMode({ channel: entity, seconds }));
+    }, `setSlowMode ${chatId}`);
+  }
+
+  async createForumTopic(
+    chatId: string,
+    title: string,
+    iconColor?: number,
+    iconEmojiId?: string,
+  ): Promise<{ id: number; title: string }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel) || !entity.forum) {
+        throw new Error("Forum topics are only available in forum supergroups");
+      }
+      const randomId = bigInt(Math.floor(Math.random() * 1e15));
+      const result = await this.client?.invoke(
+        new Api.channels.CreateForumTopic({
+          channel: entity,
+          title,
+          iconColor,
+          iconEmojiId: iconEmojiId ? bigInt(iconEmojiId) : undefined,
+          randomId,
+        }),
+      );
+      let topicId = 0;
+      if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+        for (const update of result.updates) {
+          if (
+            update instanceof Api.UpdateNewChannelMessage &&
+            update.message instanceof Api.MessageService &&
+            update.message.action instanceof Api.MessageActionTopicCreate
+          ) {
+            topicId = update.message.id;
+            break;
+          }
+        }
+        if (topicId === 0) {
+          for (const update of result.updates) {
+            if (update instanceof Api.UpdateMessageID && update.randomId?.equals(randomId)) {
+              topicId = update.id;
+              break;
+            }
+          }
+        }
+      }
+      if (topicId === 0) {
+        throw new Error("Failed to determine created topic ID");
+      }
+      return { id: topicId, title };
+    }, `createForumTopic ${chatId}`);
+  }
+
+  async editForumTopic(
+    chatId: string,
+    topicId: number,
+    options: { title?: string; iconEmojiId?: string; closed?: boolean; hidden?: boolean },
+  ): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel) || !entity.forum) {
+        throw new Error("Forum topics are only available in forum supergroups");
+      }
+      await this.client?.invoke(
+        new Api.channels.EditForumTopic({
+          channel: entity,
+          topicId,
+          title: options.title,
+          iconEmojiId: options.iconEmojiId ? bigInt(options.iconEmojiId) : undefined,
+          closed: options.closed,
+          hidden: options.hidden,
+        }),
+      );
+    }, `editForumTopic ${chatId}/${topicId}`);
+  }
+
+  async deleteForumTopic(chatId: string, topicId: number): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const entity = await this.resolveChat(chatId);
+      if (!(entity instanceof Api.Channel) || !entity.forum) {
+        throw new Error("Forum topics are only available in forum supergroups");
+      }
+      await this.client?.invoke(
+        new Api.channels.DeleteTopicHistory({
+          channel: entity,
+          topMsgId: topicId,
+        }),
+      );
+    }, `deleteForumTopic ${chatId}/${topicId}`);
+  }
+
   async exportInviteLink(
     chatId: string,
     options?: { expireDate?: number; usageLimit?: number; requestNeeded?: boolean; title?: string },
@@ -2017,7 +2686,7 @@ export class TelegramService {
       .map((inv) => {
         const expiredByDate = inv.expireDate ? inv.expireDate < Math.floor(Date.now() / 1000) : false;
         const expiredByUsage =
-          inv.usageLimit !== undefined && inv.usage !== undefined ? inv.usage >= inv.usageLimit : false;
+          inv.usageLimit != null && inv.usageLimit > 0 && inv.usage != null ? inv.usage >= inv.usageLimit : false;
         return {
           link: inv.link,
           title: inv.title,
@@ -2048,7 +2717,10 @@ export class TelegramService {
     const result = await this.client.invoke(new Api.messages.GetDialogFilters());
     const filters = "filters" in result ? result.filters : [];
     return filters
-      .filter((f): f is Api.DialogFilter => f instanceof Api.DialogFilter)
+      .filter(
+        (f): f is Api.DialogFilter | Api.DialogFilterChatlist =>
+          f instanceof Api.DialogFilter || f instanceof Api.DialogFilterChatlist,
+      )
       .map((f) => ({
         id: f.id,
         title: typeof f.title === "string" ? f.title : f.title.text,
@@ -2314,6 +2986,196 @@ export class TelegramService {
         ...(replyTo ? { replyTo } : {}),
       });
     }, `sendSticker to ${chatId}`);
+  }
+
+  async saveDraft(chatId: string, text: string, replyTo?: number): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const peer = await this.client?.getInputEntity(resolved);
+      if (!peer) throw new Error(`Cannot resolve peer for ${chatId}`);
+      const effectiveReplyTo = text === "" ? undefined : replyTo;
+      await this.client?.invoke(
+        new Api.messages.SaveDraft({
+          peer,
+          message: text,
+          ...(effectiveReplyTo ? { replyTo: new Api.InputReplyToMessage({ replyToMsgId: effectiveReplyTo }) } : {}),
+        }),
+      );
+    }, `saveDraft in ${chatId}`);
+  }
+
+  async getAllDrafts(): Promise<
+    Array<{
+      chatId: string;
+      chatTitle: string;
+      text: string;
+      date: string;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.messages.GetAllDrafts());
+      if (!result) return [];
+      const updates = result instanceof Api.Updates || result instanceof Api.UpdatesCombined ? result.updates : [];
+      const users = result instanceof Api.Updates || result instanceof Api.UpdatesCombined ? result.users : [];
+      const chats = result instanceof Api.Updates || result instanceof Api.UpdatesCombined ? result.chats : [];
+
+      const userMap = new Map<string, Api.User>();
+      for (const u of users) {
+        if (u instanceof Api.User) userMap.set(u.id.toString(), u);
+      }
+      const chatMap = new Map<string, Api.Chat | Api.Channel>();
+      for (const c of chats) {
+        if (c instanceof Api.Chat || c instanceof Api.Channel) chatMap.set(c.id.toString(), c);
+      }
+
+      const resolvePeerTitle = (peer: Api.TypePeer): { id: string; title: string } => {
+        if (peer instanceof Api.PeerUser) {
+          const user = userMap.get(peer.userId.toString());
+          if (user) {
+            const parts = [user.firstName, user.lastName].filter(Boolean);
+            const name = parts.join(" ") || "Unknown";
+            return {
+              id: peer.userId.toString(),
+              title: user.username ? `${name} (@${user.username})` : name,
+            };
+          }
+          return { id: peer.userId.toString(), title: peer.userId.toString() };
+        }
+        if (peer instanceof Api.PeerChat) {
+          const chat = chatMap.get(peer.chatId.toString());
+          return {
+            id: peer.chatId.toString(),
+            title: chat?.title ?? peer.chatId.toString(),
+          };
+        }
+        if (peer instanceof Api.PeerChannel) {
+          const channel = chatMap.get(peer.channelId.toString());
+          return {
+            id: peer.channelId.toString(),
+            title: channel?.title ?? peer.channelId.toString(),
+          };
+        }
+        return { id: "unknown", title: "unknown" };
+      };
+
+      const drafts: Array<{ chatId: string; chatTitle: string; text: string; date: string }> = [];
+      for (const update of updates) {
+        if (update instanceof Api.UpdateDraftMessage && update.draft instanceof Api.DraftMessage) {
+          const { id, title } = resolvePeerTitle(update.peer);
+          drafts.push({
+            chatId: id,
+            chatTitle: title,
+            text: update.draft.message ?? "",
+            date: new Date((update.draft.date ?? 0) * 1000).toISOString(),
+          });
+        }
+      }
+      return drafts;
+    }, "getAllDrafts");
+  }
+
+  async clearAllDrafts(): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.rateLimiter.execute(async () => {
+      await this.client?.invoke(new Api.messages.ClearAllDrafts());
+    }, "clearAllDrafts");
+  }
+
+  async getSavedDialogs(limit: number): Promise<Array<{ peerId: string; peerTitle: string; lastMsgId: number }>> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(
+        new Api.messages.GetSavedDialogs({
+          offsetDate: 0,
+          offsetId: 0,
+          offsetPeer: new Api.InputPeerEmpty(),
+          limit,
+          hash: bigInt(0),
+        }),
+      );
+      if (!result || result instanceof Api.messages.SavedDialogsNotModified) return [];
+
+      const userMap = new Map<string, Api.User>();
+      for (const u of result.users) {
+        if (u instanceof Api.User) userMap.set(u.id.toString(), u);
+      }
+      const chatMap = new Map<string, Api.Chat | Api.Channel>();
+      for (const c of result.chats) {
+        if (c instanceof Api.Chat || c instanceof Api.Channel) chatMap.set(c.id.toString(), c);
+      }
+
+      const resolvePeerTitle = (peer: Api.TypePeer): { id: string; title: string } => {
+        if (peer instanceof Api.PeerUser) {
+          const user = userMap.get(peer.userId.toString());
+          if (user) {
+            const parts = [user.firstName, user.lastName].filter(Boolean);
+            const name = parts.join(" ") || "Unknown";
+            return {
+              id: peer.userId.toString(),
+              title: user.username ? `${name} (@${user.username})` : name,
+            };
+          }
+          return { id: peer.userId.toString(), title: peer.userId.toString() };
+        }
+        if (peer instanceof Api.PeerChat) {
+          const chat = chatMap.get(peer.chatId.toString());
+          return { id: peer.chatId.toString(), title: chat?.title ?? peer.chatId.toString() };
+        }
+        if (peer instanceof Api.PeerChannel) {
+          const channel = chatMap.get(peer.channelId.toString());
+          return { id: peer.channelId.toString(), title: channel?.title ?? peer.channelId.toString() };
+        }
+        return { id: "unknown", title: "unknown" };
+      };
+
+      const dialogs: Array<{ peerId: string; peerTitle: string; lastMsgId: number }> = [];
+      for (const d of result.dialogs) {
+        if (d instanceof Api.SavedDialog) {
+          const { id, title } = resolvePeerTitle(d.peer);
+          dialogs.push({
+            peerId: id,
+            peerTitle: title,
+            lastMsgId: d.topMessage,
+          });
+        }
+      }
+      return dialogs;
+    }, "getSavedDialogs");
+  }
+
+  async getWebPreview(url: string): Promise<{
+    type: string;
+    url?: string;
+    title?: string;
+    description?: string;
+    siteName?: string;
+  } | null> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.messages.GetWebPagePreview({ message: url }));
+      if (!result) return null;
+      const media = result.media;
+      if (!(media instanceof Api.MessageMediaWebPage)) return null;
+      const page = media.webpage;
+      if (page instanceof Api.WebPageEmpty) {
+        return { type: "empty", url: page.url };
+      }
+      if (page instanceof Api.WebPagePending) {
+        return { type: "pending", url: page.url };
+      }
+      if (page instanceof Api.WebPage) {
+        return {
+          type: page.type ?? "article",
+          url: page.url,
+          title: page.title,
+          description: page.description,
+          siteName: page.siteName,
+        };
+      }
+      return null;
+    }, "getWebPreview");
   }
 
   async getRecentStickers(): Promise<Array<{ id: string; accessHash: string; emoji: string }>> {

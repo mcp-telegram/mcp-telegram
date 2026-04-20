@@ -312,6 +312,119 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
   );
 
   server.registerTool(
+    "telegram-save-draft",
+    {
+      description:
+        "Save or clear a message draft for a chat. Pass empty text to clear the draft. Optional replyTo sets the message being replied to",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        text: z.string().describe("Draft text. Empty string clears the draft"),
+        replyTo: z.number().int().positive().optional().describe("Message ID this draft replies to"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, text, replyTo }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.saveDraft(chatId, text, replyTo);
+        return ok(text === "" ? `Draft cleared for ${chatId}` : `Draft saved for ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-drafts",
+    {
+      description: "Get all saved message drafts across chats",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const drafts = await telegram.getAllDrafts();
+        if (drafts.length === 0) return ok("No drafts");
+        const text = drafts.map((d) => `[${d.chatId}] ${d.chatTitle} (${d.date})\n  ${d.text}`).join("\n\n");
+        return ok(sanitize(text));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-clear-drafts",
+    {
+      description:
+        "Delete saved message drafts. Pass chatId to clear the draft for a single chat. Without chatId, clears drafts in ALL chats — requires confirmAllChats: true",
+      inputSchema: {
+        chatId: z.string().optional().describe("Chat ID or username. If provided, clears draft only for this chat"),
+        confirmAllChats: z
+          .boolean()
+          .optional()
+          .describe("Must be true to wipe drafts across ALL chats when chatId is omitted"),
+      },
+      annotations: DESTRUCTIVE,
+    },
+    async ({ chatId, confirmAllChats }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        if (chatId !== undefined) {
+          if (confirmAllChats) {
+            return fail(new Error("Pass either chatId or confirmAllChats=true, not both"));
+          }
+          await telegram.saveDraft(chatId, "");
+          return ok(`Draft cleared for ${chatId}`);
+        }
+        if (!confirmAllChats) {
+          return fail(
+            new Error(
+              "Refusing to clear drafts in ALL chats without explicit confirmation. Pass chatId for a single chat, or confirmAllChats=true to wipe all drafts",
+            ),
+          );
+        }
+        await telegram.clearAllDrafts();
+        return ok("All drafts cleared");
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-saved-dialogs",
+    {
+      description:
+        "Get Saved Messages dialogs (Telegram's per-sender grouping of messages forwarded to your Saved Messages)",
+      inputSchema: {
+        limit: z.number().int().positive().default(20).describe("Max dialogs to return"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ limit }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const dialogs = await telegram.getSavedDialogs(limit);
+        if (dialogs.length === 0) return ok("No saved dialogs");
+        const text = dialogs.map((d) => `[${d.peerId}] ${d.peerTitle} — last msg #${d.lastMsgId}`).join("\n");
+        return ok(sanitize(text));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "telegram-revoke-invite-link",
     {
       description: "Revoke an invite link for a group or channel",

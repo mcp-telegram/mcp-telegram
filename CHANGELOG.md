@@ -5,7 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.25.0] - 2026-04-20
+
+### Added
+- **Scheduled messages** — `telegram-get-scheduled`, `telegram-delete-scheduled`
+- **Threads & replies** — `telegram-get-replies` for channel post comments
+- **Message links** — `telegram-get-message-link` returns public t.me URL for a message
+- **Mentions & unread reactions** — `telegram-get-unread-mentions`, `telegram-get-unread-reactions`
+- **Translate** — `telegram-translate-message` (requires Telegram Premium)
+- **Typing indicator** — `telegram-send-typing` with configurable action
+- **Dialog management** — `telegram-archive-chat`, `telegram-pin-chat`, `telegram-mark-dialog-unread`
+- **Drafts** — `telegram-save-draft`, `telegram-get-drafts`, `telegram-clear-drafts`
+- **Saved Messages dialogs** — `telegram-get-saved-dialogs` for the new per-peer Saved Messages folders
+- **Admin log** — `telegram-get-admin-log` for channel/supergroup moderation history
+- **Reactions catalog** — `telegram-set-default-reaction`, `telegram-get-top-reactions`, `telegram-get-recent-reactions`
+- **Chat permissions** — `telegram-set-chat-permissions` for default banned rights
+- **Slow mode** — `telegram-set-slow-mode` for supergroups
+- **Forum topics CRUD** — `telegram-create-topic`, `telegram-edit-topic`, `telegram-delete-topic`
+- **Web page preview** — `telegram-get-web-preview` to inspect link previews before sending
+
+### Fixed
+- `telegram-set-chat-permissions` now merges with the chat's current `defaultBannedRights` — omitted flags keep their current state instead of being silently cleared
+- `telegram-clear-drafts` requires `chatId` (single-chat) or `confirmAllChats: true` to wipe drafts account-wide, preventing accidental loss of all drafts in one call
+- `telegram-get-unread-mentions` and `telegram-get-unread-reactions` are now annotated as `WRITE` — they mark the listed items as read on the server
+- `telegram-translate-message` is now annotated as `WRITE` (consumes Premium translate quota); `toLang` is validated against an ISO-639 / locale pattern and `messageIds` is capped at 1–100 positive integers
+- `telegram-delete-scheduled` caps `messageIds` at 1–100 positive integers
+- `telegram-set-default-reaction` validates `emoji` length (1–8 characters)
+- `telegram-get-web-preview` rejects non-`http(s)` URLs, preventing use as an SSRF proxy
+- `telegram-send-typing` throttles non-`cancel` actions to once per 10 seconds per chat
+- `telegram-get-saved-dialogs` no longer returns a hard-coded `unreadCount: 0`
+- `telegram-create-topic` now reads the new topic ID from `UpdateNewChannelMessage` (authoritative) and fails loudly if neither source is available
+- `telegram-save-draft` drops `replyTo` when the draft text is empty, avoiding `MESSAGE_EMPTY` errors when clearing drafts
+- Removed unused `chatMap` build in `getAdminLog`
 
 ## [1.24.1] - 2026-04-20
 

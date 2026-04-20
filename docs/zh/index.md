@@ -10,7 +10,7 @@ hero:
       link: /zh/getting-started/credentials
     - theme: alt
       text: 下载二进制文件
-      link: https://github.com/overpod/mcp-telegram/releases/latest
+      link: https://github.com/mcp-telegram/mcp-telegram/releases/latest
     - theme: alt
       text: 云版本
       link: https://mcp-telegram.com
@@ -37,32 +37,32 @@ features:
 
 ## 快速开始
 
-从 [GitHub Releases](https://github.com/overpod/mcp-telegram/releases/latest) 下载您平台的二进制文件，获取 [API 凭证](/zh/getting-started/credentials)，然后连接：
+从 [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases/latest) 下载您平台的二进制文件，获取 [API 凭证](/zh/getting-started/credentials)，然后连接：
 
 ::: code-group
 ```bash [macOS (Apple Silicon)]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
 chmod +x mcp-telegram mcp-telegram-login
 TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 ```bash [macOS (Intel)]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
 chmod +x mcp-telegram mcp-telegram-login
 TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 ```bash [Linux x64]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
 chmod +x mcp-telegram mcp-telegram-login
 TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 ```powershell [Windows]
-# 从 https://github.com/overpod/mcp-telegram/releases/latest 下载
+# 从 https://github.com/mcp-telegram/mcp-telegram/releases/latest 下载
 # mcp-telegram-windows-x64.exe
 # mcp-telegram-login-windows-x64.exe
 $env:TELEGRAM_API_ID="YOUR_ID"; $env:TELEGRAM_API_HASH="YOUR_HASH"; .\mcp-telegram-login-windows-x64.exe

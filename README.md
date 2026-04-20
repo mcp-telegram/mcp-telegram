@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![mcp-telegram MCP server](https://glama.ai/mcp/servers/overpod/mcp-telegram/badges/score.svg)](https://glama.ai/mcp/servers/overpod/mcp-telegram)
 
-> **[📖 Documentation](https://overpod.github.io/mcp-telegram/)** · **[☁️ Cloud version](https://mcp-telegram.com)** — connect Telegram to Claude.ai or ChatGPT in 30 seconds with QR code, no API keys needed.
+> **[📖 Documentation](https://mcp-telegram.github.io/mcp-telegram/)** · **[☁️ Cloud version](https://mcp-telegram.com)** — connect Telegram to Claude.ai or ChatGPT in 30 seconds with QR code, no API keys needed.
 
 <p align="center">
   <img src="assets/demo.gif" alt="MCP Telegram demo — connect and summarize chats in Claude" width="700">
@@ -136,7 +136,7 @@ mcp-telegram login    # QR login
 
 ### Pre-built binary (no runtime needed)
 
-Download from [Releases](https://github.com/overpod/mcp-telegram/releases) — standalone single-file binaries, zero dependencies:
+Download from [Releases](https://github.com/mcp-telegram/mcp-telegram/releases) — standalone single-file binaries, zero dependencies:
 
 | Platform | Server | Login CLI |
 |----------|--------|-----------|
@@ -148,8 +148,8 @@ Download from [Releases](https://github.com/overpod/mcp-telegram/releases) — s
 
 ```bash
 # Download (example for Linux x64)
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
 chmod +x mcp-telegram mcp-telegram-login
 
 # Login
@@ -162,7 +162,7 @@ TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ### From source
 
 ```bash
-git clone https://github.com/overpod/mcp-telegram.git
+git clone https://github.com/mcp-telegram/mcp-telegram.git
 cd mcp-telegram
 npm install && npm run build
 ```
@@ -170,7 +170,7 @@ npm install && npm run build
 ### Docker
 
 ```bash
-docker build -t mcp-telegram https://github.com/overpod/mcp-telegram.git
+docker build -t mcp-telegram https://github.com/mcp-telegram/mcp-telegram.git
 ```
 
 Login (interactive terminal required):

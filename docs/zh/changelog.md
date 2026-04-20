@@ -2,7 +2,7 @@
 
 <VersionBadge version="1.24.0" /> 当前版本
 
-MCP Telegram 的所有重要更改。完整版本对比见 [GitHub Releases](https://github.com/overpod/mcp-telegram/releases)。
+MCP Telegram 的所有重要更改。完整版本对比见 [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases)。
 
 ## v1.24.0 <Badge type="tip" text="最新" /> {#v1.24.0}
 **2026-04-06**

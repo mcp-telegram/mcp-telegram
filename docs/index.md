@@ -10,7 +10,7 @@ hero:
       link: /getting-started/credentials
     - theme: alt
       text: Download Binary
-      link: https://github.com/overpod/mcp-telegram/releases/latest
+      link: https://github.com/mcp-telegram/mcp-telegram/releases/latest
     - theme: alt
       text: Use Cloud Version
       link: https://mcp-telegram.com
@@ -37,32 +37,32 @@ features:
 
 ## Quick Start
 
-Download the binary for your platform from [GitHub Releases](https://github.com/overpod/mcp-telegram/releases/latest), get [API credentials](/getting-started/credentials), and connect:
+Download the binary for your platform from [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases/latest), get [API credentials](/getting-started/credentials), and connect:
 
 ::: code-group
 ```bash [macOS (Apple Silicon)]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
 chmod +x mcp-telegram mcp-telegram-login
 TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 ```bash [macOS (Intel)]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
 chmod +x mcp-telegram mcp-telegram-login
 TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 ```bash [Linux x64]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
 chmod +x mcp-telegram mcp-telegram-login
 TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH ./mcp-telegram-login
 ```
 
 ```powershell [Windows]
-# Download from https://github.com/overpod/mcp-telegram/releases/latest
+# Download from https://github.com/mcp-telegram/mcp-telegram/releases/latest
 # mcp-telegram-windows-x64.exe
 # mcp-telegram-login-windows-x64.exe
 $env:TELEGRAM_API_ID="YOUR_ID"; $env:TELEGRAM_API_HASH="YOUR_HASH"; .\mcp-telegram-login-windows-x64.exe

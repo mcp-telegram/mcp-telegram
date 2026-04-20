@@ -44,4 +44,4 @@ MCP Telegram использует официальный API Telegram (MTProto) 
 
 ## Можно без Node.js?
 
-Да! Скачайте [готовые бинарники](https://github.com/overpod/mcp-telegram/releases) — самостоятельные исполняемые файлы для Linux, macOS и Windows.
+Да! Скачайте [готовые бинарники](https://github.com/mcp-telegram/mcp-telegram/releases) — самостоятельные исполняемые файлы для Linux, macOS и Windows.

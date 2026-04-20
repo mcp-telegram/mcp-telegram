@@ -6,7 +6,7 @@ defineProps({
 
 <template>
   <a
-    :href="`https://github.com/overpod/mcp-telegram/releases/tag/v${version}`"
+    :href="`https://github.com/mcp-telegram/mcp-telegram/releases/tag/v${version}`"
     target="_blank"
     rel="noopener noreferrer"
     class="version-badge"

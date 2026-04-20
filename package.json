@@ -48,11 +48,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/overpod/mcp-telegram.git"
+    "url": "https://github.com/mcp-telegram/mcp-telegram.git"
   },
-  "homepage": "https://github.com/overpod/mcp-telegram#readme",
+  "homepage": "https://github.com/mcp-telegram/mcp-telegram#readme",
   "bugs": {
-    "url": "https://github.com/overpod/mcp-telegram/issues"
+    "url": "https://github.com/mcp-telegram/mcp-telegram/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

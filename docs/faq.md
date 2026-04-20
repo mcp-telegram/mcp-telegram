@@ -44,4 +44,4 @@ Yes. Full support — list topics, read per-topic messages, send to specific top
 
 ## Can I use it without Node.js?
 
-Yes! Download [pre-built binaries](https://github.com/overpod/mcp-telegram/releases) — standalone executables for Linux, macOS, and Windows. No runtime needed.
+Yes! Download [pre-built binaries](https://github.com/mcp-telegram/mcp-telegram/releases) — standalone executables for Linux, macOS, and Windows. No runtime needed.

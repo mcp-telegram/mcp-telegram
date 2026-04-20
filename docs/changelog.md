@@ -2,7 +2,7 @@
 
 <VersionBadge version="1.24.0" /> Current version
 
-All notable changes to MCP Telegram. For full diff between versions, see [GitHub Releases](https://github.com/overpod/mcp-telegram/releases).
+All notable changes to MCP Telegram. For full diff between versions, see [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases).
 
 ## v1.24.0 <Badge type="tip" text="latest" /> {#v1.24.0}
 **2026-04-06**

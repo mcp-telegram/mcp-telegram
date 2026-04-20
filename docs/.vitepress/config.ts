@@ -201,7 +201,7 @@ export default defineConfig({
         lastUpdatedText: "Обновлено",
         docFooter: { prev: "Назад", next: "Далее" },
         editLink: {
-          pattern: "https://github.com/overpod/mcp-telegram/edit/main/docs/:path",
+          pattern: "https://github.com/mcp-telegram/mcp-telegram/edit/main/docs/:path",
           text: "Редактировать на GitHub",
         },
       },
@@ -216,7 +216,7 @@ export default defineConfig({
         lastUpdatedText: "最后更新",
         docFooter: { prev: "上一页", next: "下一页" },
         editLink: {
-          pattern: "https://github.com/overpod/mcp-telegram/edit/main/docs/:path",
+          pattern: "https://github.com/mcp-telegram/mcp-telegram/edit/main/docs/:path",
           text: "在 GitHub 上编辑",
         },
       },
@@ -225,14 +225,14 @@ export default defineConfig({
   themeConfig: {
     logo: "/logo.svg",
     socialLinks: [
-      { icon: "github", link: "https://github.com/overpod/mcp-telegram" },
+      { icon: "github", link: "https://github.com/mcp-telegram/mcp-telegram" },
       {
         icon: "npm",
         link: "https://www.npmjs.com/package/@overpod/mcp-telegram",
       },
     ],
     editLink: {
-      pattern: "https://github.com/overpod/mcp-telegram/edit/main/docs/:path",
+      pattern: "https://github.com/mcp-telegram/mcp-telegram/edit/main/docs/:path",
       text: "Edit this page on GitHub",
     },
     search: {

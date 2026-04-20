@@ -4,7 +4,7 @@
 
 Download a standalone binary — **no Node.js, no npm, no dependencies**. Just one file.
 
-Download from [GitHub Releases](https://github.com/overpod/mcp-telegram/releases/latest):
+Download from [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases/latest):
 
 | Platform | Server | Login |
 |----------|--------|-------|
@@ -16,32 +16,32 @@ Download from [GitHub Releases](https://github.com/overpod/mcp-telegram/releases
 
 ::: code-group
 ```bash [macOS (Apple Silicon)]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
 chmod +x mcp-telegram mcp-telegram-login
 ```
 
 ```bash [macOS (Intel)]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
 chmod +x mcp-telegram mcp-telegram-login
 ```
 
 ```bash [Linux x64]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
 chmod +x mcp-telegram mcp-telegram-login
 ```
 
 ```bash [Linux ARM64]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-arm64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-arm64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-linux-arm64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-arm64
 chmod +x mcp-telegram mcp-telegram-login
 ```
 
 ```powershell [Windows]
 # Download from GitHub Releases:
-# https://github.com/overpod/mcp-telegram/releases/latest
+# https://github.com/mcp-telegram/mcp-telegram/releases/latest
 # Files: mcp-telegram-windows-x64.exe, mcp-telegram-login-windows-x64.exe
 ```
 :::
@@ -74,7 +74,7 @@ mcp-telegram login    # QR login
 
 Build the image:
 ```bash
-docker build -t mcp-telegram https://github.com/overpod/mcp-telegram.git
+docker build -t mcp-telegram https://github.com/mcp-telegram/mcp-telegram.git
 ```
 
 Login (interactive terminal required):
@@ -102,7 +102,7 @@ Login must be done once via terminal. After that, the session is persisted in `~
 ## From Source
 
 ```bash
-git clone https://github.com/overpod/mcp-telegram.git
+git clone https://github.com/mcp-telegram/mcp-telegram.git
 cd mcp-telegram
 npm install && npm run build
 ```

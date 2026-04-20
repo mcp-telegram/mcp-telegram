@@ -4,7 +4,7 @@
 
 下载独立二进制文件 — **无需 Node.js、npm 或任何依赖**。只需一个文件。
 
-从 [GitHub Releases](https://github.com/overpod/mcp-telegram/releases/latest) 下载：
+从 [GitHub Releases](https://github.com/mcp-telegram/mcp-telegram/releases/latest) 下载：
 
 | 平台 | 服务器 | 登录 |
 |------|--------|------|
@@ -16,32 +16,32 @@
 
 ::: code-group
 ```bash [macOS (Apple Silicon)]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-darwin-arm64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-arm64
 chmod +x mcp-telegram mcp-telegram-login
 ```
 
 ```bash [macOS (Intel)]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-darwin-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-darwin-x64
 chmod +x mcp-telegram mcp-telegram-login
 ```
 
 ```bash [Linux x64]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-linux-x64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-x64
 chmod +x mcp-telegram mcp-telegram-login
 ```
 
 ```bash [Linux ARM64]
-curl -L -o mcp-telegram https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-linux-arm64
-curl -L -o mcp-telegram-login https://github.com/overpod/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-arm64
+curl -L -o mcp-telegram https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-linux-arm64
+curl -L -o mcp-telegram-login https://github.com/mcp-telegram/mcp-telegram/releases/latest/download/mcp-telegram-login-linux-arm64
 chmod +x mcp-telegram mcp-telegram-login
 ```
 
 ```powershell [Windows]
 # 从 GitHub Releases 下载：
-# https://github.com/overpod/mcp-telegram/releases/latest
+# https://github.com/mcp-telegram/mcp-telegram/releases/latest
 # 文件：mcp-telegram-windows-x64.exe, mcp-telegram-login-windows-x64.exe
 ```
 :::
@@ -74,7 +74,7 @@ mcp-telegram login    # 二维码登录
 
 构建镜像：
 ```bash
-docker build -t mcp-telegram https://github.com/overpod/mcp-telegram.git
+docker build -t mcp-telegram https://github.com/mcp-telegram/mcp-telegram.git
 ```
 
 登录（需要交互式终端）：
@@ -98,7 +98,7 @@ docker run -i --rm \
 ## 从源码
 
 ```bash
-git clone https://github.com/overpod/mcp-telegram.git
+git clone https://github.com/mcp-telegram/mcp-telegram.git
 cd mcp-telegram
 npm install && npm run build
 ```

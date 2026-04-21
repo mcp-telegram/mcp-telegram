@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, sanitize } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection } from "./shared.js";
 
 export function isStarsEnabled(): boolean {
   return process.env.MCP_TELEGRAM_ENABLE_STARS === "1";
@@ -29,7 +29,7 @@ export function registerStarsTools(server: McpServer, telegram: TelegramService)
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getStarsStatus(peer);
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -77,7 +77,7 @@ export function registerStarsTools(server: McpServer, telegram: TelegramService)
           offset,
           limit,
         });
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }

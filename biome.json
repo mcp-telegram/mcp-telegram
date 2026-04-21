@@ -3,7 +3,13 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "suspicious": {
+        "noConsole": {
+          "level": "warn",
+          "options": { "allow": ["error", "warn"] }
+        }
+      }
     }
   },
   "formatter": {
@@ -20,5 +26,17 @@
         }
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/index.ts", "src/qr-login-cli.ts", "src/cli.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, sanitize } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection } from "./shared.js";
 
 export function registerStoryTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -28,7 +28,7 @@ export function registerStoryTools(server: McpServer, telegram: TelegramService)
       }
       try {
         const result = await telegram.getAllStories({ next, hidden, state });
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -53,7 +53,7 @@ export function registerStoryTools(server: McpServer, telegram: TelegramService)
       try {
         const result = await telegram.getPeerStories(chat);
         if (result === null) return ok("No active stories found for the specified peer");
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -78,7 +78,7 @@ export function registerStoryTools(server: McpServer, telegram: TelegramService)
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getStoriesById(chat, ids);
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -115,7 +115,7 @@ export function registerStoryTools(server: McpServer, telegram: TelegramService)
           offset,
           limit,
         });
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         const msg = (e as Error).message ?? "";
         if (/PREMIUM|PAYMENT_REQUIRED/i.test(msg)) {

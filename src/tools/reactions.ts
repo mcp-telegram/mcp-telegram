@@ -110,7 +110,7 @@ export function registerReactionTools(server: McpServer, telegram: TelegramServi
       try {
         const reactions = await telegram.getTopReactions(limit);
         if (reactions.length === 0) return ok("No top reactions available");
-        return ok(sanitize(reactions.map((r) => r.emoji).join(" ")));
+        return ok(reactions.map((r) => r.emoji).join(" "));
       } catch (e) {
         return fail(e);
       }
@@ -182,7 +182,7 @@ export function registerReactionTools(server: McpServer, telegram: TelegramServi
       try {
         const reactions = await telegram.getRecentReactions(limit);
         if (reactions.length === 0) return ok("No recent reactions");
-        return ok(sanitize(reactions.map((r) => r.emoji).join(" ")));
+        return ok(reactions.map((r) => r.emoji).join(" "));
       } catch (e) {
         return fail(e);
       }

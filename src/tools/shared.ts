@@ -5,19 +5,20 @@ export const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
 export const WRITE = { readOnlyHint: false, openWorldHint: true } as const;
 export const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, openWorldHint: true } as const;
 
-/** Helper: success response */
+/** Remove unpaired UTF-16 surrogates that break JSON serialization */
+export function sanitize(text: string): string {
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
+}
+
+/** Helper: success response — always sanitizes to prevent surrogate crashes */
 export function ok(text: string) {
-  return { content: [{ type: "text" as const, text }] };
+  return { content: [{ type: "text" as const, text: sanitize(text) }] };
 }
 
 /** Helper: error response with isError flag */
 export function fail(e: unknown) {
-  return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true as const };
-}
-
-/** Remove unpaired UTF-16 surrogates that break JSON serialization */
-export function sanitize(text: string): string {
-  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
+  const msg = e instanceof Error ? e.message : String(e);
+  return { content: [{ type: "text" as const, text: `Error: ${sanitize(msg)}` }], isError: true as const };
 }
 
 /** Format reactions array into compact text like: [👍×5 ❤️×3(me) 🔥×1] */

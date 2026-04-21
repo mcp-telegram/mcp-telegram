@@ -33,7 +33,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
             return `${prefix} ${d.name} (${d.id})${botTag}${contactTag}${unread}`;
           })
           .join("\n");
-        return ok(sanitize(text) || "No chats");
+        return ok(text || "No chats");
       } catch (e) {
         return fail(e);
       }
@@ -63,7 +63,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
               `${c.type === "group" ? "G" : c.type === "channel" ? "C" : "P"} ${c.name}${c.username ? ` (@${c.username})` : ""} (${c.id})${c.membersCount ? ` [${c.membersCount} members]` : ""}${c.description ? ` — ${c.description.split("\n")[0].slice(0, 100)}` : ""}`,
           )
           .join("\n");
-        return ok(sanitize(text) || "No results");
+        return ok(text || "No results");
       } catch (e) {
         return fail(e);
       }
@@ -122,7 +122,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
             return `${m.name}${m.username ? ` (@${m.username})` : ""} (${m.id})${role}`;
           })
           .join("\n");
-        return ok(sanitize(text) || "No members found");
+        return ok(text || "No members found");
       } catch (e) {
         return fail(e);
       }
@@ -464,7 +464,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
             return `[#${e.id}] [${e.date}] ${e.userName}: ${e.action}${details}`;
           })
           .join("\n");
-        return ok(sanitize(text) || "No admin log events");
+        return ok(text || "No admin log events");
       } catch (e) {
         return fail(e);
       }
@@ -734,7 +734,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
 
       try {
         const topic = await telegram.createForumTopic(chatId, title, iconColor, iconEmojiId);
-        return ok(sanitize(`Created topic "${topic.title}" (id=${topic.id}) in ${chatId}`));
+        return ok(`Created topic "${topic.title}" (id=${topic.id}) in ${chatId}`);
       } catch (e) {
         return fail(e);
       }
@@ -806,7 +806,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
 
       try {
         const stats = await telegram.getBroadcastStats(chatId, { dark, includeGraphs });
-        return ok(sanitize(JSON.stringify(stats)));
+        return ok(JSON.stringify(stats));
       } catch (e) {
         return fail(e);
       }
@@ -836,7 +836,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
 
       try {
         const stats = await telegram.getMegagroupStats(chatId, { dark, includeGraphs });
-        return ok(sanitize(JSON.stringify(stats)));
+        return ok(JSON.stringify(stats));
       } catch (e) {
         return fail(e);
       }

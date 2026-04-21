@@ -15,11 +15,12 @@ export interface RateLimiterOptions {
 }
 
 export class RateLimiter {
-  private lastRequestTime = 0;
   private minInterval: number;
   private maxRetries: number;
   private initialRetryDelay: number;
   private maxRetryDelay: number;
+  // Serializes concurrent calls so each waits for the previous slot to clear
+  private slotQueue: Promise<void> = Promise.resolve();
 
   constructor(options: RateLimiterOptions = {}) {
     const maxRequestsPerSecond = options.maxRequestsPerSecond ?? 20;
@@ -101,13 +102,12 @@ export class RateLimiter {
     }
   }
 
-  private async waitForSlot(): Promise<void> {
-    const now = Date.now();
-    const elapsed = now - this.lastRequestTime;
-    if (elapsed < this.minInterval) {
-      await sleep(this.minInterval - elapsed);
-    }
-    this.lastRequestTime = Date.now();
+  private waitForSlot(): Promise<void> {
+    // Chain onto the previous slot so concurrent callers queue up sequentially.
+    // Each turn: wait minInterval from when the previous turn started, then resolve.
+    const nextSlot = this.slotQueue.then(() => sleep(this.minInterval));
+    this.slotQueue = nextSlot;
+    return nextSlot;
   }
 }
 

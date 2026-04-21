@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, sanitize } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection } from "./shared.js";
 
 export function isQuickRepliesEnabled(): boolean {
   return process.env.MCP_TELEGRAM_ENABLE_QUICK_REPLIES === "1";
@@ -29,7 +29,7 @@ export function registerQuickRepliesTools(server: McpServer, telegram: TelegramS
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getQuickReplies(hash);
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -60,7 +60,7 @@ export function registerQuickRepliesTools(server: McpServer, telegram: TelegramS
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getQuickReplyMessages(shortcutId, { ids, hash });
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }

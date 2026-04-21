@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
 
 export function registerContactTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -20,7 +20,7 @@ export function registerContactTools(server: McpServer, telegram: TelegramServic
         const text = contacts
           .map((c) => `P ${c.name}${c.username ? ` (@${c.username})` : ""} (${c.id})${c.phone ? ` +${c.phone}` : ""}`)
           .join("\n");
-        return ok(sanitize(text) || "No contacts");
+        return ok(text || "No contacts");
       } catch (e) {
         return fail(e);
       }
@@ -89,7 +89,7 @@ export function registerContactTools(server: McpServer, telegram: TelegramServic
             return `${tag} ${r.name}${username} (${r.id})${unread}${preview}`;
           })
           .join("\n");
-        return ok(sanitize(text));
+        return ok(text);
       } catch (e) {
         return fail(e);
       }

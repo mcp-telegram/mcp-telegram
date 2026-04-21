@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { DESTRUCTIVE, fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
+import { DESTRUCTIVE, fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
 
 const MUTE_FOREVER_UNTIL = 2147483647; // max 32-bit signed int
 
@@ -70,7 +70,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
               `[${f.id}] ${f.emoticon ? `${f.emoticon} ` : ""}${f.title} (${f.includeCount} chats, ${f.pinnedCount} pinned)`,
           )
           .join("\n");
-        return ok(sanitize(text));
+        return ok(text);
       } catch (e) {
         return fail(e);
       }
@@ -127,7 +127,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
               `${s.current ? "→ " : "  "}${s.device} (${s.platform}) — ${s.appName} ${s.appVersion}\n    IP: ${s.ip} (${s.country}) | Last active: ${s.dateActive}${s.current ? " [CURRENT]" : ""}\n    Hash: ${s.hash}`,
           )
           .join("\n\n");
-        return ok(sanitize(text));
+        return ok(text);
       } catch (e) {
         return fail(e);
       }
@@ -304,7 +304,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
               `${l.link}${l.title ? ` (${l.title})` : ""} — ${l.usageCount} uses${l.expired ? " [EXPIRED]" : ""}${l.revoked ? " [REVOKED]" : ""}`,
           )
           .join("\n");
-        return ok(sanitize(text));
+        return ok(text);
       } catch (e) {
         return fail(e);
       }
@@ -351,7 +351,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         const drafts = await telegram.getAllDrafts();
         if (drafts.length === 0) return ok("No drafts");
         const text = drafts.map((d) => `[${d.chatId}] ${d.chatTitle} (${d.date})\n  ${d.text}`).join("\n\n");
-        return ok(sanitize(text));
+        return ok(text);
       } catch (e) {
         return fail(e);
       }
@@ -417,7 +417,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         const dialogs = await telegram.getSavedDialogs(limit);
         if (dialogs.length === 0) return ok("No saved dialogs");
         const text = dialogs.map((d) => `[${d.peerId}] ${d.peerTitle} — last msg #${d.lastMsgId}`).join("\n");
-        return ok(sanitize(text));
+        return ok(text);
       } catch (e) {
         return fail(e);
       }
@@ -460,7 +460,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getBusinessChatLinks();
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }

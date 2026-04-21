@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, formatReactions, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
+import { fail, formatReactions, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
 
 export function registerExtraTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -146,7 +146,7 @@ export function registerExtraTools(server: McpServer, telegram: TelegramService)
             return `# ${t.title} (id: ${t.id})${flagStr}${unread}`;
           })
           .join("\n");
-        return ok(sanitize(text) || "No topics found");
+        return ok(text || "No topics found");
       } catch (e) {
         return fail(e);
       }
@@ -177,7 +177,7 @@ export function registerExtraTools(server: McpServer, telegram: TelegramService)
               `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
-        return ok(sanitize(text) || "No messages in this topic");
+        return ok(text || "No messages in this topic");
       } catch (e) {
         return fail(e);
       }

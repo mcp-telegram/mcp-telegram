@@ -17,6 +17,11 @@ describe("shared utilities", () => {
         content: [{ type: "text", text: "" }],
       });
     });
+
+    it("should auto-sanitize unpaired surrogates", () => {
+      const result = ok("Name: \uD800bad");
+      assert.strictEqual(result.content[0].text, "Name: \uFFFDbad");
+    });
   });
 
   describe("fail()", () => {
@@ -29,10 +34,21 @@ describe("shared utilities", () => {
       });
     });
 
-    it("should handle non-Error objects", () => {
-      const result = fail({ message: "Custom error" });
-      assert.ok(result.content[0].text.includes("Error:"));
+    it("should handle string errors", () => {
+      const result = fail("plain string error");
+      assert.strictEqual(result.content[0].text, "Error: plain string error");
       assert.strictEqual(result.isError, true);
+    });
+
+    it("should handle non-Error objects via String()", () => {
+      const result = fail({ message: "Custom error" });
+      assert.ok(result.content[0].text.startsWith("Error:"));
+      assert.strictEqual(result.isError, true);
+    });
+
+    it("should sanitize surrogate chars in error messages", () => {
+      const result = fail(new Error("bad\uD800name"));
+      assert.strictEqual(result.content[0].text, "Error: bad\uFFFDname");
     });
   });
 

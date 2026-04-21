@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { DESTRUCTIVE, fail, formatReactions, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
+import { DESTRUCTIVE, fail, formatReactions, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
 
 export function registerMessageTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -58,7 +58,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
               `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
-        return ok(sanitize(text) || "No messages");
+        return ok(text || "No messages");
       } catch (e) {
         return fail(e);
       }
@@ -90,7 +90,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
               `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
-        return ok(sanitize(text) || "No messages found");
+        return ok(text || "No messages found");
       } catch (e) {
         return fail(e);
       }
@@ -121,7 +121,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
               `[#${m.id}] [${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${m.chat.name}${m.chat.username ? ` @${m.chat.username}` : ""}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
-        return ok(sanitize(text) || "No messages found");
+        return ok(text || "No messages found");
       } catch (e) {
         return fail(e);
       }
@@ -228,7 +228,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
             return line;
           })
           .join("\n");
-        return ok(sanitize(text) || "No unread chats");
+        return ok(text || "No unread chats");
       } catch (e) {
         return fail(e);
       }
@@ -256,7 +256,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
               `[#${m.id}] [${m.date}] ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
           )
           .join("\n\n");
-        return ok(sanitize(text) || "No scheduled messages");
+        return ok(text || "No scheduled messages");
       } catch (e) {
         return fail(e);
       }
@@ -313,7 +313,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
               `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
-        return ok(sanitize(text) || "No replies");
+        return ok(text || "No replies");
       } catch (e) {
         return fail(e);
       }
@@ -337,7 +337,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
 
       try {
         const link = await telegram.getMessageLink(chatId, messageId, thread);
-        return ok(sanitize(link));
+        return ok(link);
       } catch (e) {
         return fail(e);
       }
@@ -367,7 +367,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
               `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
-        return ok(sanitize(text) || "No unread mentions");
+        return ok(text || "No unread mentions");
       } catch (e) {
         return fail(e);
       }
@@ -397,7 +397,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
               `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
-        return ok(sanitize(text) || "No unread reactions");
+        return ok(text || "No unread reactions");
       } catch (e) {
         return fail(e);
       }
@@ -433,7 +433,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
           translations.length === messageIds.length
             ? translations.map((t, i) => `[#${messageIds[i]}] ${t}`).join("\n\n")
             : translations.join("\n\n");
-        return ok(sanitize(text) || "No translations");
+        return ok(text || "No translations");
       } catch (e) {
         const msg = (e as Error).message ?? "";
         if (/PREMIUM|PAYMENT_REQUIRED|TRANSLATE_REQ/i.test(msg)) {
@@ -512,7 +512,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
 
       try {
         const res = await telegram.getInlineBotResults(bot, chatId, query, offset);
-        return ok(sanitize(JSON.stringify(res)));
+        return ok(JSON.stringify(res));
       } catch (e) {
         return fail(e);
       }
@@ -574,7 +574,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
 
       try {
         const result = await telegram.getMessageButtons(chatId, messageId);
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -622,7 +622,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
           buttonIndex: hasIndex ? { row: row as number, column: column as number } : undefined,
           data,
         });
-        return ok(sanitize(JSON.stringify(answer)));
+        return ok(JSON.stringify(answer));
       } catch (e) {
         return fail(e);
       }
@@ -642,7 +642,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       if (err) return fail(new Error(err));
       try {
         const state = await telegram.getUpdatesState();
-        return ok(sanitize(JSON.stringify(state)));
+        return ok(JSON.stringify(state));
       } catch (e) {
         return fail(e);
       }
@@ -680,7 +680,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       if (err) return fail(new Error(err));
       try {
         const diff = await telegram.getUpdates({ pts, qts, date, ptsLimit, ptsTotalLimit });
-        return ok(sanitize(JSON.stringify(diff)));
+        return ok(JSON.stringify(diff));
       } catch (e) {
         return fail(e);
       }
@@ -708,7 +708,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       if (err) return fail(new Error(err));
       try {
         const diff = await telegram.getChannelUpdates(chatId, { pts, limit, force });
-        return ok(sanitize(JSON.stringify(diff)));
+        return ok(JSON.stringify(diff));
       } catch (e) {
         return fail(e);
       }

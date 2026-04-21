@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, sanitize } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection } from "./shared.js";
 
 export function isGroupCallsEnabled(): boolean {
   return process.env.MCP_TELEGRAM_ENABLE_GROUP_CALLS === "1";
@@ -38,7 +38,7 @@ export function registerGroupCallTools(server: McpServer, telegram: TelegramServ
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getGroupCall(chat, { limit });
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -85,7 +85,7 @@ export function registerGroupCallTools(server: McpServer, telegram: TelegramServ
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getGroupCallParticipants(chat, { ids, sources, offset, limit });
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }

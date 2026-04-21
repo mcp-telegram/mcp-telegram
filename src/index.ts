@@ -8,10 +8,14 @@ console.log = (...args: unknown[]) => {
 };
 
 import "dotenv/config";
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { TelegramService } from "./telegram-client.js";
 import { registerTools } from "./tools/index.js";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
 
 // Telegram API credentials from env
 const API_ID = Number(process.env.TELEGRAM_API_ID);
@@ -28,7 +32,7 @@ const telegram = new TelegramService(API_ID, API_HASH);
 
 const server = new McpServer({
   name: "mcp-telegram",
-  version: "1.0.0",
+  version,
 });
 
 registerTools(server, telegram);

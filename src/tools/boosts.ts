@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, sanitize } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection } from "./shared.js";
 
 export function registerBoostTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -17,7 +17,7 @@ export function registerBoostTools(server: McpServer, telegram: TelegramService)
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getMyBoosts();
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -39,7 +39,7 @@ export function registerBoostTools(server: McpServer, telegram: TelegramService)
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getBoostsStatus(chat);
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }
@@ -70,7 +70,7 @@ export function registerBoostTools(server: McpServer, telegram: TelegramService)
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getBoostsList(chat, { gifts, offset, limit });
-        return ok(sanitize(JSON.stringify(result)));
+        return ok(JSON.stringify(result));
       } catch (e) {
         return fail(e);
       }

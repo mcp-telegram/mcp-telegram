@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
 
 export function registerStickerTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -36,7 +36,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
 
         lines.push("");
         lines.push(`Send a sticker: telegram-send-sticker(chatId, stickerSet="${set.shortName}", index=N)`);
-        return ok(sanitize(lines.join("\n")));
+        return ok(lines.join("\n"));
       } catch (e) {
         return fail(e);
       }
@@ -70,7 +70,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         }
         lines.push("");
         lines.push("Use telegram-get-sticker-set(shortName) to see individual stickers.");
-        return ok(sanitize(lines.join("\n")));
+        return ok(lines.join("\n"));
       } catch (e) {
         return fail(e);
       }
@@ -100,7 +100,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
           lines.push(`• ${set.title} — ${set.count} stickers`);
           lines.push(`  Short name: ${set.shortName}`);
         }
-        return ok(sanitize(lines.join("\n")));
+        return ok(lines.join("\n"));
       } catch (e) {
         return fail(e);
       }
@@ -158,7 +158,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         for (let i = 0; i < stickers.length; i++) {
           lines.push(`[${i}] ${stickers[i].emoji}`);
         }
-        return ok(sanitize(lines.join("\n")));
+        return ok(lines.join("\n"));
       } catch (e) {
         return fail(e);
       }

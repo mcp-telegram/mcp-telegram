@@ -13,79 +13,46 @@ import { Api } from "telegram/tl/index.js";
 import { RateLimiter } from "./rate-limiter.js";
 import type {
   AllStoriesSummary,
-  BoostSummary,
   BoostsListSummary,
   BoostsStatusSummary,
   BroadcastStatsSummary,
-  BusinessChatLinkSummary,
   BusinessChatLinksSummary,
   ChannelDifferenceSummary,
   ChatPermissions,
-  CompactPeer,
-  GroupCallInfoSummary,
-  GroupCallParticipantSummary,
   GroupCallParticipantsSummary,
   GroupCallSummary,
   MegagroupStatsSummary,
   MessageButtonDescriptor,
-  MyBoostSummary,
   MyBoostsSummary,
   PeerStoriesSummary,
-  PrepaidGiveawaySummary,
   QuickRepliesSummary,
-  QuickReplyMessageSummary,
   QuickReplyMessagesSummary,
-  QuickReplySummary,
-  StarsAmountSummary,
   StarsStatusSummary,
-  StarsSubscriptionPricingSummary,
-  StarsSubscriptionSummary,
-  StarsTransactionPeerSummary,
-  StarsTransactionSummary,
-  StatsValue,
   StoriesByIdSummary,
-  StoryItemSummary,
-  StoryViewSummary,
   StoryViewsListSummary,
   UpdatesDifferenceSummary,
-  UpdatesMessageSummary,
 } from "./telegram-helpers.js";
 import {
   describeAdminLogAction,
   describeAdminLogDetails,
   describeKeyboardButton,
   mergeBannedRights,
-  peerToCompact,
   reactionToEmoji,
   summarizeAllStories,
-  summarizeBoost,
   summarizeBoostsList,
   summarizeBoostsStatus,
   summarizeBroadcastStats,
-  summarizeBusinessChatLink,
   summarizeBusinessChatLinks,
   summarizeChannelDifference,
   summarizeGroupCall,
-  summarizeGroupCallInfo,
-  summarizeGroupCallParticipant,
   summarizeGroupCallParticipants,
   summarizeMegagroupStats,
-  summarizeMyBoost,
   summarizeMyBoosts,
   summarizePeerStories,
-  summarizePrepaidGiveaway,
   summarizeQuickReplies,
-  summarizeQuickReply,
-  summarizeQuickReplyMessage,
   summarizeQuickReplyMessages,
-  summarizeStarsAmount,
   summarizeStarsStatus,
-  summarizeStarsSubscription,
-  summarizeStarsTransaction,
-  summarizeStarsTransactionPeer,
   summarizeStoriesById,
-  summarizeStoryItem,
-  summarizeStoryView,
   summarizeStoryViewsList,
   summarizeUpdatesDifference,
 } from "./telegram-helpers.js";
@@ -227,6 +194,8 @@ export class TelegramService {
   get sessionDir(): string {
     return dirname(this.sessionPath);
   }
+
+  // ─── Session & Auth ────────────────────────────────────────────────────────
 
   getClient(): TelegramClient | null {
     return this.client;
@@ -491,6 +460,8 @@ export class TelegramService {
     }
   }
 
+  // ─── Messages ──────────────────────────────────────────────────────────────
+
   async getMe(): Promise<{ id: string; username?: string; firstName?: string }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const me = await this.client.getMe();
@@ -598,6 +569,8 @@ export class TelegramService {
     const resolved = await this.resolvePeer(chatId);
     await this.client.unpinMessage(resolved, messageId);
   }
+
+  // ─── Dialogs ───────────────────────────────────────────────────────────────
 
   async getDialogs(
     limit = 20,
@@ -721,6 +694,8 @@ export class TelegramService {
       });
   }
 
+  // ─── Contacts ──────────────────────────────────────────────────────────────
+
   async addContact(userId: string, firstName: string, lastName?: string, phone?: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const entity = await this.client.getInputEntity(userId);
@@ -745,6 +720,8 @@ export class TelegramService {
     const peer = await this.client.getInputEntity(chatId);
     await this.client.invoke(new Api.messages.ReportSpam({ peer }));
   }
+
+  // ─── Read state ────────────────────────────────────────────────────────────
 
   async markAsRead(chatId: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -1061,6 +1038,8 @@ export class TelegramService {
       }
     }, `sendTyping in ${chatId}`);
   }
+
+  // ─── Chat lookup & info ────────────────────────────────────────────────────
 
   /**
    * Resolve a chat by ID, username, or display name.
@@ -1480,6 +1459,8 @@ export class TelegramService {
     return results;
   }
 
+  // ─── Search ────────────────────────────────────────────────────────────────
+
   async getContacts(limit = 50): Promise<Array<{ id: string; name: string; username?: string; phone?: string }>> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const result = await this.client.invoke(new Api.contacts.GetContacts({ hash: bigInt(0) }));
@@ -1679,6 +1660,8 @@ export class TelegramService {
     };
   }
 
+  // ─── Profiles & Media ──────────────────────────────────────────────────────
+
   async downloadProfilePhoto(
     entityId: string,
     options?: { isBig?: boolean; savePath?: string },
@@ -1742,6 +1725,8 @@ export class TelegramService {
     }
     return items.length > 0 ? items : undefined;
   }
+
+  // ─── Reactions ─────────────────────────────────────────────────────────────
 
   async sendReaction(
     chatId: string,
@@ -1908,6 +1893,8 @@ export class TelegramService {
       return out;
     }, "getRecentReactions");
   }
+
+  // ─── Scheduled & Polls ─────────────────────────────────────────────────────
 
   async sendScheduledMessage(
     chatId: string,
@@ -2081,6 +2068,8 @@ export class TelegramService {
     } catch {}
     return false;
   }
+
+  // ─── Chat membership & management ──────────────────────────────────────────
 
   async joinChat(target: string): Promise<{ id: string; title: string; type: string }> {
     if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
@@ -2413,7 +2402,7 @@ export class TelegramService {
     );
   }
 
-  // ── New tools: feature parity ──────────────────────────────────────
+  // ─── Chat settings & moderation ────────────────────────────────────────────
 
   async unblockUser(userId: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -2674,6 +2663,8 @@ export class TelegramService {
     }, `approveChatJoinRequest ${chatId}/${userId}`);
   }
 
+  // ─── Inline bots & buttons ─────────────────────────────────────────────────
+
   async getInlineBotResults(
     bot: string,
     chatId: string,
@@ -2889,7 +2880,7 @@ export class TelegramService {
         }
         result = response as Api.stats.BroadcastStats;
       } catch (e) {
-        const msg = (e as Error).message ?? String(e);
+        const msg = e instanceof Error ? e.message : String(e);
         if (/CHAT_ADMIN_REQUIRED|ADMIN_RANK_INVALID/i.test(msg)) {
           throw new Error("Access denied: channel stats require admin rights (and may require Telegram Premium)");
         }
@@ -2928,7 +2919,7 @@ export class TelegramService {
           }
           result = response as Api.stats.MegagroupStats;
         } catch (e) {
-          const msg = (e as Error).message ?? String(e);
+          const msg = e instanceof Error ? e.message : String(e);
           if (/CHAT_ADMIN_REQUIRED|ADMIN_RANK_INVALID/i.test(msg)) {
             throw new Error("Access denied: supergroup stats require admin rights");
           }
@@ -2943,6 +2934,8 @@ export class TelegramService {
       { throwOnFloodWait: true },
     );
   }
+
+  // ─── Stats & updates ───────────────────────────────────────────────────────
 
   async getUpdatesState(): Promise<{
     pts: number;
@@ -3014,6 +3007,8 @@ export class TelegramService {
       return summarizeChannelDifference(diff, entity.id.toString(), cursor.pts);
     }, `getChannelUpdates ${chatId}`);
   }
+
+  // ─── Forum topics ──────────────────────────────────────────────────────────
 
   async createForumTopic(
     chatId: string,
@@ -3104,6 +3099,8 @@ export class TelegramService {
       );
     }, `deleteForumTopic ${chatId}/${topicId}`);
   }
+
+  // ─── Invite links & folders ────────────────────────────────────────────────
 
   async exportInviteLink(
     chatId: string,
@@ -3198,6 +3195,8 @@ export class TelegramService {
     const peer = await this.client.getInputEntity(resolved);
     await this.client.invoke(new Api.messages.SetHistoryTTL({ peer, period }));
   }
+
+  // ─── Account & privacy ─────────────────────────────────────────────────────
 
   async getActiveSessions(): Promise<
     Array<{
@@ -3324,7 +3323,7 @@ export class TelegramService {
     await this.client.invoke(new Api.account.UpdateUsername({ username }));
   }
 
-  // ─── Stickers ──────────────────────────────────────────────
+  // ─── Stickers ──────────────────────────────────────────────────────────────
 
   async getStickerSet(shortName: string): Promise<{
     title: string;
@@ -3449,6 +3448,8 @@ export class TelegramService {
       });
     }, `sendSticker to ${chatId}`);
   }
+
+  // ─── Drafts & saved dialogs ────────────────────────────────────────────────
 
   async saveDraft(chatId: string, text: string, replyTo?: number): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -3659,6 +3660,8 @@ export class TelegramService {
     }));
   }
 
+  // ─── Stories ───────────────────────────────────────────────────────────────
+
   async getAllStories(options?: { next?: boolean; hidden?: boolean; state?: string }): Promise<AllStoriesSummary> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     return this.rateLimiter.execute(async () => {
@@ -3726,6 +3729,8 @@ export class TelegramService {
     }, `getStoryViewsList ${chatId}/${options.id}`);
   }
 
+  // ─── Boosts ────────────────────────────────────────────────────────────────
+
   async getMyBoosts(): Promise<MyBoostsSummary> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     return this.rateLimiter.execute(async () => {
@@ -3774,6 +3779,8 @@ export class TelegramService {
     }, "getBusinessChatLinks");
   }
 
+  // ─── Group calls ───────────────────────────────────────────────────────────
+
   async getGroupCall(chatId: string, options: { limit?: number } = {}): Promise<GroupCallSummary> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     return this.rateLimiter.execute(async () => {
@@ -3808,6 +3815,8 @@ export class TelegramService {
       return summarizeGroupCallParticipants(response);
     }, `getGroupCallParticipants ${chatId}`);
   }
+
+  // ─── Stars ─────────────────────────────────────────────────────────────────
 
   async getStarsStatus(chatId: string): Promise<StarsStatusSummary> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -3848,6 +3857,8 @@ export class TelegramService {
       return summarizeStarsStatus(response);
     }, `getStarsTransactions ${chatId}`);
   }
+
+  // ─── Quick replies ─────────────────────────────────────────────────────────
 
   async getQuickReplies(hash?: string): Promise<QuickRepliesSummary> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);

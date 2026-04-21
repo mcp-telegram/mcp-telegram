@@ -1,3 +1,11 @@
+/** MCP SDK internal tool registry — field name "handler" confirmed in SDK v1.29.0 */
+export type McpRegisteredTool = {
+  handler: (args: Record<string, unknown>, extra: Record<string, unknown>) => Promise<unknown>;
+};
+export interface McpServerInternal {
+  _registeredTools: Record<string, McpRegisteredTool>;
+}
+
 /** Request from Client → Master */
 export interface IpcRequest {
   id: string;

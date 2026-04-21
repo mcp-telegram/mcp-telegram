@@ -136,10 +136,10 @@ function compactGraph(g: Api.TypeStatsGraph): CompactStatsGraph {
     }
     return { type: "data", data: parsed, zoomToken: g.zoomToken };
   }
-  const any = g as { token?: string; error?: string; json?: { data?: string }; zoomToken?: string };
-  if (typeof any.token === "string") return { type: "async", token: any.token };
-  if (typeof any.error === "string") return { type: "error", error: any.error };
-  return { type: "data", data: any.json?.data, zoomToken: any.zoomToken };
+  const graph = g as { token?: string; error?: string; json?: { data?: string }; zoomToken?: string };
+  if (typeof graph.token === "string") return { type: "async", token: graph.token };
+  if (typeof graph.error === "string") return { type: "error", error: graph.error };
+  return { type: "data", data: graph.json?.data, zoomToken: graph.zoomToken };
 }
 
 export type MegagroupStatsSummary = {

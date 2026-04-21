@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { connect, type Socket } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { encodeMessage, type IpcResponse, parseMessages } from "./ipc-protocol.js";
+import { encodeMessage, type IpcResponse, type McpServerInternal, parseMessages } from "./ipc-protocol.js";
 import { socketPath } from "./lock.js";
 import { TelegramService } from "./telegram-client.js";
 import { registerTools } from "./tools/index.js";
@@ -124,14 +124,6 @@ export class IpcClient {
     this.socket = null;
     this.connected = false;
   }
-}
-
-// Access internal tool registry — field name "handler" confirmed in MCP SDK v1.29.0
-type RegisteredTool = {
-  handler: (args: Record<string, unknown>, extra: Record<string, unknown>) => Promise<unknown>;
-};
-interface McpServerInternal {
-  _registeredTools: Record<string, RegisteredTool>;
 }
 
 function wireIpcProxies(server: McpServer, ipc: IpcClient): void {

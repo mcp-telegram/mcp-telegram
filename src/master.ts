@@ -1,18 +1,16 @@
 import { createServer, type Server, type Socket } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { encodeMessage, type IpcRequest, type IpcResponse, parseMessages } from "./ipc-protocol.js";
+import {
+  encodeMessage,
+  type IpcRequest,
+  type IpcResponse,
+  type McpServerInternal,
+  parseMessages,
+} from "./ipc-protocol.js";
 import { releaseLock, releaseSocket, socketPath } from "./lock.js";
 import { TelegramService } from "./telegram-client.js";
 import { registerTools } from "./tools/index.js";
-
-// Access internal tool registry — field name "handler" confirmed in MCP SDK v1.29.0
-type RegisteredTool = {
-  handler: (args: Record<string, unknown>, extra: Record<string, unknown>) => Promise<unknown>;
-};
-interface McpServerInternal {
-  _registeredTools: Record<string, RegisteredTool>;
-}
 
 let socketServer: Server | null = null;
 let cleanedUp = false;

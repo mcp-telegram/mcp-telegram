@@ -27,8 +27,9 @@
     "lint": "biome check src/",
     "lint:fix": "biome check --fix src/",
     "format": "biome format --write src/",
-    "test": "tsx --test src/**/*.test.ts",
-    "test:watch": "tsx --test --watch src/**/*.test.ts",
+    "test": "tsx --test 'src/**/*.test.ts'",
+    "test:watch": "tsx --test --watch 'src/**/*.test.ts'",
+    "test:coverage": "c8 --all --src src --exclude 'src/**/*.test.ts' --reporter=text tsx --test 'src/**/*.test.ts'",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
@@ -65,6 +66,7 @@
     "@biomejs/biome": "^2.4.12",
     "@types/node": "^25.6.0",
     "@types/qrcode": "^1.5.6",
+    "c8": "^11.0.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vitepress": "^1.6.4"

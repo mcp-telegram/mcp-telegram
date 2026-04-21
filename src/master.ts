@@ -29,7 +29,7 @@ process.on("exit", cleanup);
 process.on("SIGINT", () => process.exit(0));
 process.on("SIGTERM", () => process.exit(0));
 
-function handleClient(socket: Socket, mcpServer: McpServerInternal) {
+export function handleClient(socket: Socket, mcpServer: McpServerInternal) {
   let buf = "";
   // Processing queue — ensures sequential handling even when handler awaits
   let processing = false;

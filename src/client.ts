@@ -13,23 +13,38 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 type PendingCall = { resolve: (r: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
 
+export interface IpcClientOptions {
+  connectTimeoutMs?: number;
+  callTimeoutMs?: number;
+  connectFn?: (path: string) => Socket;
+}
+
 /** Thin IPC proxy: forwards tool calls to the master process over Unix socket */
 export class IpcClient {
   private socket: Socket | null = null;
   private pending = new Map<string, PendingCall>();
   private buf = "";
   private connected = false;
+  private readonly connectTimeoutMs: number;
+  private readonly callTimeoutMs: number;
+  private readonly connectFn: (path: string) => Socket;
+
+  constructor(opts: IpcClientOptions = {}) {
+    this.connectTimeoutMs = opts.connectTimeoutMs ?? CONNECT_TIMEOUT_MS;
+    this.callTimeoutMs = opts.callTimeoutMs ?? IPC_CALL_TIMEOUT_MS;
+    this.connectFn = opts.connectFn ?? connect;
+  }
 
   async connect(): Promise<boolean> {
     return new Promise((resolve) => {
       const sock = socketPath();
-      const s = connect(sock);
+      const s = this.connectFn(sock);
 
       // One-shot connect timeout — cleared immediately on connect (HIGH-3)
       const connectTimer = setTimeout(() => {
         s.destroy();
         resolve(false);
-      }, CONNECT_TIMEOUT_MS);
+      }, this.connectTimeoutMs);
 
       const onConnect = () => {
         clearTimeout(connectTimer);
@@ -93,7 +108,7 @@ export class IpcClient {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`IPC call timeout: ${tool}`));
-      }, IPC_CALL_TIMEOUT_MS);
+      }, this.callTimeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       socket.write(encodeMessage({ id, tool, args }));
     });

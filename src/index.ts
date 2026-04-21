@@ -2,17 +2,13 @@
 
 // Redirect console.log to stderr BEFORE any imports.
 // GramJS Logger uses console.log (stdout) which corrupts MCP JSON-RPC stream.
-const _origLog = console.log;
 console.log = (...args: unknown[]) => {
   console.error(...args);
 };
 
 import "dotenv/config";
 import { createRequire } from "node:module";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { TelegramService } from "./telegram-client.js";
-import { registerTools } from "./tools/index.js";
+import { tryAcquireLock } from "./lock.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
@@ -28,29 +24,18 @@ if (!API_ID || !API_HASH) {
   process.exit(1);
 }
 
-const telegram = new TelegramService(API_ID, API_HASH);
-
-const server = new McpServer({
-  name: "mcp-telegram",
-  version,
-});
-
-registerTools(server, telegram);
-
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("[mcp-telegram] MCP server running on stdio");
+  const isMaster = tryAcquireLock();
 
-  // Auto-connect with saved session after MCP is ready (non-blocking)
-  telegram.loadSession().then(async () => {
-    if (await telegram.connect()) {
-      const me = await telegram.getMe();
-      console.error(`[mcp-telegram] Auto-connected as @${me.username}`);
-    } else if (telegram.lastError) {
-      console.error(`[mcp-telegram] ${telegram.lastError}`);
-    }
-  });
+  if (isMaster) {
+    console.error("[mcp-telegram] Starting as master process");
+    const { runMaster } = await import("./master.js");
+    await runMaster(API_ID, API_HASH as string, version);
+  } else {
+    console.error("[mcp-telegram] Starting as client process (master already running)");
+    const { runClient } = await import("./client.js");
+    await runClient(API_ID, API_HASH as string, version);
+  }
 }
 
 main().catch((err) => {

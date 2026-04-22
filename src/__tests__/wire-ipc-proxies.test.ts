@@ -58,7 +58,7 @@ describe("wireIpcProxies", () => {
     assert.deepStrictEqual(req.args, { text: "hello" });
 
     // Reply with a result
-    fake.emit("data", Buffer.from(encodeMessage({ id: req.id, result: { ok: true } })));
+    fake.emit("data", Buffer.from(encodeMessage({ type: "tool_response", id: req.id, result: { ok: true } })));
     const result = await callPromise;
     assert.deepStrictEqual(result, { ok: true });
   });
@@ -83,8 +83,8 @@ describe("wireIpcProxies", () => {
     assert.strictEqual(reqA.tool, "tool-a");
     assert.strictEqual(reqB.tool, "tool-b");
 
-    fake.emit("data", Buffer.from(encodeMessage({ id: reqA.id, result: "a" })));
-    fake.emit("data", Buffer.from(encodeMessage({ id: reqB.id, result: "b" })));
+    fake.emit("data", Buffer.from(encodeMessage({ type: "tool_response", id: reqA.id, result: "a" })));
+    fake.emit("data", Buffer.from(encodeMessage({ type: "tool_response", id: reqB.id, result: "b" })));
 
     assert.strictEqual(await pa, "a");
     assert.strictEqual(await pb, "b");
@@ -108,7 +108,7 @@ describe("wireIpcProxies", () => {
 
     const callPromise = registry["telegram-get-me"].handler({}, {});
     const req = JSON.parse(fake.written[0]);
-    fake.emit("data", Buffer.from(encodeMessage({ id: req.id, result: { id: "456" } })));
+    fake.emit("data", Buffer.from(encodeMessage({ type: "tool_response", id: req.id, result: { id: "456" } })));
     await callPromise;
 
     assert.strictEqual(originalCalled, false);
@@ -126,7 +126,10 @@ describe("wireIpcProxies", () => {
 
     const callPromise = registry["telegram-bad-tool"].handler({}, {});
     const req = JSON.parse(fake.written[0]);
-    fake.emit("data", Buffer.from(encodeMessage({ id: req.id, error: "something went wrong on master" })));
+    fake.emit(
+      "data",
+      Buffer.from(encodeMessage({ type: "tool_response", id: req.id, error: "something went wrong on master" })),
+    );
 
     await assert.rejects(callPromise, /something went wrong on master/);
   });
@@ -154,7 +157,7 @@ describe("wireIpcProxies", () => {
     const callPromise = registry["telegram-ping"].handler({}, {});
     const req = JSON.parse(fake.written[0]);
     assert.strictEqual(req.tool, "telegram-ping");
-    fake.emit("data", Buffer.from(encodeMessage({ id: req.id, result: "pong" })));
+    fake.emit("data", Buffer.from(encodeMessage({ type: "tool_response", id: req.id, result: "pong" })));
 
     assert.strictEqual(await callPromise, "pong");
   });

@@ -368,10 +368,14 @@ export class TelegramService {
   async startQrLogin(
     onQrDataUrl: (dataUrl: string) => void,
     onQrUrl?: (url: string) => void,
+    signal?: AbortSignal,
   ): Promise<{
     success: boolean;
     message: string;
   }> {
+    // Early exit if already aborted — avoids creating a Telegram connection we'd immediately tear down.
+    if (signal?.aborted) return { success: false, message: "QR login aborted" };
+
     const session = new StringSession("");
     const proxy = resolveProxy();
     const client = new TelegramClient(session, this.apiId, this.apiHash, {
@@ -381,6 +385,12 @@ export class TelegramService {
 
     try {
       await client.connect();
+      if (signal?.aborted) {
+        try {
+          await client.destroy();
+        } catch {}
+        return { success: false, message: "QR login aborted" };
+      }
 
       let loginAccepted = false;
       let resolved = false;
@@ -394,6 +404,7 @@ export class TelegramService {
 
       const maxAttempts = 30; // 5 minutes
       for (let i = 0; i < maxAttempts && !resolved; i++) {
+        if (signal?.aborted) break;
         try {
           const result = await client.invoke(
             new Api.auth.ExportLoginToken({
@@ -435,18 +446,44 @@ export class TelegramService {
         }
 
         if (!resolved) {
-          await new Promise((r) => setTimeout(r, loginAccepted ? 1500 : 10000));
+          // Abortable sleep — wakes immediately when caller cancels
+          const waitMs = loginAccepted ? 1500 : 10000;
+          await new Promise<void>((resolve) => {
+            const timer = setTimeout(() => {
+              signal?.removeEventListener("abort", onAbort);
+              resolve();
+            }, waitMs);
+            const onAbort = () => {
+              clearTimeout(timer);
+              resolve();
+            };
+            if (signal?.aborted) onAbort();
+            else signal?.addEventListener("abort", onAbort, { once: true });
+          });
         }
+      }
+
+      if (signal?.aborted && !resolved) {
+        try {
+          await client.destroy();
+        } catch {}
+        return { success: false, message: "QR login aborted" };
       }
 
       if (resolved) {
         const newSession = client.session.save() as unknown as string;
-        // Adopt the QR login client directly instead of destroy+reconnect
-        // This avoids creating a second Telegram session from DC migration auth keys
-        this.client = client;
-        this.sessionString = newSession;
-        this.connected = true;
+        // Persist FIRST, adopt SECOND — so if file write fails, in-memory state still
+        // matches whatever's on disk; saveSession is try/catch-safe for Docker etc.
         await this.saveSession(newSession);
+        // Destroy the previous in-memory client to free its auth_key / socket.
+        // Previously left dangling → accumulated orphan Telegram connections per relogin.
+        const oldClient = this.client;
+        this.client = client;
+        this.connected = true;
+        this.entityCache.clear();
+        if (oldClient) {
+          oldClient.destroy().catch(() => {});
+        }
         return { success: true, message: "Telegram login successful" };
       }
 

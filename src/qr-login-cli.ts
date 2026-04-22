@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config";
 import QRCode from "qrcode";
+import { IpcClient } from "./client.js";
 import { TelegramService } from "./telegram-client.js";
 
 const API_ID = Number(process.env.TELEGRAM_API_ID);
@@ -11,10 +12,46 @@ if (!API_ID || !API_HASH) {
   process.exit(1);
 }
 
-const telegram = new TelegramService(API_ID, API_HASH);
+async function printQr(url: string): Promise<void> {
+  const terminalQr = await QRCode.toString(url, { type: "terminal", small: true });
+  console.log(terminalQr);
+  console.log("Waiting for scan...\n");
+}
 
-async function main() {
-  // Check if already connected
+function printLoginHeader(viaDaemon: boolean): void {
+  console.log(`\nStarting Telegram QR login${viaDaemon ? " (via running daemon)" : ""}...\n`);
+  console.log("Scan the QR code in Telegram app:");
+  console.log("  Settings > Devices > Link Desktop Device\n");
+}
+
+async function ipcLogin(): Promise<boolean> {
+  const ipc = new IpcClient();
+  const connected = await ipc.connect();
+  if (!connected) return false;
+
+  printLoginHeader(true);
+
+  try {
+    const result = await ipc.loginFlow((url) => {
+      printQr(url).catch((err) => {
+        console.error(`[mcp-telegram] Failed to render QR: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    });
+    if (result.success) {
+      console.log(`Login successful!`);
+      console.log(`  Account: @${result.username ?? "unknown"}\n`);
+    } else {
+      console.log(`Error: ${result.error ?? "unknown"}\n`);
+    }
+  } finally {
+    ipc.destroy();
+  }
+  return true;
+}
+
+async function standaloneLogin(): Promise<void> {
+  const telegram = new TelegramService(API_ID, API_HASH as string);
+
   await telegram.loadSession();
   if (await telegram.connect()) {
     const me = await telegram.getMe();
@@ -23,16 +60,12 @@ async function main() {
     return;
   }
 
-  console.log("\nStarting Telegram QR login...\n");
-  console.log("Scan the QR code in Telegram app:");
-  console.log("  Settings > Devices > Link Desktop Device\n");
+  printLoginHeader(false);
 
   const result = await telegram.startQrLogin(
     () => {},
     async (url) => {
-      const terminalQr = await QRCode.toString(url, { type: "terminal", small: true });
-      console.log(terminalQr);
-      console.log("Waiting for scan...\n");
+      await printQr(url);
     },
   );
 
@@ -45,6 +78,11 @@ async function main() {
   }
 
   await telegram.disconnect();
+}
+
+async function main() {
+  const viaIpc = await ipcLogin();
+  if (!viaIpc) await standaloneLogin();
 }
 
 main().catch(console.error);

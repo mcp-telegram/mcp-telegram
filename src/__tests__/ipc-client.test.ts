@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import type { Socket } from "node:net";
 import { describe, it } from "node:test";
 import { IpcClient } from "../client.js";
-import { encodeMessage, type IpcResponse } from "../ipc-protocol.js";
+import { encodeMessage, type IpcToolResponse } from "../ipc-protocol.js";
 
 /** Fake Socket that behaves like net.Socket but is fully controllable */
 class FakeSocket extends EventEmitter {
@@ -70,7 +70,7 @@ describe("IpcClient.call()", () => {
 
     // Extract the id from the written message and reply
     const req = JSON.parse(fake.written[0]);
-    const response: IpcResponse = { id: req.id, result: { ok: true } };
+    const response: IpcToolResponse = { type: "tool_response", id: req.id, result: { ok: true } };
     setImmediate(() => fake.emit("data", Buffer.from(encodeMessage(response))));
 
     const result = await callPromise;
@@ -85,7 +85,7 @@ describe("IpcClient.call()", () => {
 
     const callPromise = client.call("bad-tool", {});
     const req = JSON.parse(fake.written[0]);
-    const response: IpcResponse = { id: req.id, error: "tool blew up" };
+    const response: IpcToolResponse = { type: "tool_response", id: req.id, error: "tool blew up" };
     setImmediate(() => fake.emit("data", Buffer.from(encodeMessage(response))));
 
     await assert.rejects(callPromise, /tool blew up/);
@@ -127,8 +127,8 @@ describe("IpcClient.call()", () => {
 
     // Reply in reverse order
     setImmediate(() => {
-      fake.emit("data", Buffer.from(encodeMessage({ id: req2.id, result: "b-result" })));
-      fake.emit("data", Buffer.from(encodeMessage({ id: req1.id, result: "a-result" })));
+      fake.emit("data", Buffer.from(encodeMessage({ type: "tool_response", id: req2.id, result: "b-result" })));
+      fake.emit("data", Buffer.from(encodeMessage({ type: "tool_response", id: req1.id, result: "a-result" })));
     });
 
     const [r1, r2] = await Promise.all([p1, p2]);
@@ -144,7 +144,7 @@ describe("IpcClient.call()", () => {
 
     const callPromise = client.call("ping", {});
     const req = JSON.parse(fake.written[0]);
-    const full = encodeMessage({ id: req.id, result: "pong" });
+    const full = encodeMessage({ type: "tool_response", id: req.id, result: "pong" });
 
     setImmediate(() => {
       fake.emit("data", Buffer.from(full.slice(0, 5)));
@@ -182,5 +182,130 @@ describe("IpcClient.destroy()", () => {
     client.destroy();
 
     await assert.rejects(() => client.call("tool", {}), /IPC client not connected/);
+  });
+});
+
+describe("IpcClient.loginFlow()", () => {
+  it("sends login_start and resolves on login_done success", async () => {
+    const fake = new FakeSocket();
+    const client = makeClient(fake);
+    setImmediate(() => fake.emit("connect"));
+    await client.connect();
+
+    const qrUrls: string[] = [];
+    const promise = client.loginFlow((url) => qrUrls.push(url));
+
+    const sent = JSON.parse(fake.written[0]);
+    assert.strictEqual(sent.type, "login_start");
+    const id = sent.id;
+
+    setImmediate(() => {
+      fake.emit("data", Buffer.from(encodeMessage({ type: "login_qr", id, url: "tg://login?token=x" })));
+      fake.emit("data", Buffer.from(encodeMessage({ type: "login_qr", id, url: "tg://login?token=y" })));
+      fake.emit("data", Buffer.from(encodeMessage({ type: "login_done", id, success: true, username: "alex" })));
+    });
+
+    const result = await promise;
+    assert.deepStrictEqual(qrUrls, ["tg://login?token=x", "tg://login?token=y"]);
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.username, "alex");
+  });
+
+  it("resolves on login_done failure", async () => {
+    const fake = new FakeSocket();
+    const client = makeClient(fake);
+    setImmediate(() => fake.emit("connect"));
+    await client.connect();
+
+    const promise = client.loginFlow(() => {});
+    const sent = JSON.parse(fake.written[0]);
+
+    setImmediate(() => {
+      fake.emit(
+        "data",
+        Buffer.from(encodeMessage({ type: "login_done", id: sent.id, success: false, error: "2FA required" })),
+      );
+    });
+
+    const result = await promise;
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.error, "2FA required");
+  });
+
+  it("rejects with timeout if login_done never arrives", async () => {
+    const fake = new FakeSocket();
+    const client = new IpcClient({
+      connectTimeoutMs: 200,
+      callTimeoutMs: 2000,
+      loginTimeoutMs: 50,
+      connectFn: () => fake as unknown as Socket,
+    });
+    setImmediate(() => fake.emit("connect"));
+    await client.connect();
+
+    await assert.rejects(() => client.loginFlow(() => {}), /Login flow timeout/);
+  });
+
+  it("pending login rejected when socket closes", async () => {
+    const fake = new FakeSocket();
+    const client = makeClient(fake);
+    setImmediate(() => fake.emit("connect"));
+    await client.connect();
+
+    const promise = client.loginFlow(() => {});
+    setImmediate(() => fake.destroy());
+
+    await assert.rejects(promise, /IPC connection closed/);
+  });
+
+  it("throws if not connected", async () => {
+    const fake = new FakeSocket();
+    const client = makeClient(fake);
+    await assert.rejects(() => client.loginFlow(() => {}), /IPC client not connected/);
+  });
+});
+
+describe("IpcClient onDisconnect callback", () => {
+  it("fires when socket closes unexpectedly (master died)", async () => {
+    const fake = new FakeSocket();
+    const client = makeClient(fake);
+    setImmediate(() => fake.emit("connect"));
+    await client.connect();
+
+    let fired = 0;
+    client.setOnDisconnect(() => fired++);
+
+    fake.destroy(); // simulate master disconnect
+
+    assert.strictEqual(fired, 1);
+  });
+
+  it("does NOT fire when client.destroy() was called explicitly", async () => {
+    const fake = new FakeSocket();
+    const client = makeClient(fake);
+    setImmediate(() => fake.emit("connect"));
+    await client.connect();
+
+    let fired = 0;
+    client.setOnDisconnect(() => fired++);
+
+    client.destroy(); // explicit teardown — no callback
+
+    assert.strictEqual(fired, 0);
+  });
+
+  it("does NOT fire when close happens before setOnDisconnect is wired", async () => {
+    // Simulates the retry loop: connect attempts that close before the caller wires the callback.
+    const fake = new FakeSocket();
+    const client = makeClient(fake);
+    setImmediate(() => fake.emit("connect"));
+    await client.connect();
+
+    fake.destroy(); // close before any callback was registered
+
+    // Subsequent registration must not retroactively fire
+    let fired = 0;
+    client.setOnDisconnect(() => fired++);
+    assert.strictEqual(fired, 0);
   });
 });

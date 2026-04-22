@@ -2,20 +2,34 @@ import { randomUUID } from "node:crypto";
 import { connect, type Socket } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { encodeMessage, type IpcResponse, type McpServerInternal, parseMessages } from "./ipc-protocol.js";
+import {
+  encodeMessage,
+  type IpcLoginDone,
+  type IpcMessage,
+  type McpServerInternal,
+  parseMessages,
+} from "./ipc-protocol.js";
 import { socketPath } from "./lock.js";
 import { TelegramService } from "./telegram-client.js";
 import { registerTools } from "./tools/index.js";
 
 const CONNECT_TIMEOUT_MS = 5_000;
 const IPC_CALL_TIMEOUT_MS = 30_000;
+const LOGIN_FLOW_TIMEOUT_MS = 360_000; // 6 min — QR has ~5 min server-side window
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 type PendingCall = { resolve: (r: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
+type PendingLogin = {
+  onQr: (url: string) => void;
+  resolve: (done: IpcLoginDone) => void;
+  reject: (e: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
 
 export interface IpcClientOptions {
   connectTimeoutMs?: number;
   callTimeoutMs?: number;
+  loginTimeoutMs?: number;
   connectFn?: (path: string) => Socket;
 }
 
@@ -23,16 +37,27 @@ export interface IpcClientOptions {
 export class IpcClient {
   private socket: Socket | null = null;
   private pending = new Map<string, PendingCall>();
+  private pendingLogins = new Map<string, PendingLogin>();
   private buf = "";
   private connected = false;
+  private destroyed = false;
+  private onDisconnect?: () => void;
   private readonly connectTimeoutMs: number;
   private readonly callTimeoutMs: number;
+  private readonly loginTimeoutMs: number;
   private readonly connectFn: (path: string) => Socket;
 
   constructor(opts: IpcClientOptions = {}) {
     this.connectTimeoutMs = opts.connectTimeoutMs ?? CONNECT_TIMEOUT_MS;
     this.callTimeoutMs = opts.callTimeoutMs ?? IPC_CALL_TIMEOUT_MS;
+    this.loginTimeoutMs = opts.loginTimeoutMs ?? LOGIN_FLOW_TIMEOUT_MS;
     this.connectFn = opts.connectFn ?? connect;
+  }
+
+  /** Register a callback fired when the peer socket closes unexpectedly.
+   * Call this AFTER a successful connect() so aborted connection attempts don't fire it. */
+  setOnDisconnect(cb: () => void): void {
+    this.onDisconnect = cb;
   }
 
   async connect(): Promise<boolean> {
@@ -56,18 +81,7 @@ export class IpcClient {
           this.buf += chunk.toString("utf-8");
           const { messages, remaining } = parseMessages(this.buf);
           this.buf = remaining;
-          for (const msg of messages) {
-            const res = msg as IpcResponse;
-            const pending = this.pending.get(res.id);
-            if (!pending) continue;
-            clearTimeout(pending.timer);
-            this.pending.delete(res.id);
-            if (res.error) {
-              pending.reject(new Error(res.error));
-            } else {
-              pending.resolve(res.result);
-            }
-          }
+          for (const msg of messages) this.routeMessage(msg);
         });
 
         s.on("close", () => {
@@ -77,8 +91,17 @@ export class IpcClient {
             p.reject(new Error("IPC connection closed"));
           }
           this.pending.clear();
+          for (const [, l] of this.pendingLogins) {
+            clearTimeout(l.timer);
+            l.reject(new Error("IPC connection closed"));
+          }
+          this.pendingLogins.clear();
+          if (!this.destroyed) this.onDisconnect?.();
         });
 
+        // Post-connect errors (EPIPE, ECONNRESET) land here. Silent drop keeps the
+        // process alive for the "close" handler above to clean up pending calls.
+        // Node requires an error listener on sockets — absence crashes the process.
         s.on("error", () => {});
 
         resolve(true);
@@ -92,6 +115,32 @@ export class IpcClient {
       s.once("connect", onConnect);
       s.once("error", onError);
     });
+  }
+
+  private routeMessage(msg: IpcMessage): void {
+    if (msg.type === "tool_response") {
+      const pending = this.pending.get(msg.id);
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      this.pending.delete(msg.id);
+      if (msg.error) pending.reject(new Error(msg.error));
+      else pending.resolve(msg.result);
+      return;
+    }
+    if (msg.type === "login_qr") {
+      const login = this.pendingLogins.get(msg.id);
+      login?.onQr(msg.url);
+      return;
+    }
+    if (msg.type === "login_done") {
+      const login = this.pendingLogins.get(msg.id);
+      if (!login) return;
+      clearTimeout(login.timer);
+      this.pendingLogins.delete(msg.id);
+      login.resolve(msg);
+      return;
+    }
+    // tool / login_start are client→master only; ignored if received
   }
 
   isConnected(): boolean {
@@ -110,16 +159,41 @@ export class IpcClient {
         reject(new Error(`IPC call timeout: ${tool}`));
       }, this.callTimeoutMs);
       this.pending.set(id, { resolve, reject, timer });
-      socket.write(encodeMessage({ id, tool, args }));
+      socket.write(encodeMessage({ type: "tool", id, tool, args }));
+    });
+  }
+
+  /** Request QR login flow from master. `onQr` fires for each QR URL frame (refreshes ~every 10s).
+   * Only one login can run on the master side at a time — a concurrent call gets an immediate
+   * `login_done {success:false}` with "Another QR login is already in progress". */
+  async loginFlow(onQr: (url: string) => void): Promise<IpcLoginDone> {
+    if (!this.socket || !this.connected) {
+      throw new Error("IPC client not connected");
+    }
+    const id = randomUUID();
+    const socket = this.socket;
+    return new Promise<IpcLoginDone>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingLogins.delete(id);
+        reject(new Error("Login flow timeout"));
+      }, this.loginTimeoutMs);
+      this.pendingLogins.set(id, { onQr, resolve, reject, timer });
+      socket.write(encodeMessage({ type: "login_start", id }));
     });
   }
 
   destroy() {
+    this.destroyed = true;
     for (const [, p] of this.pending) {
       clearTimeout(p.timer);
       p.reject(new Error("IPC client destroyed"));
     }
     this.pending.clear();
+    for (const [, l] of this.pendingLogins) {
+      clearTimeout(l.timer);
+      l.reject(new Error("IPC client destroyed"));
+    }
+    this.pendingLogins.clear();
     this.socket?.destroy();
     this.socket = null;
     this.connected = false;
@@ -158,6 +232,13 @@ export async function runClient(apiId: number, apiHash: string, version: string)
 
   console.error(`[mcp-telegram] Client mode — proxying to master via ${socketPath()}`);
 
+  // Master died → socket closes → nothing to proxy. Exit so parent respawns us against a fresh master.
+  // Wire only AFTER successful connect, so retry attempts inside the loop above can't trip it.
+  ipc.setOnDisconnect(() => {
+    console.error("[mcp-telegram] IPC connection to master closed, exiting");
+    process.exit(1);
+  });
+
   // Register all tools for MCP schema; dummy telegram instance is never used for actual calls
   const telegram = new TelegramService(apiId, apiHash);
   const server = new McpServer({ name: "mcp-telegram", version });
@@ -165,6 +246,9 @@ export async function runClient(apiId: number, apiHash: string, version: string)
 
   // Replace all handlers with IPC-forwarding versions
   wireIpcProxies(server, ipc);
+
+  // Parent closed stdio → exit so parent can spawn a fresh instance cleanly
+  process.stdin.on("end", () => process.exit(0));
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

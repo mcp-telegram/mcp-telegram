@@ -195,6 +195,10 @@ export class TelegramService {
     return dirname(this.sessionPath);
   }
 
+  hasLocalSession(): boolean {
+    return existsSync(this.sessionPath);
+  }
+
   // ─── Session & Auth ────────────────────────────────────────────────────────
 
   getClient(): TelegramClient | null {
@@ -342,23 +346,41 @@ export class TelegramService {
   }
 
   /**
-   * Log out from Telegram completely — terminates the session on Telegram servers.
-   * After this, the session string becomes invalid and won't appear in "Active Sessions".
+   * Terminates the session on Telegram servers, destroys the client, and clears
+   * local session (in-memory + file). Returns true only when server-side revoke
+   * confirmed. False means server revoke could not be confirmed — local wipe
+   * was still attempted. Throws if local file removal failed so callers can
+   * surface the partial state instead of silently misreporting success.
    */
   async logOut(): Promise<boolean> {
-    if (!this.client || !this.connected) return false;
-    try {
-      await this.client.invoke(new Api.auth.LogOut());
-      await this.client.destroy();
-      this.connected = false;
-      this.sessionString = "";
-      this.client = null;
-      return true;
-    } catch (error) {
-      console.error("[telegram] logOut error:", error);
-      await this.disconnect();
+    const wipeLocalOrThrow = async () => {
+      await this.clearSession();
+      if (existsSync(this.sessionPath)) {
+        throw new Error(`Local session file still present after clearSession: ${this.sessionPath}`);
+      }
+    };
+
+    if (!this.client || !this.connected) {
+      if (existsSync(this.sessionPath)) await wipeLocalOrThrow();
       return false;
     }
+
+    const client = this.client;
+    let revoked = false;
+    try {
+      await client.invoke(new Api.auth.LogOut());
+      revoked = true;
+    } catch (error) {
+      console.error("[telegram] auth.LogOut failed:", error);
+    }
+    // destroy() failure must NOT mask a successful server revoke — log and continue.
+    try {
+      await client.destroy();
+    } catch (err) {
+      console.error("[telegram] client.destroy failed during logOut:", err);
+    }
+    await wipeLocalOrThrow();
+    return revoked;
   }
 
   isConnected(): boolean {

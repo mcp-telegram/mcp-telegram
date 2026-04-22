@@ -98,6 +98,11 @@ async function handleToolRequest(socket: Socket, req: IpcToolRequest, mcpServer:
   if (!tool) {
     response.error = `Unknown tool: ${req.tool}`;
   } else {
+    // telegram-logout must cancel an in-progress QR login instead of queueing behind it
+    // for up to 5 minutes. Aborting releases the globalLock held by handleLoginStart.
+    if (req.tool === "telegram-logout" && activeLogin) {
+      activeLogin.abort.abort();
+    }
     const unlock = await globalLock.acquire();
     try {
       response.result = await tool.handler(req.args ?? {}, {});

@@ -222,4 +222,62 @@ describe("master handleLoginStart", () => {
     assert.ok(resp);
     assert.deepStrictEqual((resp as { result?: unknown }).result, { status: "ok" });
   });
+
+  it("telegram-logout aborts an in-progress QR login from another client", async () => {
+    let abortFired = false;
+    let logoutInvoked = false;
+    const telegram = {
+      async startQrLogin(_onDataUrl: (dataUrl: string) => void, _onUrl?: (url: string) => void, signal?: AbortSignal) {
+        await new Promise<void>((resolve) => {
+          signal?.addEventListener("abort", () => {
+            abortFired = true;
+            resolve();
+          });
+        });
+        return { success: false, message: "QR login aborted" };
+      },
+    } as unknown as TelegramServiceLike;
+
+    const mockWithLogout = {
+      _registeredTools: {
+        "telegram-logout": {
+          handler: async () => {
+            logoutInvoked = true;
+            return { content: [{ type: "text", text: "logged out" }] };
+          },
+        },
+      },
+    } as McpServerInternal;
+
+    server?.close();
+    rmSync(sockPath, { force: true });
+    server = createServer((socket) => handleClient(socket, mockWithLogout, telegram));
+    await new Promise<void>((resolve) => server.listen(sockPath, resolve));
+
+    // Client A: start QR login and keep the socket open (do NOT close it).
+    const a = connect(sockPath);
+    await new Promise<void>((resolve) => {
+      a.on("connect", () => {
+        a.write(encodeMessage({ type: "login_start", id: "LA" }));
+        resolve();
+      });
+    });
+
+    // Give master time to register activeLogin
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Client B: telegram-logout — must abort A's login without waiting 5min.
+    const msgs = await collectMessages(
+      sockPath,
+      [{ type: "tool", id: "T2", tool: "telegram-logout", args: {} }],
+      (acc) => acc.some((m) => m.type === "tool_response"),
+      1000,
+    );
+
+    assert.strictEqual(abortFired, true, "active login must be aborted by telegram-logout");
+    assert.strictEqual(logoutInvoked, true, "logout tool handler must run");
+    assert.ok(msgs.find((m) => m.type === "tool_response"));
+
+    a.destroy();
+  });
 });

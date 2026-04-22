@@ -316,7 +316,7 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 
 | Category | Tools |
 |----------|-------|
-| **Auth** | `telegram-status`, `telegram-login` |
+| **Auth** | `telegram-status`, `telegram-login`, `telegram-logout` |
 | **Messaging** | `telegram-send-message`, `telegram-edit-message`, `telegram-delete-message`, `telegram-forward-message`, `telegram-send-scheduled`, `telegram-send-typing`, `telegram-translate-message`, `telegram-get-message-link` |
 | **Scheduled** | `telegram-get-scheduled`, `telegram-delete-scheduled` |
 | **Reading** | `telegram-list-chats`, `telegram-read-messages`, `telegram-search-messages`, `telegram-search-global`, `telegram-search-chats`, `telegram-get-unread`, `telegram-mark-as-read`, `telegram-get-replies`, `telegram-get-unread-mentions`, `telegram-get-unread-reactions`, `telegram-get-saved-dialogs` |

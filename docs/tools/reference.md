@@ -8,6 +8,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 |------|-------------|
 | `telegram-status` | Check connection status and get account info |
 | `telegram-login` | Generate QR code for authentication |
+| `telegram-logout` | Revoke session on Telegram and delete the local session file |
 
 ## Messaging
 

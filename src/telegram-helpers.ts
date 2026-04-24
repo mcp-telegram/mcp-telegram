@@ -1580,6 +1580,51 @@ export function extractPeerId(peer: Api.TypePeer): string {
   return "0";
 }
 
+// ─── Profile & Business helpers (v1.32.0) ──────────────────────────────────
+
+export type EmojiStatusSummary = {
+  kind: "default" | "collectible" | "empty";
+  documentId?: string;
+  collectibleId?: string;
+  until?: number;
+  title?: string;
+  slug?: string;
+};
+
+export function summarizeEmojiStatus(s: Api.TypeEmojiStatus): EmojiStatusSummary {
+  if (s instanceof Api.EmojiStatusCollectible) {
+    return {
+      kind: "collectible",
+      collectibleId: s.collectibleId.toString(),
+      documentId: s.documentId?.toString(),
+      title: s.title,
+      slug: s.slug,
+      until: s.until,
+    };
+  }
+  if (s instanceof Api.EmojiStatus) {
+    return { kind: "default", documentId: s.documentId.toString(), until: s.until };
+  }
+  return { kind: "empty" };
+}
+
+export type PeerSummary = {
+  id: string;
+  type: "user" | "chat" | "channel";
+};
+
+export function summarizePeer(peer: Api.TypePeer): PeerSummary {
+  if (peer instanceof Api.PeerUser) return { id: peer.userId.toString(), type: "user" };
+  if (peer instanceof Api.PeerChat) return { id: peer.chatId.toString(), type: "chat" };
+  return { id: (peer as Api.PeerChannel).channelId.toString(), type: "channel" };
+}
+
+export type ResolvedBusinessChatLinkSummary = {
+  peer: PeerSummary;
+  message: string;
+  entityCount: number;
+};
+
 export function summarizeAllStories(result: Api.stories.TypeAllStories): AllStoriesSummary {
   const stealthMode = result.stealthMode
     ? {

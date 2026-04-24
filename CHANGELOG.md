@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.0] — 2026-04-24
+
+### Added
+
+**Profile write (8 new tools):**
+- **telegram-set-emoji-status** — Set custom animated emoji status next to your name (Telegram Premium). Pass `documentId` or `collectibleId`; omit both to clear. Supports optional expiry via `untilUnix`
+- **telegram-list-emoji-statuses** — List available emoji statuses: `default`, `recent`, `channel_default`, or `collectible` (Premium). Returns `documentId`, `until`, collectible `title`/`slug`
+- **telegram-clear-recent-emoji-statuses** — Remove all entries from the "recent" emoji status picker section
+- **telegram-set-profile-color** — Set your name or profile background color. `forProfile=false` = chat list name color; `forProfile=true` = profile page background (Premium). Accepts color index 0-6 (free) or 7-20 (Premium) plus optional background pattern emoji
+- **telegram-set-birthday** — Add/update birthday on profile (`day` + `month` required, `year` optional to hide age). Pass `clear=true` to remove
+- **telegram-set-personal-channel** — Feature a channel on your profile as "Personal Channel". Pass `channelId` or `clear=true` to remove
+- **telegram-set-profile-photo** — Upload static (JPEG/PNG) or animated (MP4, square, ≤10s) avatar. Optional `fallback=true` sets it as the privacy fallback shown when your main photo is hidden
+- **telegram-delete-profile-photo** — Delete one or more profile photos by photo ID (stringified long). Fetches your photo history internally to build the required `InputPhoto`; reports which IDs were not found
+
+**Business write (9 tools, including migrated read-only tool):**
+- **telegram-get-business-chat-links** — Moved from `account.ts` to new `business.ts` module. Behavior unchanged (read-only list of Business chat links)
+- **telegram-create-business-chat-link** — Create a `t.me/m/...` deep-link pre-filled with a message. Supports `parseMode` (md/html), optional admin `title`. Returns JSON with `link`, `slug`, `message`, `views`
+- **telegram-edit-business-chat-link** — Update an existing Business chat link by slug. Same options as create
+- **telegram-delete-business-chat-link** — Delete a Business chat link by slug
+- **telegram-resolve-business-chat-link** — Resolve a slug to see who it opens a chat with and the pre-filled message. Returns `peerId`, `peerType`, `message`, `entityCount`
+- **telegram-set-business-hours** — Configure weekly work hours (Telegram Business required). Input: `timezone` (IANA string) + `schedule` array of `{day, openFrom, openTo}` in HH:MM. Internally converts to minute-of-week (0–10079). `clear=true` disables
+- **telegram-set-business-location** — Set street address ± geo coordinates for Business profile. `clear=true` removes
+- **telegram-set-business-greeting** — Auto-reply for new conversations using a Quick Reply shortcut as template. `audience` enum (all_new / contacts_only / non_contacts / existing_only), `noActivityDays`, optional include/excludeUsers. `clear=true` disables
+- **telegram-set-business-away** — Auto-reply when offline or outside hours. `schedule` enum (always / outside_hours / custom). `custom` requires `customFrom`/`customTo` Unix timestamps. `offlineOnly` flag. Same audience model as greeting. `clear=true` disables
+- **telegram-set-business-intro** — Intro card shown to new users: `title` (≤32) + `description` (≤70) + optional sticker (requires `stickerId` + `stickerAccessHash` + `stickerFileReference` all together). `clear=true` removes
+
+### Notes
+- All Premium-gated tools (`telegram-set-emoji-status`, `telegram-set-profile-color` with index ≥ 7 or `backgroundEmojiId`) throw `PREMIUM_ACCOUNT_REQUIRED` from Telegram on non-Premium accounts — the error is propagated as-is
+- All Business-gated tools throw `BUSINESS_PEER_INVALID` or similar when the account lacks Telegram Business subscription
+- `telegram-get-business-chat-links` moved to `src/tools/business.ts` — tool name and behavior unchanged
+- `telegram-set-profile-photo`: uploads via GramJS `uploadFile` (4 workers). Video must be square MP4, ≤10s; server enforces its own size limits
+- `telegram-delete-profile-photo`: calls `photos.GetUserPhotos` first (up to 100) to resolve `accessHash` + `fileReference` from the photo ID; IDs not in your history are returned in `missing` array
+
 ## [1.31.0] — 2026-04-24
 
 ### Added

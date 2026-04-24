@@ -20,6 +20,7 @@ import type {
   ChannelDifferenceSummary,
   ChatPermissions,
   DiscussionMessageSummary,
+  EmojiStatusSummary,
   GroupCallParticipantsSummary,
   GroupCallSummary,
   GroupsForDiscussionSummary,
@@ -32,6 +33,7 @@ import type {
   QuickReplyMessagesSummary,
   ReadParticipantsSummary,
   ReportResultSummary,
+  ResolvedBusinessChatLinkSummary,
   StarsStatusSummary,
   StoriesByIdSummary,
   StoryPrivacy,
@@ -57,14 +59,17 @@ import {
   summarizeBoostsList,
   summarizeBoostsStatus,
   summarizeBroadcastStats,
+  summarizeBusinessChatLink,
   summarizeBusinessChatLinks,
   summarizeChannelDifference,
   summarizeDiscussionMessage,
+  summarizeEmojiStatus,
   summarizeGroupCall,
   summarizeGroupCallParticipants,
   summarizeGroupsForDiscussion,
   summarizeMegagroupStats,
   summarizeMyBoosts,
+  summarizePeer,
   summarizePeerStories,
   summarizePoll,
   summarizeQuickReplies,
@@ -90,6 +95,7 @@ export type {
   CompactPeer,
   CompactStatsGraph,
   DiscussionMessageSummary,
+  EmojiStatusSummary,
   GroupCallInfoSummary,
   GroupCallParticipantSummary,
   GroupCallParticipantsSummary,
@@ -100,6 +106,7 @@ export type {
   MyBoostSummary,
   MyBoostsSummary,
   PeerStoriesSummary,
+  PeerSummary,
   PollSummary,
   PrepaidGiveawaySummary,
   QuickRepliesSummary,
@@ -108,6 +115,7 @@ export type {
   QuickReplySummary,
   ReadParticipantsSummary,
   ReportResultSummary,
+  ResolvedBusinessChatLinkSummary,
   StarsAmountSummary,
   StarsStatusSummary,
   StarsSubscriptionPricingSummary,
@@ -144,6 +152,7 @@ export {
   summarizeBusinessChatLinks,
   summarizeChannelDifference,
   summarizeDiscussionMessage,
+  summarizeEmojiStatus,
   summarizeGroupCall,
   summarizeGroupCallInfo,
   summarizeGroupCallParticipant,
@@ -152,6 +161,7 @@ export {
   summarizeMegagroupStats,
   summarizeMyBoost,
   summarizeMyBoosts,
+  summarizePeer,
   summarizePeerStories,
   summarizePoll,
   summarizePrepaidGiveaway,
@@ -4458,6 +4468,498 @@ export class TelegramService {
       if (!response) throw new Error("account.GetBusinessChatLinks returned nothing");
       return summarizeBusinessChatLinks(response);
     }, "getBusinessChatLinks");
+  }
+
+  // ─── Profile write (v1.32.0) ───────────────────────────────────────────────
+
+  async setEmojiStatus(opts: { documentId?: string; collectibleId?: string; untilUnix?: number }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      let emojiStatus: Api.TypeEmojiStatus;
+      if (opts.collectibleId) {
+        emojiStatus = new Api.InputEmojiStatusCollectible({
+          collectibleId: bigInt(opts.collectibleId),
+          until: opts.untilUnix,
+        });
+      } else if (opts.documentId) {
+        emojiStatus = new Api.EmojiStatus({
+          documentId: bigInt(opts.documentId),
+          until: opts.untilUnix,
+        });
+      } else {
+        emojiStatus = new Api.EmojiStatusEmpty();
+      }
+      await client.invoke(new Api.account.UpdateEmojiStatus({ emojiStatus }));
+    }, "setEmojiStatus");
+  }
+
+  async listEmojiStatuses(
+    kind: "default" | "recent" | "channel_default" | "collectible",
+    limit: number,
+  ): Promise<EmojiStatusSummary[]> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const hash = bigInt(0);
+      let resp: Api.account.TypeEmojiStatuses;
+      if (kind === "recent") {
+        resp = await client.invoke(new Api.account.GetRecentEmojiStatuses({ hash }));
+      } else if (kind === "channel_default") {
+        resp = await client.invoke(new Api.account.GetChannelDefaultEmojiStatuses({ hash }));
+      } else if (kind === "collectible") {
+        resp = await client.invoke(new Api.account.GetCollectibleEmojiStatuses({ hash }));
+      } else {
+        resp = await client.invoke(new Api.account.GetDefaultEmojiStatuses({ hash }));
+      }
+      if (resp.className === "account.EmojiStatusesNotModified") return [];
+      const statuses = (resp as Api.account.EmojiStatuses).statuses ?? [];
+      return statuses.slice(0, limit).map(summarizeEmojiStatus);
+    }, `listEmojiStatuses ${kind}`);
+  }
+
+  async clearRecentEmojiStatuses(): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      await client.invoke(new Api.account.ClearRecentEmojiStatuses());
+    }, "clearRecentEmojiStatuses");
+  }
+
+  async setProfileColor(opts: { forProfile: boolean; color?: number; backgroundEmojiId?: string }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      await client.invoke(
+        new Api.account.UpdateColor({
+          forProfile: opts.forProfile || undefined,
+          color: opts.color,
+          backgroundEmojiId: opts.backgroundEmojiId ? bigInt(opts.backgroundEmojiId) : undefined,
+        }),
+      );
+    }, "setProfileColor");
+  }
+
+  async setBirthday(opts: { day?: number; month?: number; year?: number; clear?: boolean }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const birthday =
+        opts.clear || !opts.day || !opts.month
+          ? undefined
+          : new Api.Birthday({ day: opts.day, month: opts.month, year: opts.year });
+      await client.invoke(new Api.account.UpdateBirthday({ birthday }));
+    }, "setBirthday");
+  }
+
+  async setPersonalChannel(opts: { channelId?: string; clear?: boolean }): Promise<string | null> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(
+      async () => {
+        if (opts.clear) {
+          await client.invoke(new Api.account.UpdatePersonalChannel({ channel: new Api.InputChannelEmpty() }));
+          return null;
+        }
+        const entity = await client.getInputEntity(opts.channelId ?? "");
+        if (!(entity instanceof Api.InputPeerChannel)) {
+          throw new Error(`Not a channel: ${opts.channelId}`);
+        }
+        const channel = new Api.InputChannel({
+          channelId: entity.channelId,
+          accessHash: entity.accessHash,
+        });
+        await client.invoke(new Api.account.UpdatePersonalChannel({ channel }));
+        const info = await client.getEntity(entity);
+        return "title" in info ? (info as { title: string }).title : (opts.channelId ?? "");
+      },
+      `setPersonalChannel ${opts.channelId ?? "clear"}`,
+    );
+  }
+
+  async setProfilePhoto(opts: {
+    filePath: string;
+    isVideo: boolean;
+    videoStartTs?: number;
+    fallback: boolean;
+  }): Promise<{ id: string }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const inputFile = await client.uploadFile({
+        file: new CustomFile(
+          opts.filePath.split("/").pop() ?? "upload",
+          (await import("node:fs")).statSync(opts.filePath).size,
+          opts.filePath,
+        ),
+        workers: 4,
+      });
+      const request = opts.isVideo
+        ? new Api.photos.UploadProfilePhoto({
+            fallback: opts.fallback || undefined,
+            video: inputFile,
+            videoStartTs: opts.videoStartTs,
+          })
+        : new Api.photos.UploadProfilePhoto({
+            fallback: opts.fallback || undefined,
+            file: inputFile,
+          });
+      const result = await client.invoke(request);
+      const photo = result.photo as Api.Photo;
+      return { id: photo.id.toString() };
+    }, "setProfilePhoto");
+  }
+
+  async deleteProfilePhotos(photoIds: string[]): Promise<{ deleted: string[]; missing: string[] }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const me = await client.getMe();
+      const all = await client.invoke(
+        new Api.photos.GetUserPhotos({
+          userId: me.id,
+          offset: 0,
+          maxId: bigInt(0),
+          limit: 100,
+        }),
+      );
+      const byId = new Map<string, Api.Photo>();
+      for (const p of all.photos) {
+        if (p instanceof Api.Photo) byId.set(p.id.toString(), p);
+      }
+      const inputs: Api.InputPhoto[] = [];
+      const missing: string[] = [];
+      for (const pid of photoIds) {
+        const photo = byId.get(pid);
+        if (!photo) {
+          missing.push(pid);
+          continue;
+        }
+        inputs.push(
+          new Api.InputPhoto({
+            id: photo.id,
+            accessHash: photo.accessHash,
+            fileReference: photo.fileReference,
+          }),
+        );
+      }
+      if (inputs.length === 0) {
+        throw new Error(`No matching photos found. Missing IDs: ${missing.join(", ")}`);
+      }
+      const deletedIds = await client.invoke(new Api.photos.DeletePhotos({ id: inputs }));
+      return { deleted: deletedIds.map((x) => x.toString()), missing };
+    }, "deleteProfilePhotos");
+  }
+
+  // ─── Business write (v1.32.0) ──────────────────────────────────────────────
+
+  private async buildBusinessRecipients(opts: {
+    audience: "all_new" | "contacts_only" | "non_contacts" | "existing_only";
+    includeUsers?: string[];
+    excludeUsers?: string[];
+  }): Promise<Api.InputBusinessRecipients> {
+    const flags: Partial<{
+      existingChats: boolean;
+      contacts: boolean;
+      nonContacts: boolean;
+      excludeSelected: boolean;
+      users: Api.InputUser[];
+    }> = {};
+    switch (opts.audience) {
+      case "all_new":
+        flags.contacts = true;
+        flags.nonContacts = true;
+        break;
+      case "contacts_only":
+        flags.contacts = true;
+        break;
+      case "non_contacts":
+        flags.nonContacts = true;
+        break;
+      case "existing_only":
+        flags.existingChats = true;
+        break;
+    }
+    if (opts.includeUsers?.length) {
+      flags.users = await this.resolveInputUsers(opts.includeUsers);
+    } else if (opts.excludeUsers?.length) {
+      flags.users = await this.resolveInputUsers(opts.excludeUsers);
+      flags.excludeSelected = true;
+    }
+    return new Api.InputBusinessRecipients({ ...flags });
+  }
+
+  private async resolveInputUsers(ids: string[]): Promise<Api.InputUser[]> {
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    const result: Api.InputUser[] = [];
+    for (const id of ids) {
+      const entity = await client.getInputEntity(id);
+      if (entity instanceof Api.InputPeerUser) {
+        result.push(new Api.InputUser({ userId: entity.userId, accessHash: entity.accessHash }));
+      } else {
+        throw new Error(`Not a user: ${id}`);
+      }
+    }
+    return result;
+  }
+
+  private async parseEntities(
+    text: string,
+    parseMode?: "md" | "html",
+  ): Promise<{ text: string; entities?: Api.TypeMessageEntity[] }> {
+    if (!this.client || !parseMode) return { text };
+    // biome-ignore lint/suspicious/noExplicitAny: internal GramJS API
+    const parser = (this.client as any)._parseMessageText?.bind(this.client);
+    if (!parser) return { text };
+    const [parsedText, entities] = await parser(text, parseMode === "md" ? "markdown" : "html");
+    return { text: parsedText, entities: entities?.length ? entities : undefined };
+  }
+
+  async setBusinessWorkHours(opts: {
+    timezone?: string;
+    openNow?: boolean;
+    schedule?: Array<{ day: string; openFrom: string; openTo: string }>;
+    clear?: boolean;
+  }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      if (opts.clear) {
+        await client.invoke(new Api.account.UpdateBusinessWorkHours({}));
+        return;
+      }
+      const dayOffsets: Record<string, number> = {
+        mon: 0,
+        tue: 1,
+        wed: 2,
+        thu: 3,
+        fri: 4,
+        sat: 5,
+        sun: 6,
+      };
+      const weeklyOpen = (opts.schedule ?? []).map((s) => {
+        const [fh, fm] = s.openFrom.split(":").map(Number);
+        const [th, tm] = s.openTo.split(":").map(Number);
+        const base = (dayOffsets[s.day] ?? 0) * 1440;
+        return new Api.BusinessWeeklyOpen({
+          startMinute: base + fh * 60 + fm,
+          endMinute: base + th * 60 + tm,
+        });
+      });
+      await client.invoke(
+        new Api.account.UpdateBusinessWorkHours({
+          businessWorkHours: new Api.BusinessWorkHours({
+            openNow: opts.openNow,
+            timezoneId: opts.timezone ?? "",
+            weeklyOpen,
+          }),
+        }),
+      );
+    }, "setBusinessWorkHours");
+  }
+
+  async setBusinessLocation(opts: {
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    clear?: boolean;
+  }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      if (opts.clear) {
+        await client.invoke(new Api.account.UpdateBusinessLocation({}));
+        return;
+      }
+      const geoPoint =
+        opts.latitude !== undefined && opts.longitude !== undefined
+          ? new Api.InputGeoPoint({ lat: opts.latitude, long: opts.longitude })
+          : undefined;
+      await client.invoke(new Api.account.UpdateBusinessLocation({ geoPoint, address: opts.address }));
+    }, "setBusinessLocation");
+  }
+
+  async setBusinessGreeting(opts: {
+    shortcutId?: number;
+    audience: "all_new" | "contacts_only" | "non_contacts" | "existing_only";
+    includeUsers?: string[];
+    excludeUsers?: string[];
+    noActivityDays: number;
+    clear?: boolean;
+  }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      if (opts.clear) {
+        await client.invoke(new Api.account.UpdateBusinessGreetingMessage({}));
+        return;
+      }
+      const recipients = await this.buildBusinessRecipients({
+        audience: opts.audience,
+        includeUsers: opts.includeUsers,
+        excludeUsers: opts.excludeUsers,
+      });
+      await client.invoke(
+        new Api.account.UpdateBusinessGreetingMessage({
+          message: new Api.InputBusinessGreetingMessage({
+            shortcutId: opts.shortcutId ?? 0,
+            recipients,
+            noActivityDays: opts.noActivityDays,
+          }),
+        }),
+      );
+    }, "setBusinessGreeting");
+  }
+
+  async setBusinessAway(opts: {
+    shortcutId?: number;
+    schedule: "always" | "outside_hours" | "custom";
+    customFrom?: number;
+    customTo?: number;
+    offlineOnly: boolean;
+    audience: "all_new" | "contacts_only" | "non_contacts" | "existing_only";
+    includeUsers?: string[];
+    excludeUsers?: string[];
+    clear?: boolean;
+  }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      if (opts.clear) {
+        await client.invoke(new Api.account.UpdateBusinessAwayMessage({}));
+        return;
+      }
+      const scheduleObj =
+        opts.schedule === "always"
+          ? new Api.BusinessAwayMessageScheduleAlways()
+          : opts.schedule === "outside_hours"
+            ? new Api.BusinessAwayMessageScheduleOutsideWorkHours()
+            : new Api.BusinessAwayMessageScheduleCustom({
+                startDate: opts.customFrom ?? 0,
+                endDate: opts.customTo ?? 0,
+              });
+      const recipients = await this.buildBusinessRecipients({
+        audience: opts.audience,
+        includeUsers: opts.includeUsers,
+        excludeUsers: opts.excludeUsers,
+      });
+      await client.invoke(
+        new Api.account.UpdateBusinessAwayMessage({
+          message: new Api.InputBusinessAwayMessage({
+            offlineOnly: opts.offlineOnly || undefined,
+            shortcutId: opts.shortcutId ?? 0,
+            schedule: scheduleObj,
+            recipients,
+          }),
+        }),
+      );
+    }, "setBusinessAway");
+  }
+
+  async setBusinessIntro(opts: {
+    title?: string;
+    description?: string;
+    stickerId?: string;
+    stickerAccessHash?: string;
+    stickerFileReference?: string;
+    clear?: boolean;
+  }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      if (opts.clear) {
+        await client.invoke(new Api.account.UpdateBusinessIntro({}));
+        return;
+      }
+      const sticker =
+        opts.stickerId && opts.stickerAccessHash && opts.stickerFileReference
+          ? new Api.InputDocument({
+              id: bigInt(opts.stickerId),
+              accessHash: bigInt(opts.stickerAccessHash),
+              fileReference: Buffer.from(opts.stickerFileReference, "hex"),
+            })
+          : undefined;
+      await client.invoke(
+        new Api.account.UpdateBusinessIntro({
+          intro: new Api.InputBusinessIntro({
+            title: opts.title ?? "",
+            description: opts.description ?? "",
+            sticker,
+          }),
+        }),
+      );
+    }, "setBusinessIntro");
+  }
+
+  async createBusinessChatLink(opts: {
+    message: string;
+    title?: string;
+    parseMode?: "md" | "html";
+  }): Promise<BusinessChatLinksSummary["links"][0] & { slug: string }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const { text, entities } = await this.parseEntities(opts.message, opts.parseMode);
+      const result = await client.invoke(
+        new Api.account.CreateBusinessChatLink({
+          link: new Api.InputBusinessChatLink({
+            message: text,
+            entities,
+            title: opts.title,
+          }),
+        }),
+      );
+      const summary = summarizeBusinessChatLink(result as Api.TypeBusinessChatLink);
+      const slug = (result as Api.BusinessChatLink).link.split("/").pop() ?? "";
+      return { ...summary, slug };
+    }, "createBusinessChatLink");
+  }
+
+  async editBusinessChatLink(opts: {
+    slug: string;
+    message: string;
+    title?: string;
+    parseMode?: "md" | "html";
+  }): Promise<BusinessChatLinksSummary["links"][0]> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const { text, entities } = await this.parseEntities(opts.message, opts.parseMode);
+      const result = await client.invoke(
+        new Api.account.EditBusinessChatLink({
+          slug: opts.slug,
+          link: new Api.InputBusinessChatLink({
+            message: text,
+            entities,
+            title: opts.title,
+          }),
+        }),
+      );
+      return summarizeBusinessChatLink(result as Api.TypeBusinessChatLink);
+    }, `editBusinessChatLink ${opts.slug}`);
+  }
+
+  async deleteBusinessChatLink(slug: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      await client.invoke(new Api.account.DeleteBusinessChatLink({ slug }));
+    }, `deleteBusinessChatLink ${slug}`);
+  }
+
+  async resolveBusinessChatLink(slug: string): Promise<ResolvedBusinessChatLinkSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const result = await client.invoke(new Api.account.ResolveBusinessChatLink({ slug }));
+      const r = result as Api.account.ResolvedBusinessChatLinks;
+      return {
+        peer: summarizePeer(r.peer),
+        message: r.message,
+        entityCount: r.entities?.length ?? 0,
+      };
+    }, `resolveBusinessChatLink ${slug}`);
   }
 
   // ─── Group calls ───────────────────────────────────────────────────────────

@@ -24,7 +24,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **Full-featured** -- messaging, reactions, polls, scheduled messages, stickers, media, contacts, and more
 - **Forum Topics** -- list topics, read per-topic messages, send to specific topics, per-topic unread counts
 - **Stickers** -- search sticker sets, browse installed/recent stickers, send stickers to any chat
-- **Account management** -- update profile, manage privacy settings, sessions, auto-delete timers
+- **Account & profile management** -- update profile, set emoji status, birthday, personal channel, profile photo, manage privacy settings, sessions, auto-delete timers
 - **Global search** -- search messages across all chats at once
 - **Real-time polling** -- fetch updates via stateless cursors; agent owns `{pts, qts, date}` state
 - **Inline bots & buttons** -- query inline bots, send results, press callback buttons
@@ -33,7 +33,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **Read Receipts** -- who read a message in a small group, when your private message was read (v1.30.0)
 - **Admin controls** -- toggle channel signatures, anti-spam, forum mode, prehistory; approve join requests
 - **Stats** -- channel and supergroup analytics (GetBroadcastStats / GetMegagroupStats)
-- **Boosts & Business** -- boost status, boosters list, Telegram Business chat links
+- **Boosts & Business** -- boost status, boosters list, Telegram Business chat links CRUD, work hours, location, greeting/away/intro messages
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
@@ -338,7 +338,8 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Invite Links** | `telegram-create-invite-link`, `telegram-get-invite-links`, `telegram-revoke-invite-link` |
 | **Contacts** | `telegram-get-contacts`, `telegram-add-contact`, `telegram-get-contact-requests` |
 | **Moderation** | `telegram-block-user`, `telegram-unblock-user`, `telegram-report-spam` |
-| **Profiles** | `telegram-get-profile`, `telegram-update-profile` |
+| **Profiles (read)** | `telegram-get-profile`, `telegram-update-profile` |
+| **Profile (write, v1.32.0)** | `telegram-set-emoji-status` (Premium), `telegram-list-emoji-statuses`, `telegram-clear-recent-emoji-statuses`, `telegram-set-profile-color` (Premium), `telegram-set-birthday`, `telegram-set-personal-channel`, `telegram-set-profile-photo`, `telegram-delete-profile-photo` |
 | **Account** | `telegram-get-sessions`, `telegram-terminate-session`, `telegram-set-privacy`, `telegram-set-auto-delete` |
 | **Pinning** | `telegram-pin-message`, `telegram-unpin-message` |
 | **Chat Settings** | `telegram-mute-chat`, `telegram-archive-chat`, `telegram-pin-chat`, `telegram-mark-dialog-unread` |
@@ -350,7 +351,8 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Stories (write, v1.30.0)** | `telegram-send-story`, `telegram-edit-story`, `telegram-delete-stories`, `telegram-react-to-story`, `telegram-export-story-link`, `telegram-read-stories`, `telegram-toggle-story-pinned`, `telegram-toggle-story-pinned-to-top`, `telegram-activate-stealth-mode` (Premium), `telegram-get-stories-archive`, `telegram-report-story` |
 | **Discussion (v1.30.0)** | `telegram-get-discussion-message`, `telegram-get-groups-for-discussion` |
 | **Read Receipts (v1.30.0)** | `telegram-get-message-read-participants`, `telegram-get-outbox-read-date` |
-| **Boosts & Business** | `telegram-get-my-boosts`, `telegram-get-boosts-status`, `telegram-get-boosts-list`, `telegram-get-business-chat-links` |
+| **Boosts** | `telegram-get-my-boosts`, `telegram-get-boosts-status`, `telegram-get-boosts-list` |
+| **Business (v1.32.0)** | `telegram-get-business-chat-links`, `telegram-create-business-chat-link`, `telegram-edit-business-chat-link`, `telegram-delete-business-chat-link`, `telegram-resolve-business-chat-link`, `telegram-set-business-hours`, `telegram-set-business-location`, `telegram-set-business-greeting`, `telegram-set-business-away`, `telegram-set-business-intro` |
 | **Opt-in (env-gated)** | `telegram-get-group-call`, `telegram-get-group-call-participants` (requires `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1`), `telegram-get-stars-status`, `telegram-get-stars-transactions` (requires `MCP_TELEGRAM_ENABLE_STARS=1`), `telegram-get-quick-replies`, `telegram-get-quick-reply-messages` (requires `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1`) |
 
 > **Tip**: Ask your AI assistant *"What Telegram tools are available?"* to get the full list with parameters and descriptions.
@@ -395,7 +397,8 @@ src/
     reactions.ts      -- Reactions, set-chat-reactions
     extras.ts         -- Pin, schedule, polls, topics
     stickers.ts       -- Sticker sets, send, search, browse
-    account.ts        -- Sessions, privacy, auto-delete, profile, chat mute/folders, invite links, business chat links
+    account.ts        -- Sessions, privacy, auto-delete, profile, emoji status, birthday, chat mute/folders, invite links
+    business.ts       -- Telegram Business: chat links CRUD, work hours, location, greeting/away/intro
     boosts.ts         -- Boost status, my boosts, boosters list
     stories.ts        -- Stories: list all, peer, by-id, view stats
     group-calls.ts    -- Group call info and participants (opt-in: MCP_TELEGRAM_ENABLE_GROUP_CALLS)

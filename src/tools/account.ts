@@ -1,7 +1,16 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { DESTRUCTIVE, fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
+import {
+  ABSOLUTE_PATH_ERROR,
+  DESTRUCTIVE,
+  fail,
+  isSafeAbsolutePath,
+  ok,
+  READ_ONLY,
+  requireConnection,
+  WRITE,
+} from "./shared.js";
 
 const MUTE_FOREVER_UNTIL = 2147483647; // max 32-bit signed int
 
@@ -447,20 +456,269 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
     },
   );
 
+  // ─── Profile write tools (v1.32.0) ─────────────────────────────────────────
+
   server.registerTool(
-    "telegram-get-business-chat-links",
+    "telegram-set-emoji-status",
     {
       description:
-        "List Telegram Business chat links configured for the account (account.GetBusinessChatLinks). Each entry includes the t.me/... link, the prefilled message, optional title (admin-facing label), views count, and entityCount (number of formatting entities in the message). Requires a Telegram Business-enabled account — returns an empty list when the account has none configured. Read-only.",
-      inputSchema: {},
+        "Set your profile emoji status (custom animated emoji shown next to your name). Requires Telegram Premium. Pass documentId or collectibleId to set — omit both to clear the status. Use telegram-list-emoji-statuses to browse available IDs.",
+      inputSchema: {
+        documentId: z
+          .string()
+          .optional()
+          .describe("Custom emoji document ID (stringified long). Omit to clear the status."),
+        collectibleId: z
+          .string()
+          .optional()
+          .describe(
+            "Collectible emoji ID (stringified long) — for paid unique emoji. Exactly one of documentId/collectibleId may be set.",
+          ),
+        untilUnix: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Unix timestamp when status expires. Omit for permanent."),
+      },
+      annotations: WRITE,
+    },
+    async ({ documentId, collectibleId, untilUnix }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      if (documentId && collectibleId) {
+        return fail(new Error("Only one of documentId or collectibleId may be set"));
+      }
+      try {
+        await telegram.setEmojiStatus({ documentId, collectibleId, untilUnix });
+        if (!documentId && !collectibleId) return ok("Emoji status cleared");
+        const id = collectibleId ?? documentId;
+        const until = untilUnix ? ` until ${new Date(untilUnix * 1000).toISOString()}` : "";
+        return ok(`Emoji status set: ${id}${until}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-list-emoji-statuses",
+    {
+      description:
+        "List default or recently-used emoji statuses available for your account. Useful for finding a documentId to pass to telegram-set-emoji-status.",
+      inputSchema: {
+        kind: z
+          .enum(["default", "recent", "channel_default", "collectible"])
+          .default("default")
+          .describe(
+            "Which list: default (popular set), recent (your recent usage), channel_default (for channels), collectible (paid unique)",
+          ),
+        limit: z.number().int().positive().max(200).default(50).describe("Max items to return"),
+      },
       annotations: READ_ONLY,
+    },
+    async ({ kind, limit }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const items = await telegram.listEmojiStatuses(kind, limit);
+        if (!items.length) return ok(`[${kind}]\n(no statuses)`);
+        const lines = items.map((s) => {
+          const id = s.collectibleId ?? s.documentId ?? "empty";
+          const until = s.until ? ` until=${s.until}` : " until=permanent";
+          const extra = s.title ? ` title="${s.title}"` : "";
+          return `${s.kind} id=${id}${until}${extra}`;
+        });
+        return ok(`[${kind}]\n${lines.join("\n")}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-clear-recent-emoji-statuses",
+    {
+      description: "Clear your recently-used emoji status list (the 'recent' section in the emoji status picker).",
+      inputSchema: {},
+      annotations: WRITE,
     },
     async () => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
       try {
-        const result = await telegram.getBusinessChatLinks();
-        return ok(JSON.stringify(result));
+        await telegram.clearRecentEmojiStatuses();
+        return ok("Recent emoji statuses cleared");
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-set-profile-color",
+    {
+      description:
+        "Set your profile name color or profile background color. Requires Telegram Premium for colors above index 6 and for profile background patterns. Omit color to reset to default.",
+      inputSchema: {
+        forProfile: z
+          .boolean()
+          .default(false)
+          .describe("true = profile page color + background pattern (Premium); false = name color in chat lists"),
+        color: z
+          .number()
+          .int()
+          .min(0)
+          .max(20)
+          .optional()
+          .describe("Color index (0-6 free palette; 7+ Premium custom). Omit to reset to default."),
+        backgroundEmojiId: z
+          .string()
+          .optional()
+          .describe(
+            "Custom emoji document ID (stringified long) for profile background pattern (Premium). Omit to remove.",
+          ),
+      },
+      annotations: WRITE,
+    },
+    async ({ forProfile, color, backgroundEmojiId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        await telegram.setProfileColor({ forProfile, color, backgroundEmojiId });
+        if (color === undefined && !backgroundEmojiId) return ok("Profile color reset");
+        return ok(
+          `Profile color updated: forProfile=${forProfile} color=${color ?? "default"} bg=${backgroundEmojiId ?? "none"}`,
+        );
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-set-birthday",
+    {
+      description:
+        "Set your birthday in your Telegram profile. Year is optional (omit to hide age). Pass clear=true to remove birthday. Requires day and month unless clearing.",
+      inputSchema: {
+        day: z.number().int().min(1).max(31).optional().describe("Day of month (1-31)"),
+        month: z.number().int().min(1).max(12).optional().describe("Month (1-12)"),
+        year: z.number().int().min(1900).max(2100).optional().describe("Year (optional — omit to hide age)"),
+        clear: z.boolean().optional().describe("Pass true to remove birthday from profile"),
+      },
+      annotations: WRITE,
+    },
+    async ({ day, month, year, clear }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      if (!clear && (!day || !month)) {
+        return fail(new Error("day and month are required when not clearing"));
+      }
+      try {
+        await telegram.setBirthday({ day, month, year, clear });
+        if (clear) return ok("Birthday cleared");
+        const yearStr = year ? `/${year}` : "";
+        return ok(`Birthday set: ${day}/${month}${yearStr}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-set-personal-channel",
+    {
+      description:
+        "Set the channel displayed on your profile as 'Personal Channel'. Pass clear=true to remove. Pass channelId or @username of a channel you own or are subscribed to.",
+      inputSchema: {
+        channelId: z.string().optional().describe("Channel ID or @username to feature on profile"),
+        clear: z.boolean().optional().describe("Pass true to remove personal channel from profile"),
+      },
+      annotations: WRITE,
+    },
+    async ({ channelId, clear }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      if (!clear && !channelId) {
+        return fail(new Error("channelId is required when not clearing"));
+      }
+      if (clear && channelId) {
+        return fail(new Error("Cannot set channelId and clear=true simultaneously"));
+      }
+      try {
+        const title = await telegram.setPersonalChannel({ channelId, clear });
+        if (clear) return ok("Personal channel cleared");
+        return ok(`Personal channel set to ${title ?? channelId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-set-profile-photo",
+    {
+      description:
+        "Upload and set a new profile photo from a local file. Supports JPEG/PNG for static avatar or MP4 for animated avatar (square, up to 10s). Optionally set as fallback photo shown to users who cannot see your main photo.",
+      inputSchema: {
+        filePath: z
+          .string()
+          .min(1)
+          .refine(isSafeAbsolutePath, ABSOLUTE_PATH_ERROR)
+          .describe(
+            "Absolute local filesystem path to photo (JPEG/PNG) or video (MP4, square) to upload as avatar. URLs are rejected.",
+          ),
+        isVideo: z.boolean().default(false).describe("true if file is an MP4 animated avatar; false for static photo"),
+        videoStartTs: z
+          .number()
+          .min(0)
+          .optional()
+          .describe("For video avatar: timestamp in seconds to use as still preview frame"),
+        fallback: z
+          .boolean()
+          .default(false)
+          .describe(
+            "true = set as fallback photo (shown to users who cannot see your main photo due to privacy settings)",
+          ),
+      },
+      annotations: WRITE,
+    },
+    async ({ filePath, isVideo, videoStartTs, fallback }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const { id } = await telegram.setProfilePhoto({ filePath, isVideo, videoStartTs, fallback });
+        const label = fallback ? "Fallback profile photo" : "Profile photo";
+        return ok(`${label} updated [id=${id}]`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-delete-profile-photo",
+    {
+      description:
+        "Delete one or more profile photos by their photo IDs. Use telegram-get-profile-photo to obtain the current photo ID. Returns which IDs were deleted and which were not found.",
+      inputSchema: {
+        photoIds: z
+          .array(z.string().regex(/^\d{1,20}$/, "must be a numeric photo ID"))
+          .min(1)
+          .max(100)
+          .describe("Array of photo IDs (stringified long) to delete from your profile photo history"),
+      },
+      annotations: WRITE,
+    },
+    async ({ photoIds }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const { deleted, missing } = await telegram.deleteProfilePhotos(photoIds);
+        const parts = [`Deleted ${deleted.length} profile photo(s): ${deleted.join(", ")}`];
+        if (missing.length) parts.push(`Not found: ${missing.join(", ")}`);
+        return ok(parts.join(". "));
       } catch (e) {
         return fail(e);
       }

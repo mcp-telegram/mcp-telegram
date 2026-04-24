@@ -305,14 +305,43 @@ Cursors are client-owned — the agent stores `{pts, qts, date}` between calls a
 | `telegram-get-message-read-participants` | List who has read a message in a small group (≤100 members, ≤7 days old) |
 | `telegram-get-outbox-read-date` | Get when your recipient read your outgoing private message |
 
-## Boosts & Business
+## Profile (write, v1.32.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-set-emoji-status` | Set custom animated emoji status next to your name. Pass `documentId` (from `telegram-list-emoji-statuses`) or `collectibleId`; omit both to clear. Optional `untilUnix` expiry. **Requires Telegram Premium.** |
+| `telegram-list-emoji-statuses` | Browse emoji statuses available for your account. `kind`: `default`, `recent`, `channel_default`, `collectible`. Returns `documentId`, `until`, collectible `title`/`slug`. |
+| `telegram-clear-recent-emoji-statuses` | Clear the "recent" emoji status picker list. |
+| `telegram-set-profile-color` | Set name color (`forProfile=false`) or profile background color + pattern (`forProfile=true`, Premium). `color` 0–6 free, 7–20 Premium. Omit `color` to reset. |
+| `telegram-set-birthday` | Set birthday on profile. `day` + `month` required; `year` optional (omit to hide age). `clear=true` removes. |
+| `telegram-set-personal-channel` | Feature a channel on your profile. Pass `channelId` or `@username`. `clear=true` removes. |
+| `telegram-set-profile-photo` | Upload static (JPEG/PNG) or animated (MP4, square, ≤10s) avatar. `fallback=true` sets it as the privacy-fallback photo. |
+| `telegram-delete-profile-photo` | Delete profile photos by photo IDs (stringified longs). Internally fetches photo history to resolve `InputPhoto`; IDs not found are listed in `missing`. |
+
+## Business (v1.32.0)
+
+Requires **Telegram Business** subscription unless noted otherwise.
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-business-chat-links` | List your Telegram Business chat links (read-only; no Business subscription required to read). |
+| `telegram-create-business-chat-link` | Create a `t.me/m/...` deep-link with pre-filled message and optional admin `title`. Returns JSON with `link`, `slug`, `message`, `views`. |
+| `telegram-edit-business-chat-link` | Update an existing link by `slug`. Same options as create. |
+| `telegram-delete-business-chat-link` | Delete a link by `slug`. |
+| `telegram-resolve-business-chat-link` | Resolve a `slug` to see who the link opens a chat with and the pre-filled message. No Business subscription needed. |
+| `telegram-set-business-hours` | Set weekly work hours: `timezone` (IANA) + `schedule` array of `{day, openFrom, openTo}` in HH:MM. `clear=true` disables. |
+| `telegram-set-business-location` | Set address ± geo coordinates. `clear=true` removes. |
+| `telegram-set-business-greeting` | Auto-reply for new conversations. `shortcutId` (from `telegram-get-quick-replies`), `audience` enum, `noActivityDays`, optional include/exclude user lists. `clear=true` disables. |
+| `telegram-set-business-away` | Auto-reply when offline. `schedule`: `always`, `outside_hours`, or `custom` (requires `customFrom`/`customTo` Unix timestamps). `offlineOnly` flag. Same audience model as greeting. `clear=true` disables. |
+| `telegram-set-business-intro` | Intro card for new users: `title` (≤32 chars) + `description` (≤70 chars) + optional sticker (requires all three: `stickerId`, `stickerAccessHash`, `stickerFileReference`). `clear=true` removes. |
+
+## Boosts
 
 | Tool | Description |
 |------|-------------|
 | `telegram-get-my-boosts` | List boost slots assigned by your account |
 | `telegram-get-boosts-status` | Boost status for a channel/supergroup |
 | `telegram-get-boosts-list` | List boosters for a channel (admin) |
-| `telegram-get-business-chat-links` | List your Telegram Business chat links |
 
 ## Opt-In (env-gated)
 

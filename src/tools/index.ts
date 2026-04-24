@@ -3,6 +3,7 @@ import type { TelegramService } from "../telegram-client.js";
 import { registerAccountTools } from "./account.js";
 import { registerAuthTools } from "./auth.js";
 import { registerBoostTools } from "./boosts.js";
+import { registerBusinessTools } from "./business.js";
 import { registerChatTools } from "./chats.js";
 import { registerContactTools } from "./contacts.js";
 import { registerExtraTools } from "./extras.js";
@@ -30,6 +31,7 @@ export function registerTools(server: McpServer, telegram: TelegramService) {
   registerFactCheckTools(server, telegram);
   registerExtraTools(server, telegram);
   registerAccountTools(server, telegram);
+  registerBusinessTools(server, telegram);
   registerStickerTools(server, telegram);
   registerStoryTools(server, telegram);
   registerBoostTools(server, telegram);

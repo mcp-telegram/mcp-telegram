@@ -305,14 +305,43 @@ MCP Telegram предоставляет расширенный набор инс
 | `telegram-get-message-read-participants` | Кто прочитал сообщение в малой группе (≤100 чел., ≤7 дней) |
 | `telegram-get-outbox-read-date` | Когда получатель прочитал ваше исходящее сообщение в личке |
 
-## Бусты и Business
+## Профиль (запись, v1.32.0)
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-set-emoji-status` | Установить эмодзи-статус рядом с именем (Premium). Передать `documentId` или `collectibleId`; пропустить оба = очистить |
+| `telegram-list-emoji-statuses` | Список доступных статусов: `default`, `recent`, `channel_default`, `collectible` |
+| `telegram-clear-recent-emoji-statuses` | Очистить список «недавних» эмодзи-статусов |
+| `telegram-set-profile-color` | Цвет имени или фона профиля (Premium для index ≥ 7). `forProfile=false` = имя в чатах, `true` = фон профиля |
+| `telegram-set-birthday` | Дата рождения (`day`, `month`; `year` необязателен). `clear=true` = удалить |
+| `telegram-set-personal-channel` | Добавить канал на профиль. `clear=true` = убрать |
+| `telegram-set-profile-photo` | Загрузить аватар (JPEG/PNG или MP4, квадратное, ≤10с). `fallback=true` = запасной аватар |
+| `telegram-delete-profile-photo` | Удалить фото профиля по ID. Возвращает `deleted` и `missing` |
+
+## Telegram Business (v1.32.0)
+
+Требуется подписка **Telegram Business**, кроме отмеченных.
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-get-business-chat-links` | Список Business chat links (без подписки тоже работает) |
+| `telegram-create-business-chat-link` | Создать ссылку `t.me/m/...` с предзаполненным сообщением |
+| `telegram-edit-business-chat-link` | Изменить ссылку по slug |
+| `telegram-delete-business-chat-link` | Удалить ссылку по slug |
+| `telegram-resolve-business-chat-link` | Узнать чей чат откроет ссылка и предзаполненное сообщение |
+| `telegram-set-business-hours` | Часы работы: `timezone` + массив `{day, openFrom, openTo}` в HH:MM. `clear=true` = убрать |
+| `telegram-set-business-location` | Адрес ± геоточка. `clear=true` = убрать |
+| `telegram-set-business-greeting` | Авто-ответ для новых чатов. `shortcutId` (из `get-quick-replies`), `audience`, `noActivityDays` |
+| `telegram-set-business-away` | Авто-ответ при офлайне. `schedule`: `always`/`outside_hours`/`custom`. `clear=true` = убрать |
+| `telegram-set-business-intro` | Карточка-приветствие: `title` (≤32) + `description` (≤70) + опциональный стикер |
+
+## Бусты
 
 | Инструмент | Описание |
 |------------|----------|
 | `telegram-get-my-boosts` | Список бустов, выданных вашим аккаунтом |
 | `telegram-get-boosts-status` | Статус бустов канала/супергруппы |
 | `telegram-get-boosts-list` | Список бустеров канала (админ) |
-| `telegram-get-business-chat-links` | Список ваших Business chat links |
 
 ## Opt-in (по env-флагам)
 

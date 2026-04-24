@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.34.0] — 2026-04-24
+
+### Added
+
+**Star Gifts (7 new tools, opt-in `MCP_TELEGRAM_ENABLE_STARS=1`):**
+- **telegram-get-available-star-gifts** — List all available Star Gift catalog items: gift ID, cost in Stars, conversion value, limited-edition availability, and upgrade cost
+- **telegram-get-saved-star-gifts** — List Star Gifts received by a user/chat. Supports pagination (`offset`/`nextOffset`), filter flags (`excludeUnsaved`, `excludeSaved`, `excludeUnlimited`, `excludeLimited`, `excludeUnique`), and `sortByValue`. Returns kind (regular/unique), from-peer, date, and upgrade eligibility
+- **telegram-save-star-gift** — Show or hide a received gift on your profile. For personal gifts pass `msgId`; for chat/channel gifts pass `chatId` + `savedId`. Set `unsave=true` to hide, omit to show
+- **telegram-convert-star-gift** — Convert a received gift into Stars (non-reversible, removes gift from profile). Same addressing as save: `msgId` for personal, `chatId`+`savedId` for chat gifts
+- **telegram-get-stars-topup-options** — List available Stars top-up tiers with star count, currency, price amount (smallest currency units), and extended/standard tier flag
+- **telegram-get-stars-subscriptions** — List active Stars subscriptions for a peer (`me` for self). Returns subscription ID, peer, until date, billing period (seconds), price in Stars, canceled status, and title. Pagination via `offset`
+- **telegram-change-stars-subscription** — Cancel or restore a Stars subscription by ID. `canceled=true` to cancel before next renewal, `canceled=false` to restore
+
 ## [1.33.0] — 2026-04-24
 
 ### Added

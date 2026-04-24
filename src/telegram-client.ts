@@ -5242,6 +5242,205 @@ export class TelegramService {
     }, `getStarsTransactions ${chatId}`);
   }
 
+  // ─── Star Gifts (v1.34.0) ──────────────────────────────────────────────────
+
+  async getAvailableStarGifts(): Promise<
+    Array<{
+      id: string;
+      stars: string;
+      convertStars: string;
+      limited: boolean;
+      availabilityRemains?: number;
+      availabilityTotal?: number;
+      upgradeStars?: string;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(new Api.payments.GetStarGifts({ hash: 0 }));
+    if (result.className === "payments.StarGiftsNotModified") return [];
+    const gifts = result.className === "payments.StarGifts" ? result.gifts : [];
+    return gifts
+      .filter((g): g is Api.StarGift => g instanceof Api.StarGift)
+      .map((g) => ({
+        id: g.id.toString(),
+        stars: g.stars.toString(),
+        convertStars: g.convertStars.toString(),
+        limited: g.limited ?? false,
+        availabilityRemains: g.availabilityRemains,
+        availabilityTotal: g.availabilityTotal,
+        upgradeStars: g.upgradeStars?.toString(),
+      }));
+  }
+
+  async getSavedStarGifts(
+    chatId: string,
+    opts: {
+      limit?: number;
+      offset?: string;
+      excludeUnsaved?: boolean;
+      excludeSaved?: boolean;
+      excludeUnlimited?: boolean;
+      excludeLimited?: boolean;
+      excludeUnique?: boolean;
+      sortByValue?: boolean;
+    } = {},
+  ): Promise<{
+    count: number;
+    nextOffset?: string;
+    gifts: Array<{
+      giftId: string;
+      giftKind: "regular" | "unique";
+      giftTitle?: string;
+      stars?: string;
+      convertStars?: string;
+      msgId?: number;
+      savedId?: string;
+      fromPeerId?: string;
+      date: number;
+      unsaved: boolean;
+      canUpgrade: boolean;
+      upgradeStars?: string;
+    }>;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    const peer = await this.resolvePeer(chatId);
+    const resolved = await client.getInputEntity(peer);
+    const result = await client.invoke(
+      new Api.payments.GetSavedStarGifts({
+        peer: resolved,
+        offset: opts.offset ?? "",
+        limit: opts.limit ?? 20,
+        excludeUnsaved: opts.excludeUnsaved,
+        excludeSaved: opts.excludeSaved,
+        excludeUnlimited: opts.excludeUnlimited,
+        excludeLimited: opts.excludeLimited,
+        excludeUnique: opts.excludeUnique,
+        sortByValue: opts.sortByValue,
+      }),
+    );
+    const r = result as Api.payments.SavedStarGifts;
+    return {
+      count: r.count,
+      nextOffset: r.nextOffset,
+      gifts: r.gifts.map((sg) => {
+        const gift = sg.gift;
+        if (gift instanceof Api.StarGift) {
+          return {
+            giftId: gift.id.toString(),
+            giftKind: "regular" as const,
+            stars: gift.stars.toString(),
+            convertStars: gift.convertStars.toString(),
+            msgId: sg.msgId ?? undefined,
+            savedId: sg.savedId?.toString(),
+            fromPeerId: sg.fromId ? summarizePeer(sg.fromId).id : undefined,
+            date: sg.date,
+            unsaved: sg.unsaved ?? false,
+            canUpgrade: sg.canUpgrade ?? false,
+            upgradeStars: sg.upgradeStars?.toString(),
+          };
+        }
+        const u = gift as Api.StarGiftUnique;
+        return {
+          giftId: u.id.toString(),
+          giftKind: "unique" as const,
+          giftTitle: u.title,
+          msgId: sg.msgId ?? undefined,
+          savedId: sg.savedId?.toString(),
+          fromPeerId: sg.fromId ? summarizePeer(sg.fromId).id : undefined,
+          date: sg.date,
+          unsaved: sg.unsaved ?? false,
+          canUpgrade: false,
+        };
+      }),
+    };
+  }
+
+  async saveStarGift(opts: { msgId?: number; chatId?: string; savedId?: string; unsave?: boolean }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    let stargift: Api.TypeInputSavedStarGift;
+    if (opts.msgId !== undefined) {
+      stargift = new Api.InputSavedStarGiftUser({ msgId: opts.msgId });
+    } else if (opts.chatId && opts.savedId) {
+      const peer = await this.resolvePeer(opts.chatId);
+      const inputPeer = await client.getInputEntity(peer);
+      stargift = new Api.InputSavedStarGiftChat({ peer: inputPeer, savedId: bigInt(opts.savedId) });
+    } else {
+      throw new Error("Provide msgId (user gift) or both chatId and savedId (chat gift)");
+    }
+    await client.invoke(new Api.payments.SaveStarGift({ stargift, unsave: opts.unsave }));
+  }
+
+  async convertStarGift(opts: { msgId?: number; chatId?: string; savedId?: string }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    let stargift: Api.TypeInputSavedStarGift;
+    if (opts.msgId !== undefined) {
+      stargift = new Api.InputSavedStarGiftUser({ msgId: opts.msgId });
+    } else if (opts.chatId && opts.savedId) {
+      const peer = await this.resolvePeer(opts.chatId);
+      const inputPeer = await client.getInputEntity(peer);
+      stargift = new Api.InputSavedStarGiftChat({ peer: inputPeer, savedId: bigInt(opts.savedId) });
+    } else {
+      throw new Error("Provide msgId (user gift) or both chatId and savedId (chat gift)");
+    }
+    await client.invoke(new Api.payments.ConvertStarGift({ stargift }));
+  }
+
+  async getStarsTopupOptions(): Promise<Array<{ stars: string; currency: string; amount: string; extended: boolean }>> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(new Api.payments.GetStarsTopupOptions());
+    return result.map((o) => ({
+      stars: o.stars.toString(),
+      currency: o.currency,
+      amount: o.amount.toString(),
+      extended: o.extended ?? false,
+    }));
+  }
+
+  async getStarsSubscriptions(
+    chatId: string,
+    opts: { offset?: string; missingBalance?: boolean } = {},
+  ): Promise<{
+    subscriptions: Array<{
+      id: string;
+      peerId: string;
+      untilDate: number;
+      periodSeconds: number;
+      priceStars: string;
+      canceled: boolean;
+      title?: string;
+    }>;
+    nextOffset?: string;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const result = await this.client.invoke(
+      new Api.payments.GetStarsSubscriptions({ peer, offset: opts.offset ?? "", missingBalance: opts.missingBalance }),
+    );
+    const r = result as Api.payments.StarsStatus;
+    const subs = r.subscriptions ?? [];
+    return {
+      subscriptions: subs.map((s) => ({
+        id: s.id,
+        peerId: summarizePeer(s.peer).id,
+        untilDate: s.untilDate,
+        periodSeconds: s.pricing.period,
+        priceStars: s.pricing.amount.toString(),
+        canceled: s.canceled ?? false,
+        title: s.title,
+      })),
+      nextOffset: r.subscriptionsNextOffset,
+    };
+  }
+
+  async changeStarsSubscription(chatId: string, subscriptionId: string, canceled: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    await this.client.invoke(new Api.payments.ChangeStarsSubscription({ peer, subscriptionId, canceled }));
+  }
+
   // ─── Quick replies ─────────────────────────────────────────────────────────
 
   async getQuickReplies(hash?: string): Promise<QuickRepliesSummary> {

@@ -8,6 +8,7 @@ import { registerChatTools } from "./chats.js";
 import { registerContactTools } from "./contacts.js";
 import { registerExtraTools } from "./extras.js";
 import { registerFactCheckTools } from "./fact-check.js";
+import { registerFolderTools } from "./folders.js";
 import { registerGroupCallTools } from "./group-calls.js";
 import { registerMediaTools } from "./media.js";
 import { registerMessageTools } from "./messages.js";
@@ -32,6 +33,7 @@ export function registerTools(server: McpServer, telegram: TelegramService) {
   registerExtraTools(server, telegram);
   registerAccountTools(server, telegram);
   registerBusinessTools(server, telegram);
+  registerFolderTools(server, telegram);
   registerStickerTools(server, telegram);
   registerStoryTools(server, telegram);
   registerBoostTools(server, telegram);

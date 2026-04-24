@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.0] — 2026-04-24
+
+### Added
+
+**Folder management (6 new tools):**
+- **telegram-create-folder** — Create a new chat folder. Accepts `title` (max 12 chars), optional `emoticon`, type flags (`contacts`, `nonContacts`, `groups`, `broadcasts`, `bots`), filter flags (`excludeMuted`, `excludeRead`, `excludeArchived`), and peer lists (`includePeers`, `excludePeers`, `pinnedPeers` max 5). Auto-assigns the next available folder ID ≥ 2. Returns the new ID
+- **telegram-edit-folder** — Edit an existing folder by `id`. Only pass fields to change — omitted fields preserve current values (fetches current state first via `messages.GetDialogFilters`)
+- **telegram-delete-folder** — Delete a chat folder by ID. Chats remain in All Chats. System folders (0 = All Chats, 1 = Archive) cannot be deleted. Uses `messages.UpdateDialogFilter` without a filter argument
+- **telegram-reorder-folders** — Set the display order of folders by passing an ordered array of folder IDs. Uses `messages.UpdateDialogFiltersOrder`
+- **telegram-get-suggested-folders** — Fetch Telegram's server-side folder suggestions based on your chat list (e.g. "Unread", "Work", "Personal"). Skips `DialogFilterDefault` entries that lack a title
+- **telegram-toggle-folder-tags** — Enable or disable folder tag labels on messages in chat lists. Requires Telegram Premium. Uses `messages.ToggleDialogFilterTags`
+
+**Global privacy (2 new tools):**
+- **telegram-get-global-privacy-settings** — Read all five global privacy flags: `archiveAndMuteNewNoncontactPeers`, `keepArchivedUnmuted`, `keepArchivedFolders`, `hideReadMarks`, `newNoncontactPeersRequirePremium`. Returns JSON
+- **telegram-set-global-privacy-settings** — Update any subset of global privacy flags. Fetches current settings first and merges only the fields you pass. `hideReadMarks` and `newNoncontactPeersRequirePremium` require Telegram Premium
+
 ## [1.32.0] — 2026-04-24
 
 ### Added

@@ -3887,6 +3887,207 @@ export class TelegramService {
     await this.client.invoke(new Api.messages.SetHistoryTTL({ peer, period }));
   }
 
+  // ─── Folder management (v1.33.0) ───────────────────────────────────────────
+
+  async createFolder(opts: {
+    title: string;
+    emoticon?: string;
+    contacts?: boolean;
+    nonContacts?: boolean;
+    groups?: boolean;
+    broadcasts?: boolean;
+    bots?: boolean;
+    excludeMuted?: boolean;
+    excludeRead?: boolean;
+    excludeArchived?: boolean;
+    includePeers?: string[];
+    excludePeers?: string[];
+    pinnedPeers?: string[];
+  }): Promise<number> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    const filtersResult = await client.invoke(new Api.messages.GetDialogFilters());
+    const existing = "filters" in filtersResult ? filtersResult.filters : [];
+    const usedIds = existing
+      .filter((f): f is Api.DialogFilter | Api.DialogFilterChatlist => "id" in f)
+      .map((f) => f.id);
+    let newId = 2;
+    while (usedIds.includes(newId)) newId++;
+
+    const toInput = async (ids: string[]) => {
+      const peers: Api.TypeInputPeer[] = [];
+      for (const id of ids) {
+        const resolved = await this.resolvePeer(id);
+        peers.push(await client.getInputEntity(resolved));
+      }
+      return peers;
+    };
+
+    const includePeers = await toInput(opts.includePeers ?? []);
+    const excludePeers = await toInput(opts.excludePeers ?? []);
+    const pinnedPeers = await toInput(opts.pinnedPeers ?? []);
+
+    await client.invoke(
+      new Api.messages.UpdateDialogFilter({
+        id: newId,
+        filter: new Api.DialogFilter({
+          id: newId,
+          title: new Api.TextWithEntities({ text: opts.title, entities: [] }),
+          emoticon: opts.emoticon,
+          contacts: opts.contacts,
+          nonContacts: opts.nonContacts,
+          groups: opts.groups,
+          broadcasts: opts.broadcasts,
+          bots: opts.bots,
+          excludeMuted: opts.excludeMuted,
+          excludeRead: opts.excludeRead,
+          excludeArchived: opts.excludeArchived,
+          pinnedPeers,
+          includePeers,
+          excludePeers,
+        }),
+      }),
+    );
+    return newId;
+  }
+
+  async editFolder(
+    id: number,
+    opts: {
+      title?: string;
+      emoticon?: string;
+      contacts?: boolean;
+      nonContacts?: boolean;
+      groups?: boolean;
+      broadcasts?: boolean;
+      bots?: boolean;
+      excludeMuted?: boolean;
+      excludeRead?: boolean;
+      excludeArchived?: boolean;
+      includePeers?: string[];
+      excludePeers?: string[];
+      pinnedPeers?: string[];
+    },
+  ): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    const filtersResult = await client.invoke(new Api.messages.GetDialogFilters());
+    const existing = "filters" in filtersResult ? filtersResult.filters : [];
+    const current = existing.find((f): f is Api.DialogFilter => f instanceof Api.DialogFilter && f.id === id);
+    if (!current) throw new Error(`Folder with id=${id} not found`);
+
+    const toInput = async (ids: string[]) => {
+      const peers: Api.TypeInputPeer[] = [];
+      for (const id of ids) {
+        const resolved = await this.resolvePeer(id);
+        peers.push(await client.getInputEntity(resolved));
+      }
+      return peers;
+    };
+
+    const includePeers = opts.includePeers !== undefined ? await toInput(opts.includePeers) : current.includePeers;
+    const excludePeers = opts.excludePeers !== undefined ? await toInput(opts.excludePeers) : current.excludePeers;
+    const pinnedPeers = opts.pinnedPeers !== undefined ? await toInput(opts.pinnedPeers) : current.pinnedPeers;
+
+    const titleText =
+      opts.title !== undefined ? opts.title : typeof current.title === "string" ? current.title : current.title.text;
+
+    await client.invoke(
+      new Api.messages.UpdateDialogFilter({
+        id,
+        filter: new Api.DialogFilter({
+          id,
+          title: new Api.TextWithEntities({ text: titleText, entities: [] }),
+          emoticon: opts.emoticon !== undefined ? opts.emoticon : current.emoticon,
+          contacts: opts.contacts !== undefined ? opts.contacts : current.contacts,
+          nonContacts: opts.nonContacts !== undefined ? opts.nonContacts : current.nonContacts,
+          groups: opts.groups !== undefined ? opts.groups : current.groups,
+          broadcasts: opts.broadcasts !== undefined ? opts.broadcasts : current.broadcasts,
+          bots: opts.bots !== undefined ? opts.bots : current.bots,
+          excludeMuted: opts.excludeMuted !== undefined ? opts.excludeMuted : current.excludeMuted,
+          excludeRead: opts.excludeRead !== undefined ? opts.excludeRead : current.excludeRead,
+          excludeArchived: opts.excludeArchived !== undefined ? opts.excludeArchived : current.excludeArchived,
+          pinnedPeers,
+          includePeers,
+          excludePeers,
+        }),
+      }),
+    );
+  }
+
+  async deleteFolder(id: number): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.client.invoke(new Api.messages.UpdateDialogFilter({ id }));
+  }
+
+  async reorderFolders(ids: number[]): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.client.invoke(new Api.messages.UpdateDialogFiltersOrder({ order: ids }));
+  }
+
+  async getSuggestedFolders(): Promise<Array<{ title: string; emoticon?: string }>> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(new Api.messages.GetSuggestedDialogFilters());
+    return result
+      .filter(
+        (s): s is Api.DialogFilterSuggested & { filter: Api.DialogFilter | Api.DialogFilterChatlist } =>
+          s.filter instanceof Api.DialogFilter || s.filter instanceof Api.DialogFilterChatlist,
+      )
+      .map((s) => ({
+        title: typeof s.filter.title === "string" ? s.filter.title : s.filter.title.text,
+        emoticon: (s.filter as Api.DialogFilter).emoticon,
+      }));
+  }
+
+  async toggleDialogFilterTags(enabled: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.client.invoke(new Api.messages.ToggleDialogFilterTags({ enabled }));
+  }
+
+  // ─── Global privacy (v1.33.0) ──────────────────────────────────────────────
+
+  async getGlobalPrivacySettings(): Promise<{
+    archiveAndMuteNewNoncontactPeers: boolean;
+    keepArchivedUnmuted: boolean;
+    keepArchivedFolders: boolean;
+    hideReadMarks: boolean;
+    newNoncontactPeersRequirePremium: boolean;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const s = await this.client.invoke(new Api.account.GetGlobalPrivacySettings());
+    return {
+      archiveAndMuteNewNoncontactPeers: s.archiveAndMuteNewNoncontactPeers ?? false,
+      keepArchivedUnmuted: s.keepArchivedUnmuted ?? false,
+      keepArchivedFolders: s.keepArchivedFolders ?? false,
+      hideReadMarks: s.hideReadMarks ?? false,
+      newNoncontactPeersRequirePremium: s.newNoncontactPeersRequirePremium ?? false,
+    };
+  }
+
+  async setGlobalPrivacySettings(opts: {
+    archiveAndMuteNewNoncontactPeers?: boolean;
+    keepArchivedUnmuted?: boolean;
+    keepArchivedFolders?: boolean;
+    hideReadMarks?: boolean;
+    newNoncontactPeersRequirePremium?: boolean;
+  }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const current = await this.client.invoke(new Api.account.GetGlobalPrivacySettings());
+    await this.client.invoke(
+      new Api.account.SetGlobalPrivacySettings({
+        settings: new Api.GlobalPrivacySettings({
+          archiveAndMuteNewNoncontactPeers:
+            opts.archiveAndMuteNewNoncontactPeers ?? current.archiveAndMuteNewNoncontactPeers,
+          keepArchivedUnmuted: opts.keepArchivedUnmuted ?? current.keepArchivedUnmuted,
+          keepArchivedFolders: opts.keepArchivedFolders ?? current.keepArchivedFolders,
+          hideReadMarks: opts.hideReadMarks ?? current.hideReadMarks,
+          newNoncontactPeersRequirePremium:
+            opts.newNoncontactPeersRequirePremium ?? current.newNoncontactPeersRequirePremium,
+        }),
+      }),
+    );
+  }
+
   // ─── Account & privacy ─────────────────────────────────────────────────────
 
   async getActiveSessions(): Promise<

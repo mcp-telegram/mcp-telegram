@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.0] - 2026-04-23
+
+### Added
+- **Phase 5 Block A — Rich media sending (7 new tools)** — functional parity with Telegram UI for content types that could not be sent before.
+  - `telegram-send-voice` — send a voice note (OGG/Opus preferred) with optional caption, parseMode, reply/topic. Shows as a waveform UI in the chat.
+  - `telegram-send-video-note` — send a round-shaped video message (MP4, square recommended; duration ≤60s enforced client-side, length ≤640px).
+  - `telegram-send-location` — send a geographic location; single tool handles both static pins and live-updating locations (`livePeriod` 60–86400 seconds; optional `heading` 1–360°, `proximityRadius` meters).
+  - `telegram-send-venue` — send a venue card (title, address, lat/long + optional provider-specific metadata).
+  - `telegram-send-contact` — send a contact card (phone number in E.164-like format `^\+?\d{6,15}$`, first name, optional last name and vCard).
+  - `telegram-send-dice` — send an animated dice/game emoji (🎲 🎯 🎰 🏀 ⚽ 🎳) and receive the server-rolled value in the response.
+  - `telegram-send-album` — send 2–10 grouped photos/videos as a single album message with per-item or album-level caption.
+- **Block B — enhancements to existing `telegram-send-message`:**
+  - `quoteText` — attach a verbatim quote from the replied-to message (requires `replyTo`). Uses raw `messages.SendMessage` + `InputReplyToMessage.quoteText` under the hood.
+  - `effect` — Premium message effect ID (numeric string) attached to the outgoing message.
+- **Defence-in-depth for file-path inputs (`isSafeAbsolutePath`)** — all new `filePath` parameters reject:
+  - URL schemes (`http:`, `https:`, `file:`, `ftp:`, `data:`, `javascript:`, `ws:`, `wss:`) — no SSRF via GramJS URL-fetching.
+  - UNC / SMB shares (`\\server\share`, `//server/share`) — no NTLM-relay from Windows hosts.
+  - Path traversal (`..` segments inside an absolute path) — no escape out of the intended directory.
+  - POSIX pseudo-filesystems (`/proc`, `/sys`, `/dev`, `/run`) — prevents AI prompt-injection from reading `/proc/self/environ` and leaking env vars / session paths to Telegram.
+  - Embedded NUL byte and bare `/` — rejected explicitly.
+- **UTF-16 surrogate sanitation on input** — all free-text parameters (message `text`, captions, venue title/address/provider/venueId/venueType, contact name/vCard, quoteText) now strip unpaired surrogates before reaching GramJS's TL encoder. Complements the existing v1.11.1 output-side fix.
+- **Shared helpers in `telegram-helpers.ts`:**
+  - `buildReplyTo(replyTo?, topicId?)` — construct `InputReplyToMessage` (supports topic root where `replyToMsgId === topicId`).
+  - `generateRandomBigInt()` — cryptographically-random 64-bit `long` for TL `randomId`.
+  - `extractMessageId(result)` — unified parser across `Api.Updates`, `UpdatesCombined`, `Api.Message`, `UpdateShortSentMessage`, `UpdateNewMessage`, `UpdateNewChannelMessage`.
+  - `extractDiceResult(result)` — dice-specific extractor returning `{id, value?}` from `MessageMediaDice`.
+
+### Changed
+- `telegram-send-contact`: `phone` field now validated against `^\+?\d{6,15}$` (E.164-like) to reject malformed/hallucinated numbers.
+- `telegram-send-venue`: `provider` relaxed from a 2-value enum to a free string (≤32 chars) to match TL `venueProvider: string`.
+- `TelegramService.sendMessage()`: gained an optional 6th `extra: { quoteText?, effect? }` parameter. When set, falls back to raw `messages.SendMessage` (high-level `client.sendMessage` does not support these fields). Backward-compatible — existing callers see no change.
+
+### Security
+- `quoteText` without `replyTo` now raises a clear error instead of silently dropping the quote.
+- GramJS private `_parseMessageText` usage in the quoteText/effect raw path is feature-detected; future GramJS bumps surface a clear "version incompatible" error instead of crashing.
+- `effect` ID regex tightened to `^\d{1,19}$` (Int64-safe range).
+
+### Testing
+- 371 unit tests (was 322 in v1.28.1, +49). All tests mock-only (no live Telegram connection).
+- New coverage: all 8 new/changed service methods, helper edge cases (channel path, combined updates, direct Api.Message, UpdateShortSentMessage), SSRF guard (POSIX/Windows accept + URL/UNC/traversal/pseudo-fs reject), raw-path `sendMessage` with `quoteText` / `effect`.
+
+### Notes & known limitations
+- **`telegram-send-video-note` caption omitted** — Telegram UI does not render captions under round video notes; including it here would silently drop.
+- **`telegram-send-contact.userId` field dropped** — GramJS 2.26.22 `InputMediaContact` TL schema (Layer 198) has no `userId` slot. The card is standalone; recipients see the number and name, not a link to a Telegram user. Will return once GramJS advances.
+- **TTL / self-destruct media** — deferred. Requires raw `InputMediaUploadedPhoto({ttlSeconds})` path which bypasses the high-level `sendFile`; will ship in a follow-up.
+- **`telegram-send-voice.duration` removed vs. initial design** — GramJS auto-detects duration from the audio file; letting the AI override it caused the Telegram UI to display wrong playback times.
+- **Album mixed photo+video** — GramJS accepts mixed arrays via extension-based detection, but this is not covered by tests; recommend uniform media type per album until a live-test checkpoint confirms.
+- **Album flood control** — a 10-item album fans out 10 `messages.UploadMedia` calls inside one rate-limit slot; under heavy contention the later items may still hit `FLOOD_WAIT`. Rate limiter retries apply.
+
 ## [1.26.0] - 2026-04-20
 
 ### Added

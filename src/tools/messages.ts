@@ -1,7 +1,16 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { DESTRUCTIVE, fail, formatReactions, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
+import {
+  DESTRUCTIVE,
+  fail,
+  formatReactions,
+  ok,
+  READ_ONLY,
+  requireConnection,
+  sanitizeInputText,
+  WRITE,
+} from "./shared.js";
 
 export function registerMessageTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -10,19 +19,35 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       description: "Send a message to a Telegram chat",
       inputSchema: {
         chatId: z.string().describe("Chat ID or username (e.g. @username or numeric ID)"),
-        text: z.string().describe("Message text"),
+        text: z.string().transform(sanitizeInputText).describe("Message text"),
         replyTo: z.number().optional().describe("Message ID to reply to"),
         parseMode: z.enum(["md", "html"]).optional().describe("Message format: md (Markdown) or html"),
         topicId: z.number().optional().describe("Forum topic ID to send message into (for groups with Topics enabled)"),
+        quoteText: z
+          .string()
+          .transform(sanitizeInputText)
+          .optional()
+          .describe(
+            "Optional excerpt from the replied-to message to show as a quote above your reply. " +
+              "Requires `replyTo` to be set. Must be a verbatim substring of the original message text.",
+          ),
+        effect: z
+          .string()
+          .regex(/^\d{1,19}$/)
+          .optional()
+          .describe(
+            "Optional message effect ID (numeric string, up to 19 digits). Premium animated effect attached to the message.",
+          ),
       },
       annotations: WRITE,
     },
-    async ({ chatId, text, replyTo, parseMode, topicId }) => {
+    async ({ chatId, text, replyTo, parseMode, topicId, quoteText, effect }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
-        const result = await telegram.sendMessage(chatId, text, replyTo, parseMode, topicId);
+        const extra = quoteText || effect ? { quoteText, effect } : undefined;
+        const result = await telegram.sendMessage(chatId, text, replyTo, parseMode, topicId, extra);
         const dest = topicId ? `topic ${topicId} in ${chatId}` : chatId;
         const messageId = result?.id;
         const idInfo = messageId ? ` [#${messageId}]` : "";

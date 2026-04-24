@@ -317,7 +317,7 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | Category | Tools |
 |----------|-------|
 | **Auth** | `telegram-status`, `telegram-login`, `telegram-logout` |
-| **Messaging** | `telegram-send-message`, `telegram-edit-message`, `telegram-delete-message`, `telegram-forward-message`, `telegram-send-scheduled`, `telegram-send-typing`, `telegram-translate-message`, `telegram-get-message-link` |
+| **Messaging** | `telegram-send-message` (incl. `quoteText` for verbatim reply quotes and Premium message `effect`), `telegram-edit-message`, `telegram-delete-message`, `telegram-forward-message`, `telegram-send-scheduled`, `telegram-send-typing`, `telegram-translate-message`, `telegram-get-message-link` |
 | **Scheduled** | `telegram-get-scheduled`, `telegram-delete-scheduled` |
 | **Reading** | `telegram-list-chats`, `telegram-read-messages`, `telegram-search-messages`, `telegram-search-global`, `telegram-search-chats`, `telegram-get-unread`, `telegram-mark-as-read`, `telegram-get-replies`, `telegram-get-unread-mentions`, `telegram-get-unread-reactions`, `telegram-get-saved-dialogs` |
 | **Drafts** | `telegram-save-draft`, `telegram-get-drafts`, `telegram-clear-drafts` |
@@ -326,6 +326,7 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Reactions** | `telegram-send-reaction`, `telegram-get-reactions`, `telegram-set-default-reaction`, `telegram-get-top-reactions`, `telegram-get-recent-reactions` |
 | **Stickers** | `telegram-send-sticker`, `telegram-get-installed-stickers`, `telegram-get-recent-stickers`, `telegram-get-sticker-set`, `telegram-search-sticker-sets` |
 | **Media** | `telegram-send-file`, `telegram-download-media`, `telegram-get-profile-photo`, `telegram-get-web-preview` |
+| **Rich Media Sending** | `telegram-send-voice`, `telegram-send-video-note` (round video), `telegram-send-location` (static or live), `telegram-send-venue`, `telegram-send-contact`, `telegram-send-dice` (🎲🎯🎰🏀⚽🎳), `telegram-send-album` (2–10 grouped photos/videos) |
 | **Groups** | `telegram-create-group`, `telegram-edit-group`, `telegram-invite-to-group`, `telegram-join-chat`, `telegram-leave-group`, `telegram-kick-user`, `telegram-ban-user`, `telegram-unban-user`, `telegram-set-admin`, `telegram-remove-admin`, `telegram-get-my-role`, `telegram-set-chat-permissions`, `telegram-set-slow-mode`, `telegram-get-admin-log` |
 | **Chat Info** | `telegram-get-chat-info`, `telegram-get-chat-members`, `telegram-get-chat-folders` |
 | **Invite Links** | `telegram-create-invite-link`, `telegram-get-invite-links`, `telegram-revoke-invite-link` |

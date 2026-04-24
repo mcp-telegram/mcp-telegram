@@ -33,9 +33,13 @@ import type {
   UpdatesDifferenceSummary,
 } from "./telegram-helpers.js";
 import {
+  buildReplyTo,
   describeAdminLogAction,
   describeAdminLogDetails,
   describeKeyboardButton,
+  extractDiceResult,
+  extractMessageId,
+  generateRandomBigInt,
   mergeBannedRights,
   reactionToEmoji,
   summarizeAllStories,
@@ -538,19 +542,63 @@ export class TelegramService {
     replyTo?: number,
     parseMode?: "md" | "html",
     topicId?: number,
+    extra?: { quoteText?: string; effect?: string },
   ): Promise<Api.Message | Api.UpdateShortSentMessage | undefined> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
+      // Raw path: high-level client.sendMessage does not support quoteText/effect.
+      // Fall back to messages.SendMessage when either is requested.
+      if (extra?.quoteText || extra?.effect) {
+        if (extra.quoteText && !replyTo) {
+          throw new Error("quoteText requires replyTo — provide the message ID of the message you are quoting");
+        }
+        const replyToObj = extra.quoteText
+          ? new Api.InputReplyToMessage({
+              replyToMsgId: replyTo as number,
+              topMsgId: topicId,
+              quoteText: extra.quoteText,
+            })
+          : buildReplyTo(replyTo, topicId);
+        // GramJS parses md/html via the internal `_parseMessageText` helper. We feature-detect
+        // it so a future GramJS rename surfaces a clear error instead of silently sending plain.
+        let parsedText = text;
+        let entities: Api.TypeMessageEntity[] | undefined;
+        if (parseMode) {
+          // biome-ignore lint/suspicious/noExplicitAny: GramJS internal helper, no public typing
+          const parser = (client as unknown as any)._parseMessageText;
+          if (typeof parser !== "function") {
+            throw new Error(
+              "GramJS version incompatible: parseMode not supported in quoteText/effect code path. Omit parseMode or upgrade GramJS.",
+            );
+          }
+          [parsedText, entities] = await parser.call(client, text, parseMode === "html" ? "html" : "md");
+        }
+        const result = await client.invoke(
+          new Api.messages.SendMessage({
+            peer: resolved,
+            message: parsedText,
+            randomId: generateRandomBigInt(),
+            ...(replyToObj ? { replyTo: replyToObj } : {}),
+            ...(entities?.length ? { entities } : {}),
+            ...(extra.effect ? { effect: bigInt(extra.effect) } : {}),
+          }),
+        );
+        const id = extractMessageId(result);
+        if (id === undefined) throw new Error("Telegram did not return a message ID for sendMessage");
+        // Return a minimal UpdateShortSentMessage — it only carries `id`, avoiding fake peerId/date.
+        return new Api.UpdateShortSentMessage({ id, pts: 0, ptsCount: 0, date: Math.floor(Date.now() / 1000) });
+      }
       if (topicId) {
-        return await this.client?.sendMessage(resolved, {
+        return await client.sendMessage(resolved, {
           message: text,
           topMsgId: topicId,
           ...(replyTo ? { replyTo } : {}),
           ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
         });
       }
-      return await this.client?.sendMessage(resolved, {
+      return await client.sendMessage(resolved, {
         message: text,
         ...(replyTo ? { replyTo } : {}),
         ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
@@ -564,6 +612,258 @@ export class TelegramService {
       const resolved = await this.resolvePeer(chatId);
       await this.client?.sendFile(resolved, { file: filePath, caption });
     }, `sendFile to ${chatId}`);
+  }
+
+  async sendVoice(
+    chatId: string,
+    filePath: string,
+    opts: {
+      caption?: string;
+      replyTo?: number;
+      topicId?: number;
+      parseMode?: "md" | "html";
+    } = {},
+  ): Promise<{ id: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      // Duration is intentionally auto-detected by GramJS from the audio file —
+      // letting the AI override it would mis-report playback length in the Telegram UI.
+      const message = await client.sendFile(resolved, {
+        file: filePath,
+        voiceNote: true,
+        caption: opts.caption,
+        parseMode: opts.parseMode,
+        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+      });
+      return { id: message.id };
+    }, `sendVoice to ${chatId}`);
+  }
+
+  async sendVideoNote(
+    chatId: string,
+    filePath: string,
+    opts: {
+      duration?: number;
+      length?: number;
+      replyTo?: number;
+      topicId?: number;
+    } = {},
+  ): Promise<{ id: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const attributes =
+        opts.duration || opts.length
+          ? [
+              new Api.DocumentAttributeVideo({
+                roundMessage: true,
+                duration: opts.duration ?? 0,
+                w: opts.length ?? 0,
+                h: opts.length ?? 0,
+              }),
+            ]
+          : undefined;
+      const message = await client.sendFile(resolved, {
+        file: filePath,
+        videoNote: true,
+        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+        ...(attributes ? { attributes } : {}),
+      });
+      return { id: message.id };
+    }, `sendVideoNote to ${chatId}`);
+  }
+
+  async sendContact(
+    chatId: string,
+    phone: string,
+    firstName: string,
+    opts: {
+      lastName?: string;
+      vcard?: string;
+      replyTo?: number;
+      topicId?: number;
+    } = {},
+  ): Promise<{ id: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const media = new Api.InputMediaContact({
+        phoneNumber: phone,
+        firstName,
+        lastName: opts.lastName ?? "",
+        vcard: opts.vcard ?? "",
+      });
+      const result = await client.invoke(
+        new Api.messages.SendMedia({
+          peer: resolved,
+          media,
+          message: "",
+          randomId: generateRandomBigInt(),
+          replyTo: buildReplyTo(opts.replyTo, opts.topicId),
+        }),
+      );
+      const id = extractMessageId(result);
+      if (id === undefined) throw new Error("Telegram did not return a message ID for sendContact");
+      return { id };
+    }, `sendContact to ${chatId}`);
+  }
+
+  async sendDice(
+    chatId: string,
+    emoji: string,
+    opts: { replyTo?: number; topicId?: number } = {},
+  ): Promise<{ id: number; value?: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const result = await client.invoke(
+        new Api.messages.SendMedia({
+          peer: resolved,
+          media: new Api.InputMediaDice({ emoticon: emoji }),
+          message: "",
+          randomId: generateRandomBigInt(),
+          replyTo: buildReplyTo(opts.replyTo, opts.topicId),
+        }),
+      );
+      const dice = extractDiceResult(result);
+      if (!dice) {
+        const id = extractMessageId(result);
+        if (id === undefined) throw new Error("Telegram did not return a message ID for sendDice");
+        return { id };
+      }
+      return dice;
+    }, `sendDice to ${chatId}`);
+  }
+
+  async sendLocation(
+    chatId: string,
+    latitude: number,
+    longitude: number,
+    opts: {
+      accuracyRadius?: number;
+      livePeriod?: number;
+      heading?: number;
+      proximityRadius?: number;
+      replyTo?: number;
+      topicId?: number;
+    } = {},
+  ): Promise<{ id: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const geoPoint = new Api.InputGeoPoint({
+        lat: latitude,
+        long: longitude,
+        ...(opts.accuracyRadius !== undefined ? { accuracyRadius: opts.accuracyRadius } : {}),
+      });
+      const media = opts.livePeriod
+        ? new Api.InputMediaGeoLive({
+            geoPoint,
+            period: opts.livePeriod,
+            ...(opts.heading !== undefined ? { heading: opts.heading } : {}),
+            ...(opts.proximityRadius !== undefined ? { proximityNotificationRadius: opts.proximityRadius } : {}),
+          })
+        : new Api.InputMediaGeoPoint({ geoPoint });
+      const result = await client.invoke(
+        new Api.messages.SendMedia({
+          peer: resolved,
+          media,
+          message: "",
+          randomId: generateRandomBigInt(),
+          replyTo: buildReplyTo(opts.replyTo, opts.topicId),
+        }),
+      );
+      const id = extractMessageId(result);
+      if (id === undefined) throw new Error("Telegram did not return a message ID for sendLocation");
+      return { id };
+    }, `sendLocation to ${chatId}`);
+  }
+
+  async sendVenue(
+    chatId: string,
+    latitude: number,
+    longitude: number,
+    title: string,
+    address: string,
+    opts: {
+      provider?: string;
+      venueId?: string;
+      venueType?: string;
+      replyTo?: number;
+      topicId?: number;
+    } = {},
+  ): Promise<{ id: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const media = new Api.InputMediaVenue({
+        geoPoint: new Api.InputGeoPoint({ lat: latitude, long: longitude }),
+        title,
+        address,
+        provider: opts.provider ?? "foursquare",
+        venueId: opts.venueId ?? "",
+        venueType: opts.venueType ?? "",
+      });
+      const result = await client.invoke(
+        new Api.messages.SendMedia({
+          peer: resolved,
+          media,
+          message: "",
+          randomId: generateRandomBigInt(),
+          replyTo: buildReplyTo(opts.replyTo, opts.topicId),
+        }),
+      );
+      const id = extractMessageId(result);
+      if (id === undefined) throw new Error("Telegram did not return a message ID for sendVenue");
+      return { id };
+    }, `sendVenue to ${chatId}`);
+  }
+
+  async sendAlbum(
+    chatId: string,
+    items: Array<{ filePath: string; caption?: string }>,
+    opts: {
+      caption?: string;
+      parseMode?: "md" | "html";
+      replyTo?: number;
+      topicId?: number;
+    } = {},
+  ): Promise<{ ids: number[] }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    if (items.length < 2 || items.length > 10) {
+      throw new Error("Album requires 2-10 items");
+    }
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      // Album-level caption lands on the first item; per-item captions stay as provided.
+      const captions = items.map((it, i) => (i === 0 ? (opts.caption ?? it.caption ?? "") : (it.caption ?? "")));
+      // GramJS sendFile auto-detects `file: string[]` and takes the _sendAlbum path,
+      // which invokes messages.UploadMedia per item + messages.SendMultiMedia.
+      const result = (await client.sendFile(resolved, {
+        file: items.map((it) => it.filePath),
+        caption: captions,
+        parseMode: opts.parseMode,
+        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+      })) as unknown as Api.Message | Api.Message[] | undefined;
+      const ids = Array.isArray(result)
+        ? result.filter((m): m is Api.Message => m instanceof Api.Message).map((m) => m.id)
+        : result instanceof Api.Message
+          ? [result.id]
+          : [];
+      if (ids.length === 0) throw new Error("Telegram did not return any message IDs for sendAlbum");
+      return { ids };
+    }, `sendAlbum to ${chatId}`);
   }
 
   async downloadMedia(chatId: string, messageId: number, downloadPath: string): Promise<string> {

@@ -14,7 +14,7 @@ MCP Telegram предоставляет расширенный набор инс
 
 | Инструмент | Описание |
 |------------|----------|
-| `telegram-send-message` | Отправка сообщения в любой чат |
+| `telegram-send-message` | Отправка сообщения в любой чат (включая `quoteText` для цитаты фрагмента и Premium `effect` — анимированный эффект) |
 | `telegram-edit-message` | Редактирование отправленного сообщения |
 | `telegram-delete-message` | Удаление сообщений |
 | `telegram-forward-message` | Пересылка сообщений между чатами |
@@ -98,6 +98,20 @@ MCP Telegram предоставляет расширенный набор инс
 | `telegram-download-media` | Скачивание медиа из сообщения |
 | `telegram-get-profile-photo` | Получение фото профиля |
 | `telegram-get-web-preview` | Превью ссылки (заголовок/описание/сайт) перед отправкой |
+
+## Rich Media (v1.29.0)
+
+| Инструмент | Описание |
+|------------|----------|
+| `telegram-send-voice` | Голосовое сообщение (OGG/Opus) — показывается с waveform UI |
+| `telegram-send-video-note` | Видео-кружочек (MP4, квадратный, ≤60 сек) |
+| `telegram-send-location` | Геопозиция — статичная либо live (параметр `livePeriod`, 60–86400 сек) |
+| `telegram-send-venue` | Карточка места (title, address, координаты) |
+| `telegram-send-contact` | Карточка контакта (phone, firstName, lastName, vCard) |
+| `telegram-send-dice` | Анимированный dice/game (🎲🎯🎰🏀⚽🎳); возвращает значение броска |
+| `telegram-send-album` | Альбом из 2–10 фото/видео в одном сообщении |
+
+Все `filePath` принимают только абсолютные локальные пути. URL, UNC-шары, `..` и системные псевдо-директории (`/proc`, `/sys`, `/dev`, `/run`) отклоняются.
 
 ## Группы
 

@@ -99,6 +99,20 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 | `telegram-get-profile-photo` | Get a user's or chat's profile photo |
 | `telegram-get-web-preview` | Preview a URL's title/description/site before sending |
 
+## Rich Media Sending (v1.29.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-send-voice` | Send a voice note (OGG/Opus recommended). Shows as a waveform UI. |
+| `telegram-send-video-note` | Send a round video message (MP4, square recommended, ≤60s) |
+| `telegram-send-location` | Send a geographic location; optional `livePeriod` (60–86400s) makes it live-updating |
+| `telegram-send-venue` | Send a venue card (title, address, lat/long) |
+| `telegram-send-contact` | Send a contact card (phone, first/last name, optional vCard) |
+| `telegram-send-dice` | Send an animated dice/game emoji (🎲🎯🎰🏀⚽🎳) and return the rolled value |
+| `telegram-send-album` | Send 2–10 grouped photos/videos as a single album message |
+
+All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shares, path-traversal (`..`), and POSIX pseudo-filesystems (`/proc`, `/sys`, `/dev`, `/run`) are rejected.
+
 ## Groups
 
 | Tool | Description |

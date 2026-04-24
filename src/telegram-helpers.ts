@@ -1,5 +1,71 @@
-import type bigInt from "big-integer";
+import { randomBytes } from "node:crypto";
+import bigInt from "big-integer";
 import { Api } from "telegram/tl/index.js";
+
+/**
+ * Build an InputReplyToMessage from optional replyTo / topicId, matching the shape used by
+ * raw messages.SendMedia. Returns undefined when neither is set so the caller can spread-omit it.
+ */
+export function buildReplyTo(replyTo?: number, topicId?: number): Api.InputReplyToMessage | undefined {
+  if (!replyTo && !topicId) return undefined;
+  // Telegram expects replyToMsgId to equal topicId when replying to the topic root
+  // (posting into a topic without quoting a specific message inside it).
+  return new Api.InputReplyToMessage({
+    replyToMsgId: (replyTo ?? topicId) as number,
+    topMsgId: topicId,
+  });
+}
+
+/** Cryptographically random 64-bit bigInt for TL randomId (SendMedia/SendMultiMedia require it). */
+export function generateRandomBigInt(): bigInt.BigInteger {
+  return bigInt(randomBytes(8).toString("hex"), 16);
+}
+
+/**
+ * Extract the server-assigned message ID from an Updates envelope returned by SendMedia/SendMessage.
+ * Prefers UpdateMessageID (authoritative for SendMedia), falls back to UpdateNewMessage /
+ * UpdateNewChannelMessage for safety. Returns undefined when no ID is found.
+ */
+export function extractMessageId(
+  result: Api.TypeUpdates | Api.Message | Api.UpdateShortSentMessage | undefined,
+): number | undefined {
+  if (!result) return undefined;
+  if (result instanceof Api.Message) return result.id;
+  if (result instanceof Api.UpdateShortSentMessage) return result.id;
+  if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+    for (const u of result.updates) {
+      if (u instanceof Api.UpdateMessageID) return u.id;
+    }
+    for (const u of result.updates) {
+      if (u instanceof Api.UpdateNewMessage || u instanceof Api.UpdateNewChannelMessage) {
+        if (u.message instanceof Api.Message) return u.message.id;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Extract the MessageMediaDice value and captured message ID from a SendMedia dice envelope.
+ * Value is only present in UpdateNewMessage/UpdateNewChannelMessage; UpdateMessageID carries the ID only.
+ */
+export function extractDiceResult(result: Api.TypeUpdates | undefined): { id: number; value?: number } | undefined {
+  if (!result) return undefined;
+  if (!(result instanceof Api.Updates) && !(result instanceof Api.UpdatesCombined)) return undefined;
+  let id: number | undefined;
+  let value: number | undefined;
+  for (const u of result.updates) {
+    if (u instanceof Api.UpdateMessageID && id === undefined) id = u.id;
+    if (u instanceof Api.UpdateNewMessage || u instanceof Api.UpdateNewChannelMessage) {
+      if (u.message instanceof Api.Message) {
+        if (id === undefined) id = u.message.id;
+        if (u.message.media instanceof Api.MessageMediaDice) value = u.message.media.value;
+      }
+    }
+  }
+  if (id === undefined) return undefined;
+  return { id, value };
+}
 
 export function describeAdminLogAction(action: Api.TypeChannelAdminLogEventAction): string {
   const prefix = "ChannelAdminLogEventAction";

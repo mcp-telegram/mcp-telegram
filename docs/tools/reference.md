@@ -242,6 +242,36 @@ Cursors are client-owned — the agent stores `{pts, qts, date}` between calls a
 | `telegram-get-stories-by-id` | Fetch specific story items by id |
 | `telegram-get-story-views` | List views on your own stories (Premium for full stats) |
 
+## Stories (write, v1.30.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-send-story` | Publish a photo or video story with privacy controls (everyone/contacts/close_friends/selected), period, pinning, no-forward flag |
+| `telegram-edit-story` | Edit an existing story: replace media, update caption, or change privacy rules |
+| `telegram-delete-stories` | Delete one or more stories (irreversible; requires `confirm: true`) |
+| `telegram-react-to-story` | React to a story with an emoji; pass `""` to remove the reaction |
+| `telegram-export-story-link` | Get a shareable `t.me/…` URL for a public story |
+| `telegram-read-stories` | Mark stories as seen up to a given story ID |
+| `telegram-toggle-story-pinned` | Pin or unpin stories in profile highlights |
+| `telegram-toggle-story-pinned-to-top` | Pin stories to the top of the pinned row; pass `[]` to clear |
+| `telegram-activate-stealth-mode` | Hide your story views retroactively and/or for 25 min (Telegram Premium required) |
+| `telegram-get-stories-archive` | Fetch auto-archived (expired) stories, paginated |
+| `telegram-report-story` | Report a story via the multi-step option flow |
+
+## Discussion (v1.30.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-discussion-message` | For a channel post with comments, get discussion-group info (discussionGroupId, discussionMsgId, unreadCount) |
+| `telegram-get-groups-for-discussion` | List groups eligible to link as discussion group to a channel you admin |
+
+## Read Receipts (v1.30.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-message-read-participants` | List who has read a message in a small group (≤100 members, ≤7 days old) |
+| `telegram-get-outbox-read-date` | Get when your recipient read your outgoing private message |
+
 ## Boosts & Business
 
 | Tool | Description |

@@ -28,7 +28,9 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **Global search** -- search messages across all chats at once
 - **Real-time polling** -- fetch updates via stateless cursors; agent owns `{pts, qts, date}` state
 - **Inline bots & buttons** -- query inline bots, send results, press callback buttons
-- **Stories** -- read stories from peers, get story view stats
+- **Stories** -- read stories from peers, get story view stats; publish/edit/delete stories, react, pin, stealth mode, archive, report (v1.30.0)
+- **Discussion** -- get discussion-group info for channel posts with comments, list groups eligible for discussion (v1.30.0)
+- **Read Receipts** -- who read a message in a small group, when your private message was read (v1.30.0)
 - **Admin controls** -- toggle channel signatures, anti-spam, forum mode, prehistory; approve join requests
 - **Stats** -- channel and supergroup analytics (GetBroadcastStats / GetMegagroupStats)
 - **Boosts & Business** -- boost status, boosters list, Telegram Business chat links
@@ -340,7 +342,10 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Stats** | `telegram-get-broadcast-stats`, `telegram-get-megagroup-stats` |
 | **Inline Bots & Buttons** | `telegram-inline-query`, `telegram-inline-query-send`, `telegram-press-button`, `telegram-get-message-buttons` |
 | **Real-Time Polling** | `telegram-get-state`, `telegram-get-updates`, `telegram-get-channel-updates` |
-| **Stories** | `telegram-get-all-stories`, `telegram-get-peer-stories`, `telegram-get-stories-by-id`, `telegram-get-story-views` |
+| **Stories (read)** | `telegram-get-all-stories`, `telegram-get-peer-stories`, `telegram-get-stories-by-id`, `telegram-get-story-views` |
+| **Stories (write, v1.30.0)** | `telegram-send-story`, `telegram-edit-story`, `telegram-delete-stories`, `telegram-react-to-story`, `telegram-export-story-link`, `telegram-read-stories`, `telegram-toggle-story-pinned`, `telegram-toggle-story-pinned-to-top`, `telegram-activate-stealth-mode` (Premium), `telegram-get-stories-archive`, `telegram-report-story` |
+| **Discussion (v1.30.0)** | `telegram-get-discussion-message`, `telegram-get-groups-for-discussion` |
+| **Read Receipts (v1.30.0)** | `telegram-get-message-read-participants`, `telegram-get-outbox-read-date` |
 | **Boosts & Business** | `telegram-get-my-boosts`, `telegram-get-boosts-status`, `telegram-get-boosts-list`, `telegram-get-business-chat-links` |
 | **Opt-in (env-gated)** | `telegram-get-group-call`, `telegram-get-group-call-participants` (requires `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1`), `telegram-get-stars-status`, `telegram-get-stars-transactions` (requires `MCP_TELEGRAM_ENABLE_STARS=1`), `telegram-get-quick-replies`, `telegram-get-quick-reply-messages` (requires `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1`) |
 

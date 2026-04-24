@@ -1335,6 +1335,171 @@ export function summarizeStoryViewsList(result: Api.stories.TypeStoryViewsList):
   };
 }
 
+// ─── Story Privacy ─────────────────────────────────────────────────────────
+
+export type StoryPrivacy = "everyone" | "contacts" | "close_friends" | "selected";
+
+export function detectMediaType(filePath: string): "photo" | "video" {
+  const ext = filePath.toLowerCase().split(".").pop() ?? "";
+  if (["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(ext)) return "photo";
+  return "video";
+}
+
+export function buildStoryPrivacyRules(
+  privacy: StoryPrivacy,
+  allowUserIds?: string[],
+  disallowUserIds?: string[],
+): Api.TypeInputPrivacyRule[] {
+  const rules: Api.TypeInputPrivacyRule[] = [];
+  switch (privacy) {
+    case "everyone":
+      rules.push(new Api.InputPrivacyValueAllowAll());
+      break;
+    case "contacts":
+      rules.push(new Api.InputPrivacyValueAllowContacts());
+      break;
+    case "close_friends":
+      rules.push(new Api.InputPrivacyValueAllowCloseFriends());
+      break;
+    case "selected":
+      rules.push(
+        new Api.InputPrivacyValueAllowUsers({
+          users: (allowUserIds ?? []).map((id) => new Api.InputUser({ userId: bigInt(id), accessHash: bigInt(0) })),
+        }),
+      );
+      break;
+  }
+  if (disallowUserIds?.length && privacy !== "selected") {
+    rules.push(
+      new Api.InputPrivacyValueDisallowUsers({
+        users: disallowUserIds.map((id) => new Api.InputUser({ userId: bigInt(id), accessHash: bigInt(0) })),
+      }),
+    );
+  }
+  return rules;
+}
+
+export function extractStoryIdFromUpdates(result: Api.TypeUpdates | undefined): number {
+  if (!result) return 0;
+  if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+    for (const u of result.updates) {
+      if (u instanceof Api.UpdateStoryID) return u.id;
+    }
+    for (const u of result.updates) {
+      if (u instanceof Api.UpdateStory && u.story instanceof Api.StoryItem) return u.story.id;
+    }
+  }
+  return 0;
+}
+
+// ─── Discussion ────────────────────────────────────────────────────────────
+
+export type DiscussionMessageSummary = {
+  discussionGroupId: string;
+  discussionMsgId: number;
+  unreadCount: number;
+  readInboxMaxId?: number;
+  readOutboxMaxId?: number;
+  topMessage?: { id: number; text?: string; date: number };
+};
+
+export function summarizeDiscussionMessage(result: Api.messages.DiscussionMessage): DiscussionMessageSummary {
+  const topMsg = result.messages?.[0];
+  let discussionGroupId = "";
+  for (const chat of result.chats ?? []) {
+    const isBroadcast = "broadcast" in chat && (chat as Api.Channel).broadcast;
+    if (!isBroadcast) {
+      discussionGroupId = `-100${chat.id.toString()}`;
+      break;
+    }
+  }
+  const discussionMsgId = topMsg instanceof Api.Message || topMsg instanceof Api.MessageService ? topMsg.id : 0;
+  const topMessage =
+    topMsg instanceof Api.Message
+      ? {
+          id: topMsg.id,
+          text: topMsg.message?.slice(0, 200),
+          date: topMsg.date,
+        }
+      : undefined;
+  return {
+    discussionGroupId,
+    discussionMsgId,
+    unreadCount: result.unreadCount ?? 0,
+    readInboxMaxId: result.readInboxMaxId,
+    readOutboxMaxId: result.readOutboxMaxId,
+    topMessage,
+  };
+}
+
+// ─── Groups For Discussion ─────────────────────────────────────────────────
+
+export type GroupsForDiscussionSummary = {
+  groups: Array<{ id: string; title: string; username?: string; participantsCount?: number }>;
+};
+
+export function summarizeGroupsForDiscussion(result: Api.messages.TypeChats): GroupsForDiscussionSummary {
+  const chats = "chats" in result ? result.chats : [];
+  return {
+    groups: chats.map((c) => {
+      const id = `-100${c.id.toString()}`;
+      const title = "title" in c ? (c as Api.Channel).title : "";
+      const username = "username" in c ? ((c as Api.Channel).username ?? undefined) : undefined;
+      const participantsCount =
+        "participantsCount" in c ? ((c as Api.Channel).participantsCount ?? undefined) : undefined;
+      return { id, title, username, participantsCount };
+    }),
+  };
+}
+
+// ─── Read Participants ─────────────────────────────────────────────────────
+
+export type ReadParticipantsSummary = {
+  messageId: number;
+  readers: Array<{ userId: string; readAt: string }>;
+  count: number;
+};
+
+export function summarizeReadParticipants(
+  list: Api.TypeReadParticipantDate[],
+  messageId: number,
+): ReadParticipantsSummary {
+  return {
+    messageId,
+    readers: list.map((r) => ({
+      userId: (r as Api.ReadParticipantDate).userId.toString(),
+      readAt: new Date((r as Api.ReadParticipantDate).date * 1000).toISOString(),
+    })),
+    count: list.length,
+  };
+}
+
+// ─── Report Result ─────────────────────────────────────────────────────────
+
+export type ReportResultSummary =
+  | { kind: "reported" }
+  | { kind: "chooseOption"; title?: string; options: Array<{ text: string; option: string }> }
+  | { kind: "addComment"; optional?: boolean };
+
+export function summarizeReportResult(result: Api.TypeReportResult): ReportResultSummary {
+  if (result instanceof Api.ReportResultReported) return { kind: "reported" };
+  if (result instanceof Api.ReportResultAddComment) return { kind: "addComment", optional: result.optional };
+  if (result instanceof Api.ReportResultChooseOption) {
+    return {
+      kind: "chooseOption",
+      title: result.title,
+      options: (result.options ?? []).map((o) => {
+        const opt = o as Api.MessageReportOption;
+        return {
+          text: opt.text,
+          option: Buffer.from(opt.option as Uint8Array).toString("base64"),
+        };
+      }),
+    };
+  }
+  throw new Error(`unknown ReportResult type: ${(result as { className?: string }).className ?? "unknown"}`);
+}
+
 export function summarizeAllStories(result: Api.stories.TypeAllStories): AllStoriesSummary {
   const stealthMode = result.stealthMode
     ? {

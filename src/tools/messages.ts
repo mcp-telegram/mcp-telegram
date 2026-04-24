@@ -739,4 +739,93 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       }
     },
   );
+
+  server.registerTool(
+    "telegram-get-discussion-message",
+    {
+      description:
+        "For a channel post with comments enabled, returns the linked discussion-group info: discussionGroupId, discussionMsgId, unreadCount, readInboxMaxId, readOutboxMaxId, topMessage. Use discussionGroupId + discussionMsgId with telegram-send-message (replyTo=discussionMsgId) to post a comment.",
+      inputSchema: {
+        chatId: z.string().describe("Channel ID or @username that contains the post"),
+        messageId: z.number().int().positive().describe("ID of the channel post to get discussion info for"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, messageId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.getDiscussionMessage(chatId, messageId);
+        return ok(JSON.stringify(result));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-groups-for-discussion",
+    {
+      description:
+        "List groups that can be linked as a discussion group to a channel you admin. Helper for channel admins setting up comment threads.",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.getGroupsForDiscussion();
+        return ok(JSON.stringify(result));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-message-read-participants",
+    {
+      description:
+        "List who has read a message in a small group (≤100 members, ≤7 days old). Returns readers with userId, readAt timestamp. Does NOT work for channels or groups over 100 members (CHAT_TOO_BIG).",
+      inputSchema: {
+        chatId: z.string().describe("Group chat ID or @username"),
+        messageId: z.number().int().positive().describe("ID of the message to check read status for"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, messageId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.getMessageReadParticipants(chatId, messageId);
+        return ok(JSON.stringify(result));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-outbox-read-date",
+    {
+      description:
+        "Get when your recipient read your outgoing message in a private chat. Returns null/Not read yet if unread. Errors if the other side disabled read receipts (YOUR_PRIVACY_RESTRICTED / USER_PRIVACY_RESTRICTED).",
+      inputSchema: {
+        chatId: z.string().describe("Private chat ID or @username of the recipient"),
+        messageId: z.number().int().positive().describe("ID of your outgoing message"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, messageId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.getOutboxReadDate(chatId, messageId);
+        return ok(result.readAt ? `Read at ${result.readAt}` : "Not read yet");
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
 }

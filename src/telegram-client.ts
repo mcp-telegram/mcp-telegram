@@ -19,26 +19,34 @@ import type {
   BusinessChatLinksSummary,
   ChannelDifferenceSummary,
   ChatPermissions,
+  DiscussionMessageSummary,
   GroupCallParticipantsSummary,
   GroupCallSummary,
+  GroupsForDiscussionSummary,
   MegagroupStatsSummary,
   MessageButtonDescriptor,
   MyBoostsSummary,
   PeerStoriesSummary,
   QuickRepliesSummary,
   QuickReplyMessagesSummary,
+  ReadParticipantsSummary,
+  ReportResultSummary,
   StarsStatusSummary,
   StoriesByIdSummary,
+  StoryPrivacy,
   StoryViewsListSummary,
   UpdatesDifferenceSummary,
 } from "./telegram-helpers.js";
 import {
   buildReplyTo,
+  buildStoryPrivacyRules,
   describeAdminLogAction,
   describeAdminLogDetails,
   describeKeyboardButton,
+  detectMediaType,
   extractDiceResult,
   extractMessageId,
+  extractStoryIdFromUpdates,
   generateRandomBigInt,
   mergeBannedRights,
   reactionToEmoji,
@@ -48,13 +56,17 @@ import {
   summarizeBroadcastStats,
   summarizeBusinessChatLinks,
   summarizeChannelDifference,
+  summarizeDiscussionMessage,
   summarizeGroupCall,
   summarizeGroupCallParticipants,
+  summarizeGroupsForDiscussion,
   summarizeMegagroupStats,
   summarizeMyBoosts,
   summarizePeerStories,
   summarizeQuickReplies,
   summarizeQuickReplyMessages,
+  summarizeReadParticipants,
+  summarizeReportResult,
   summarizeStarsStatus,
   summarizeStoriesById,
   summarizeStoryViewsList,
@@ -73,10 +85,12 @@ export type {
   ChatPermissions,
   CompactPeer,
   CompactStatsGraph,
+  DiscussionMessageSummary,
   GroupCallInfoSummary,
   GroupCallParticipantSummary,
   GroupCallParticipantsSummary,
   GroupCallSummary,
+  GroupsForDiscussionSummary,
   MegagroupStatsSummary,
   MessageButtonDescriptor,
   MyBoostSummary,
@@ -87,6 +101,8 @@ export type {
   QuickReplyMessageSummary,
   QuickReplyMessagesSummary,
   QuickReplySummary,
+  ReadParticipantsSummary,
+  ReportResultSummary,
   StarsAmountSummary,
   StarsStatusSummary,
   StarsSubscriptionPricingSummary,
@@ -96,15 +112,19 @@ export type {
   StatsValue,
   StoriesByIdSummary,
   StoryItemSummary,
+  StoryPrivacy,
   StoryViewSummary,
   StoryViewsListSummary,
   UpdatesDifferenceSummary,
   UpdatesMessageSummary,
 } from "./telegram-helpers.js";
 export {
+  buildStoryPrivacyRules,
   describeAdminLogAction,
   describeAdminLogDetails,
   describeKeyboardButton,
+  detectMediaType,
+  extractStoryIdFromUpdates,
   mergeBannedRights,
   peerToCompact,
   reactionToEmoji,
@@ -116,10 +136,12 @@ export {
   summarizeBusinessChatLink,
   summarizeBusinessChatLinks,
   summarizeChannelDifference,
+  summarizeDiscussionMessage,
   summarizeGroupCall,
   summarizeGroupCallInfo,
   summarizeGroupCallParticipant,
   summarizeGroupCallParticipants,
+  summarizeGroupsForDiscussion,
   summarizeMegagroupStats,
   summarizeMyBoost,
   summarizeMyBoosts,
@@ -129,6 +151,8 @@ export {
   summarizeQuickReply,
   summarizeQuickReplyMessage,
   summarizeQuickReplyMessages,
+  summarizeReadParticipants,
+  summarizeReportResult,
   summarizeStarsAmount,
   summarizeStarsStatus,
   summarizeStarsSubscription,
@@ -4246,6 +4270,269 @@ export class TelegramService {
       if (!response) throw new Error("messages.GetQuickReplyMessages returned nothing");
       return summarizeQuickReplyMessages(response);
     }, `getQuickReplyMessages ${shortcutId}`);
+  }
+
+  // ─── Stories Write ─────────────────────────────────────────────────────────
+
+  async sendStory(
+    chatId: string,
+    filePath: string,
+    opts: {
+      type?: "photo" | "video";
+      caption?: string;
+      parseMode?: "md" | "html";
+      privacy: StoryPrivacy;
+      allowUserIds?: string[];
+      disallowUserIds?: string[];
+      period?: number;
+      pinned?: boolean;
+      noforwards?: boolean;
+    },
+  ): Promise<{ id: number | undefined; period: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const inputPeer = await client.getInputEntity(peer);
+      const fileData = await readFile(filePath);
+      const uploaded = await client.uploadFile({
+        file: new CustomFile(filePath, fileData.length, filePath, fileData),
+        workers: 4,
+      });
+      const mediaType = opts.type ?? detectMediaType(filePath);
+      const media: Api.TypeInputMedia =
+        mediaType === "photo"
+          ? new Api.InputMediaUploadedPhoto({ file: uploaded })
+          : new Api.InputMediaUploadedDocument({
+              file: uploaded,
+              mimeType: "video/mp4",
+              attributes: [new Api.DocumentAttributeVideo({ duration: 0, w: 0, h: 0, supportsStreaming: true })],
+            });
+      const privacyRules = buildStoryPrivacyRules(opts.privacy, opts.allowUserIds, opts.disallowUserIds);
+      let caption = opts.caption;
+      let entities: Api.TypeMessageEntity[] | undefined;
+      if (opts.caption && opts.parseMode) {
+        // biome-ignore lint/suspicious/noExplicitAny: GramJS internal helper, no public typing
+        const parser = (client as unknown as any)._parseMessageText;
+        if (typeof parser === "function") {
+          [caption, entities] = await parser.call(client, opts.caption, opts.parseMode === "html" ? "html" : "md");
+        }
+      }
+      const result = await client.invoke(
+        new Api.stories.SendStory({
+          peer: inputPeer,
+          media,
+          privacyRules,
+          caption,
+          ...(entities?.length ? { entities } : {}),
+          randomId: generateRandomBigInt(),
+          period: opts.period ?? 86400,
+          pinned: opts.pinned,
+          noforwards: opts.noforwards,
+        }),
+      );
+      const id = extractStoryIdFromUpdates(result) || undefined;
+      return { id, period: opts.period ?? 86400 };
+    }, `sendStory ${chatId}`);
+  }
+
+  async editStory(
+    chatId: string,
+    storyId: number,
+    opts: {
+      filePath?: string;
+      type?: "photo" | "video";
+      caption?: string;
+      parseMode?: "md" | "html";
+      privacy?: StoryPrivacy;
+      allowUserIds?: string[];
+      disallowUserIds?: string[];
+    },
+  ): Promise<{ changed: string[] }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const inputPeer = await client.getInputEntity(peer);
+      const changed: string[] = [];
+      let media: Api.TypeInputMedia | undefined;
+      if (opts.filePath) {
+        changed.push("media");
+        const fileData = await readFile(opts.filePath);
+        const uploaded = await client.uploadFile({
+          file: new CustomFile(opts.filePath, fileData.length, opts.filePath, fileData),
+          workers: 4,
+        });
+        const mediaType = opts.type ?? detectMediaType(opts.filePath);
+        media =
+          mediaType === "photo"
+            ? new Api.InputMediaUploadedPhoto({ file: uploaded })
+            : new Api.InputMediaUploadedDocument({
+                file: uploaded,
+                mimeType: "video/mp4",
+                attributes: [new Api.DocumentAttributeVideo({ duration: 0, w: 0, h: 0, supportsStreaming: true })],
+              });
+      }
+      let caption = opts.caption;
+      let entities: Api.TypeMessageEntity[] | undefined;
+      if (opts.caption !== undefined) {
+        changed.push("caption");
+        if (opts.caption && opts.parseMode) {
+          // biome-ignore lint/suspicious/noExplicitAny: GramJS internal helper, no public typing
+          const parser = (client as unknown as any)._parseMessageText;
+          if (typeof parser === "function") {
+            [caption, entities] = await parser.call(client, opts.caption, opts.parseMode === "html" ? "html" : "md");
+          }
+        }
+      }
+      let privacyRules: Api.TypeInputPrivacyRule[] | undefined;
+      if (opts.privacy) {
+        changed.push("privacy");
+        privacyRules = buildStoryPrivacyRules(opts.privacy, opts.allowUserIds, opts.disallowUserIds);
+      }
+      await client.invoke(
+        new Api.stories.EditStory({
+          peer: inputPeer,
+          id: storyId,
+          ...(media ? { media } : {}),
+          ...(caption !== undefined ? { caption } : {}),
+          ...(entities?.length ? { entities } : {}),
+          ...(privacyRules ? { privacyRules } : {}),
+        }),
+      );
+      return { changed };
+    }, `editStory ${chatId}/${storyId}`);
+  }
+
+  async deleteStories(chatId: string, ids: number[]): Promise<{ deleted: number[] }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const deleted = await this.client?.invoke(new Api.stories.DeleteStories({ peer, id: ids }));
+      return { deleted: (deleted as number[]) ?? [] };
+    }, `deleteStories ${chatId}`);
+  }
+
+  async sendStoryReaction(chatId: string, storyId: number, emoji: string, addToRecent?: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const reaction: Api.TypeReaction =
+        emoji === "" ? new Api.ReactionEmpty() : new Api.ReactionEmoji({ emoticon: emoji });
+      await this.client?.invoke(new Api.stories.SendReaction({ peer, storyId, reaction, addToRecent }));
+    }, `sendStoryReaction ${chatId}/${storyId}`);
+  }
+
+  async exportStoryLink(chatId: string, storyId: number): Promise<{ link: string }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.stories.ExportStoryLink({ peer, id: storyId }));
+      if (!result) throw new Error("stories.ExportStoryLink returned nothing");
+      return { link: (result as Api.ExportedStoryLink).link };
+    }, `exportStoryLink ${chatId}/${storyId}`);
+  }
+
+  async readStories(chatId: string, maxId: number): Promise<{ ids: number[] }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const ids = await this.client?.invoke(new Api.stories.ReadStories({ peer, maxId }));
+      return { ids: (ids as number[]) ?? [] };
+    }, `readStories ${chatId}/${maxId}`);
+  }
+
+  async toggleStoryPinned(chatId: string, ids: number[], pinned: boolean): Promise<{ affected: number[] }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const affected = await this.client?.invoke(new Api.stories.TogglePinned({ peer, id: ids, pinned }));
+      return { affected: (affected as number[]) ?? [] };
+    }, `toggleStoryPinned ${chatId}`);
+  }
+
+  async toggleStoryPinnedToTop(chatId: string, ids: number[]): Promise<{ ok: boolean }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      await this.client?.invoke(new Api.stories.TogglePinnedToTop({ peer, id: ids }));
+      return { ok: true };
+    }, `toggleStoryPinnedToTop ${chatId}`);
+  }
+
+  async activateStealthMode(past?: boolean, future?: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      await this.client?.invoke(new Api.stories.ActivateStealthMode({ past: past ?? false, future: future ?? false }));
+    }, "activateStealthMode");
+  }
+
+  async getStoriesArchive(chatId: string, offsetId: number, limit: number): Promise<StoriesByIdSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.stories.GetStoriesArchive({ peer, offsetId, limit }));
+      if (!result) throw new Error("stories.GetStoriesArchive returned nothing");
+      return summarizeStoriesById(result);
+    }, `getStoriesArchive ${chatId}`);
+  }
+
+  async reportStory(chatId: string, ids: number[], option: string, message: string): Promise<ReportResultSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const optionBytes = Buffer.from(option, "base64");
+      const result = await this.client?.invoke(new Api.stories.Report({ peer, id: ids, option: optionBytes, message }));
+      if (!result) throw new Error("stories.Report returned nothing");
+      return summarizeReportResult(result);
+    }, `reportStory ${chatId}`);
+  }
+
+  // ─── Discussion & Read Receipts ────────────────────────────────────────────
+
+  async getDiscussionMessage(chatId: string, messageId: number): Promise<DiscussionMessageSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.messages.GetDiscussionMessage({ peer, msgId: messageId }));
+      if (!result) throw new Error("messages.GetDiscussionMessage returned nothing");
+      return summarizeDiscussionMessage(result as Api.messages.DiscussionMessage);
+    }, `getDiscussionMessage ${chatId}/${messageId}`);
+  }
+
+  async getGroupsForDiscussion(): Promise<GroupsForDiscussionSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.channels.GetGroupsForDiscussion());
+      if (!result) throw new Error("channels.GetGroupsForDiscussion returned nothing");
+      return summarizeGroupsForDiscussion(result as Api.messages.TypeChats);
+    }, "getGroupsForDiscussion");
+  }
+
+  async getMessageReadParticipants(chatId: string, messageId: number): Promise<ReadParticipantsSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      const result = await this.client?.invoke(new Api.messages.GetMessageReadParticipants({ peer, msgId: messageId }));
+      if (!result) throw new Error("messages.GetMessageReadParticipants returned nothing");
+      return summarizeReadParticipants(result as Api.TypeReadParticipantDate[], messageId);
+    }, `getMessageReadParticipants ${chatId}/${messageId}`);
+  }
+
+  async getOutboxReadDate(chatId: string, messageId: number): Promise<{ readAt: string | null }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    return this.rateLimiter.execute(async () => {
+      try {
+        const result = await this.client?.invoke(new Api.messages.GetOutboxReadDate({ peer, msgId: messageId }));
+        if (!result) return { readAt: null };
+        const date = (result as Api.OutboxReadDate).date;
+        return { readAt: new Date(date * 1000).toISOString() };
+      } catch (e) {
+        if (/NOT_READ_YET/i.test((e as Error).message ?? "")) return { readAt: null };
+        throw e;
+      }
+    }, `getOutboxReadDate ${chatId}/${messageId}`);
   }
 
   private async resolveInputGroupCall(chatId: string): Promise<Api.TypeInputGroupCall> {

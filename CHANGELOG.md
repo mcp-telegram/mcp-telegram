@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0] — 2026-04-24
+
+### Added
+- **telegram-send-story** — Publish a photo or video story to your profile or a channel with privacy controls (everyone/contacts/close_friends/selected), period (6-48h), pinning, and no-forward flag. Accepts absolute file path, auto-detects photo/video from extension (jpg/jpeg/png/webp/heic/heif → photo; everything else → video). Caption supports md/html parse mode.
+- **telegram-edit-story** — Edit an existing story: replace media, update caption (empty string clears it), or change privacy rules. At least one field (filePath, caption, or privacy) must be provided.
+- **telegram-delete-stories** — Delete one or more stories (irreversible; requires `confirm: true`; up to 100 IDs per call). Returns the actually-deleted IDs from Telegram (partial success possible).
+- **telegram-react-to-story** — React to a story with an emoji, or remove the reaction by passing empty string `""`.
+- **telegram-export-story-link** — Get a shareable `t.me/…` URL for a public story.
+- **telegram-read-stories** — Mark stories as seen up to a given story ID (maxId, inclusive). Returns count of newly-seen stories.
+- **telegram-toggle-story-pinned** — Pin/unpin stories in profile highlights (Telegram allows up to 3 pinned stories). Returns affected story IDs.
+- **telegram-toggle-story-pinned-to-top** — Pin stories to the very top of the pinned row; pass `[]` to clear all top-pinned stories.
+- **telegram-activate-stealth-mode** — Hide your story views retroactively (`past: true`) and/or for the next 25 minutes (`future: true`). At least one of past/future must be true. Requires Telegram Premium — non-Premium accounts receive PREMIUM_ACCOUNT_REQUIRED.
+- **telegram-get-stories-archive** — Fetch auto-archived (expired) stories from a peer's archive, paginated via `offsetId` + `limit` (1–100, default 50).
+- **telegram-report-story** — Report a story via Telegram's multi-step option flow. First call with `option: ""` starts the flow; subsequent calls pass the base64 option bytes from the previous response's `options[n].option` field.
+- **telegram-get-discussion-message** — For a channel post with comments enabled, returns the linked discussion-group info: `discussionGroupId`, `discussionMsgId`, `unreadCount`, `readInboxMaxId`, `readOutboxMaxId`, `topMessage`. Use `discussionGroupId` + `discussionMsgId` with `telegram-send-message` (replyTo=discussionMsgId) to post a comment.
+- **telegram-get-groups-for-discussion** — List groups eligible to link as discussion group to a channel you admin (channels.GetGroupsForDiscussion). No parameters required.
+- **telegram-get-message-read-participants** — List who has read a message in a small group (≤100 members, ≤7 days old). Returns `readers` array with `userId` and `readAt` (ISO timestamp). Returns CHAT_TOO_BIG error for large groups or channels.
+- **telegram-get-outbox-read-date** — Get when your recipient read your outgoing private message. Returns `"Read at <ISO date>"` or `"Not read yet"` (maps NOT_READ_YET error to null). Propagates YOUR_PRIVACY_RESTRICTED / USER_PRIVACY_RESTRICTED as errors.
+
+### New helpers in `telegram-helpers.ts`
+- `StoryPrivacy` type and `buildStoryPrivacyRules()` — builds GramJS `TypeInputPrivacyRule[]` from privacy enum + allow/disallow user ID lists
+- `detectMediaType()` — infers photo/video from file extension (safe default: video)
+- `extractStoryIdFromUpdates()` — extracts story ID from SendStory Updates envelope (prefers UpdateStoryID, falls back to UpdateStory)
+- `summarizeDiscussionMessage()`, `DiscussionMessageSummary` type
+- `summarizeGroupsForDiscussion()`, `GroupsForDiscussionSummary` type
+- `summarizeReadParticipants()`, `ReadParticipantsSummary` type
+- `summarizeReportResult()`, `ReportResultSummary` type (discriminated union: reported / chooseOption / addComment)
+
+### Notes
+- `telegram-activate-stealth-mode` requires Telegram Premium — non-Premium accounts receive PREMIUM_ACCOUNT_REQUIRED
+- `telegram-get-message-read-participants` only works for groups ≤100 members and messages ≤7 days old
+- `telegram-delete-stories` requires `confirm: true` (irreversible)
+- `telegram-send-story`: MediaAreas (venue/reaction/URL tags on the story frame) are not supported in this version
+- `telegram-report-story`: Multi-step flow — first call with `option: ""` starts the flow; subsequent calls pass the base64 option bytes from the previous response
+
+### Testing
+- 45 new mock-only tests in `src/__tests__/stories-v2.test.ts` (cumulative: 418 total)
+
 ## [1.29.0] - 2026-04-23
 
 ### Added

@@ -70,6 +70,15 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 |------|-------------|
 | `telegram-create-poll` | Create a poll or quiz in a chat |
 
+## Poll Interaction (v1.31.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-vote-poll` | Vote in a poll by option index. Empty `optionIndexes: []` retracts your vote |
+| `telegram-get-poll-results` | Get aggregated results: vote counts, percentages, quiz correct-answer flags |
+| `telegram-get-poll-voters` | List users who voted for specific options (public polls only, paginated) |
+| `telegram-close-poll` | Permanently close a poll — irreversible, no further votes allowed |
+
 ## Reactions
 
 | Tool | Description |
@@ -79,6 +88,30 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 | `telegram-set-default-reaction` | Set your account's default quick-reaction emoji |
 | `telegram-get-top-reactions` | List Telegram's top (popular) reaction emojis |
 | `telegram-get-recent-reactions` | List emojis you recently used as reactions |
+
+## Paid Reactions (v1.31.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-send-paid-reaction` | Send ★ Stars as a paid reaction on a channel post (`count` 1–2500, optional `private` flag) |
+| `telegram-toggle-paid-reaction-privacy` | Toggle leaderboard visibility of your paid reaction on a specific post |
+| `telegram-get-paid-reaction-privacy` | Get your current default paid reaction privacy setting |
+
+## Audio Transcription (v1.31.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-transcribe-audio` | Start server-side transcription of a voice/video note (Telegram Premium). Returns `transcriptionId`; if `pending:true` poll with `telegram-get-transcription` |
+| `telegram-get-transcription` | Poll for updated transcription status — idempotent, same `transcriptionId`, updated text once complete |
+| `telegram-rate-transcription` | Rate transcription quality as good or poor to improve Telegram speech-to-text |
+
+## Fact-check (v1.31.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-fact-check` | Fetch fact-check annotations on up to 100 channel messages; most messages have no annotation |
+| `telegram-edit-fact-check` | Add or update a fact-check annotation (requires fact-checker privileges) |
+| `telegram-delete-fact-check` | Remove a fact-check annotation (requires fact-checker privileges) |
 
 ## Stickers
 

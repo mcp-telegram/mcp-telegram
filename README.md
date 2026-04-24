@@ -325,7 +325,11 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Drafts** | `telegram-save-draft`, `telegram-get-drafts`, `telegram-clear-drafts` |
 | **Forum Topics** | `telegram-list-topics`, `telegram-read-topic-messages`, `telegram-create-topic`, `telegram-edit-topic`, `telegram-delete-topic` |
 | **Polls** | `telegram-create-poll` |
+| **Poll Interaction (v1.31.0)** | `telegram-vote-poll`, `telegram-get-poll-results`, `telegram-get-poll-voters`, `telegram-close-poll` |
 | **Reactions** | `telegram-send-reaction`, `telegram-get-reactions`, `telegram-set-default-reaction`, `telegram-get-top-reactions`, `telegram-get-recent-reactions` |
+| **Paid Reactions (v1.31.0)** | `telegram-send-paid-reaction` (★ Stars), `telegram-toggle-paid-reaction-privacy`, `telegram-get-paid-reaction-privacy` |
+| **Audio Transcription (v1.31.0)** | `telegram-transcribe-audio` (Premium), `telegram-get-transcription`, `telegram-rate-transcription` |
+| **Fact-check (v1.31.0)** | `telegram-get-fact-check`, `telegram-edit-fact-check`, `telegram-delete-fact-check` |
 | **Stickers** | `telegram-send-sticker`, `telegram-get-installed-stickers`, `telegram-get-recent-stickers`, `telegram-get-sticker-set`, `telegram-search-sticker-sets` |
 | **Media** | `telegram-send-file`, `telegram-download-media`, `telegram-get-profile-photo`, `telegram-get-web-preview` |
 | **Rich Media Sending** | `telegram-send-voice`, `telegram-send-video-note` (round video), `telegram-send-location` (static or live), `telegram-send-venue`, `telegram-send-contact`, `telegram-send-dice` (🎲🎯🎰🏀⚽🎳), `telegram-send-album` (2–10 grouped photos/videos) |

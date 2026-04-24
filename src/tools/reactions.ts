@@ -188,4 +188,79 @@ export function registerReactionTools(server: McpServer, telegram: TelegramServi
       }
     },
   );
+
+  // ─── Paid reactions ────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "telegram-send-paid-reaction",
+    {
+      description:
+        "Send a paid reaction (★ Stars) on a channel post. Stars are spent from your balance. Optional private flag controls leaderboard visibility.",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username (channel)"),
+        messageId: z.number().int().positive().describe("Message ID of the channel post"),
+        count: z.number().int().min(1).max(2500).default(1).describe("Number of Stars to send (1-2500)"),
+        private: z
+          .boolean()
+          .optional()
+          .describe("true = anonymous on leaderboard, false = show name, omit = use account default"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, messageId, count, private: privateFlag }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        await telegram.sendPaidReaction(chatId, messageId, count, { private: privateFlag });
+        const privacy = privateFlag === true ? " (anonymous)" : privateFlag === false ? " (public)" : "";
+        return ok(`Sent ★×${count} paid reaction to message #${messageId} in ${chatId}${privacy}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-toggle-paid-reaction-privacy",
+    {
+      description: "Change leaderboard visibility of your paid reaction on a specific channel post (Layer 198 API).",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username (channel)"),
+        messageId: z.number().int().positive().describe("Message ID of the channel post"),
+        private: z.boolean().describe("true = anonymous on leaderboard, false = show name"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, messageId, private: privateFlag }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        await telegram.togglePaidReactionPrivacy(chatId, messageId, privateFlag);
+        return ok(
+          `Updated paid reaction privacy on message #${messageId} in ${chatId}: ${privateFlag ? "anonymous" : "show name"}`,
+        );
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-paid-reaction-privacy",
+    {
+      description: "Get your current default paid reaction privacy setting.",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.getPaidReactionPrivacy();
+        return ok(`Default paid reaction privacy: ${result.private ? "anonymous" : "show name"}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
 }

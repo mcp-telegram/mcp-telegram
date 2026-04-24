@@ -1500,6 +1500,86 @@ export function summarizeReportResult(result: Api.TypeReportResult): ReportResul
   throw new Error(`unknown ReportResult type: ${(result as { className?: string }).className ?? "unknown"}`);
 }
 
+// ─── Poll helpers ──────────────────────────────────────────────────────────
+
+export type PollSummary = {
+  question: string;
+  isClosed: boolean;
+  isQuiz: boolean;
+  isMulti: boolean;
+  totalVoters: number;
+  options: Array<{
+    index: number;
+    text: string;
+    votes: number;
+    percent: number;
+    chosen: boolean;
+    correct?: boolean;
+  }>;
+};
+
+export function summarizePoll(poll: Api.Poll, results?: Api.PollResults): PollSummary {
+  const total = results?.totalVoters ?? 0;
+  const answerResults = results?.results ?? [];
+
+  const options = (poll.answers as Api.PollAnswer[]).map((answer, index) => {
+    // Match by option bytes
+    const v = answerResults.find((r) => {
+      const rOpt = Buffer.from(r.option as Uint8Array);
+      const aOpt = Buffer.from(answer.option as Uint8Array);
+      return rOpt.equals(aOpt);
+    }) as Api.PollAnswerVoters | undefined;
+    const votes = v?.voters ?? 0;
+    const percent = total > 0 ? Math.round((votes / total) * 1000) / 10 : 0;
+    return {
+      index,
+      text: (answer.text as Api.TextWithEntities).text,
+      votes,
+      percent,
+      chosen: v?.chosen ?? false,
+      correct: poll.quiz ? (v?.correct ?? false) : undefined,
+    };
+  });
+
+  return {
+    question: (poll.question as Api.TextWithEntities).text,
+    isClosed: poll.closed ?? false,
+    isQuiz: poll.quiz ?? false,
+    isMulti: poll.multipleChoice ?? false,
+    totalVoters: total,
+    options,
+  };
+}
+
+export function extractPollMediaFromUpdates(
+  updates: Api.TypeUpdates,
+): { poll: Api.Poll; results?: Api.PollResults } | null {
+  let list: Api.TypeUpdate[] = [];
+  if (updates instanceof Api.Updates || updates instanceof Api.UpdatesCombined) {
+    list = updates.updates;
+  } else if (updates instanceof Api.UpdateShort) {
+    list = [updates.update];
+  }
+  for (const u of list) {
+    if (u instanceof Api.UpdateMessagePoll) {
+      if (u.poll instanceof Api.Poll) {
+        return {
+          poll: u.poll,
+          results: u.results instanceof Api.PollResults ? u.results : undefined,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+export function extractPeerId(peer: Api.TypePeer): string {
+  if (peer instanceof Api.PeerUser) return peer.userId.toString();
+  if (peer instanceof Api.PeerChat) return peer.chatId.toString();
+  if (peer instanceof Api.PeerChannel) return peer.channelId.toString();
+  return "0";
+}
+
 export function summarizeAllStories(result: Api.stories.TypeAllStories): AllStoriesSummary {
   const stealthMode = result.stealthMode
     ? {

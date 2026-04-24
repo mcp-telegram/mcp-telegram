@@ -27,6 +27,7 @@ import type {
   MessageButtonDescriptor,
   MyBoostsSummary,
   PeerStoriesSummary,
+  PollSummary,
   QuickRepliesSummary,
   QuickReplyMessagesSummary,
   ReadParticipantsSummary,
@@ -46,6 +47,8 @@ import {
   detectMediaType,
   extractDiceResult,
   extractMessageId,
+  extractPeerId,
+  extractPollMediaFromUpdates,
   extractStoryIdFromUpdates,
   generateRandomBigInt,
   mergeBannedRights,
@@ -63,6 +66,7 @@ import {
   summarizeMegagroupStats,
   summarizeMyBoosts,
   summarizePeerStories,
+  summarizePoll,
   summarizeQuickReplies,
   summarizeQuickReplyMessages,
   summarizeReadParticipants,
@@ -96,6 +100,7 @@ export type {
   MyBoostSummary,
   MyBoostsSummary,
   PeerStoriesSummary,
+  PollSummary,
   PrepaidGiveawaySummary,
   QuickRepliesSummary,
   QuickReplyMessageSummary,
@@ -124,6 +129,8 @@ export {
   describeAdminLogDetails,
   describeKeyboardButton,
   detectMediaType,
+  extractPeerId,
+  extractPollMediaFromUpdates,
   extractStoryIdFromUpdates,
   mergeBannedRights,
   peerToCompact,
@@ -146,6 +153,7 @@ export {
   summarizeMyBoost,
   summarizeMyBoosts,
   summarizePeerStories,
+  summarizePoll,
   summarizePrepaidGiveaway,
   summarizeQuickReplies,
   summarizeQuickReply,
@@ -2340,6 +2348,296 @@ export class TelegramService {
       }
     }
     return 0;
+  }
+
+  // ─── Poll interaction ──────────────────────────────────────────────────────
+
+  async sendPollVote(
+    chatId: string,
+    messageId: number,
+    optionIndexes: number[],
+  ): Promise<{ totalVoters: number; chosenLabels: string[]; isRetracted: boolean }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const options = optionIndexes.map((i) => Buffer.from([i]));
+      const result = await client.invoke(new Api.messages.SendVote({ peer, msgId: messageId, options }));
+      const pollMedia = extractPollMediaFromUpdates(result);
+      const results = pollMedia?.results;
+      const poll = pollMedia?.poll;
+      return {
+        totalVoters: results?.totalVoters ?? 0,
+        chosenLabels: optionIndexes.map((i) => {
+          const answer = poll?.answers?.[i] as Api.PollAnswer | undefined;
+          return answer ? (answer.text as Api.TextWithEntities).text : `#${i}`;
+        }),
+        isRetracted: optionIndexes.length === 0,
+      };
+    }, `sendPollVote ${chatId}/${messageId}`);
+  }
+
+  async getPollResults(chatId: string, messageId: number): Promise<PollSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const msgs = await client.getMessages(peer, { ids: [messageId] });
+      if (!(msgs[0]?.media instanceof Api.MessageMediaPoll)) {
+        throw new Error("Message is not a poll");
+      }
+      const pollMedia = msgs[0].media as Api.MessageMediaPoll;
+      // Refresh results from server
+      try {
+        await client.invoke(new Api.messages.GetPollResults({ peer, msgId: messageId }));
+      } catch {
+        // ignore — use whatever is in the message
+      }
+      return summarizePoll(pollMedia.poll as Api.Poll, pollMedia.results as Api.PollResults | undefined);
+    }, `getPollResults ${chatId}/${messageId}`);
+  }
+
+  async getPollVoters(
+    chatId: string,
+    messageId: number,
+    opts?: { optionIndex?: number; limit?: number; offset?: string },
+  ): Promise<{
+    total: number;
+    nextOffset?: string;
+    voters: Array<{ peerId: string; name?: string; username?: string; options: string[]; date: number }>;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const optionIndex = opts?.optionIndex;
+      const result = (await client.invoke(
+        new Api.messages.GetPollVotes({
+          peer,
+          id: messageId,
+          option: optionIndex !== undefined ? Buffer.from([optionIndex]) : undefined,
+          offset: opts?.offset,
+          limit: opts?.limit ?? 20,
+        }),
+      )) as Api.messages.VotesList;
+
+      // Build user map
+      const userMap = new Map<string, { name?: string; username?: string }>();
+      for (const u of result.users ?? []) {
+        const user = u as Api.User;
+        const id = user.id?.toString() ?? "";
+        userMap.set(id, {
+          name: [user.firstName, user.lastName].filter(Boolean).join(" ") || undefined,
+          username: user.username ?? undefined,
+        });
+      }
+
+      const voters = (result.votes ?? []).map((v) => {
+        const vote = v as Api.MessagePeerVote | Api.MessagePeerVoteInputOption | Api.MessagePeerVoteMultiple;
+        const peerId = extractPeerId(vote.peer);
+        const info = userMap.get(peerId) ?? {};
+        let options: string[] = [];
+        if ("option" in vote && vote.option) {
+          options = [Buffer.from(vote.option as Uint8Array).toString("hex")];
+        } else if ("options" in vote && vote.options) {
+          options = (vote.options as Uint8Array[]).map((o) => Buffer.from(o).toString("hex"));
+        }
+        return {
+          peerId,
+          name: info.name,
+          username: info.username,
+          options,
+          date: vote.date,
+        };
+      });
+
+      return { total: result.count, nextOffset: result.nextOffset, voters };
+    }, `getPollVoters ${chatId}/${messageId}`);
+  }
+
+  async closePoll(chatId: string, messageId: number): Promise<{ totalVoters: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      // Step 1: fetch existing poll
+      const msgs = await client.getMessages(peer, { ids: [messageId] });
+      if (!(msgs[0]?.media instanceof Api.MessageMediaPoll)) {
+        throw new Error("Message is not a poll");
+      }
+      const pollMedia = msgs[0].media as Api.MessageMediaPoll;
+      const originalPoll = pollMedia.poll as Api.Poll;
+
+      // Step 2: build closed poll (preserve all flags)
+      const closedPoll = new Api.Poll({
+        id: originalPoll.id,
+        question: originalPoll.question,
+        answers: originalPoll.answers,
+        closed: true,
+        publicVoters: originalPoll.publicVoters,
+        multipleChoice: originalPoll.multipleChoice,
+        quiz: originalPoll.quiz,
+        closePeriod: originalPoll.closePeriod,
+        closeDate: originalPoll.closeDate,
+      });
+
+      // Step 3: edit message to close poll
+      const result = await client.invoke(
+        new Api.messages.EditMessage({
+          peer,
+          id: messageId,
+          media: new Api.InputMediaPoll({ poll: closedPoll }),
+        }),
+      );
+
+      // Extract updated voter count from result updates
+      const pollInfo = extractPollMediaFromUpdates(result);
+      const totalVoters = pollInfo?.results?.totalVoters ?? (pollMedia.results as Api.PollResults)?.totalVoters ?? 0;
+      return { totalVoters };
+    }, `closePoll ${chatId}/${messageId}`);
+  }
+
+  // ─── Audio transcription ───────────────────────────────────────────────────
+
+  async transcribeAudio(
+    chatId: string,
+    messageId: number,
+  ): Promise<{
+    transcriptionId: string;
+    text: string;
+    pending: boolean;
+    trialRemainsNum?: number;
+    trialRemainsUntilDate?: number;
+  }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const result = (await client.invoke(
+        new Api.messages.TranscribeAudio({ peer, msgId: messageId }),
+      )) as Api.messages.TranscribedAudio;
+      return {
+        transcriptionId: result.transcriptionId.toString(),
+        text: result.text ?? "",
+        pending: result.pending ?? false,
+        trialRemainsNum: result.trialRemainsNum,
+        trialRemainsUntilDate: result.trialRemainsUntilDate,
+      };
+    }, `transcribeAudio ${chatId}/${messageId}`);
+  }
+
+  async rateTranscription(chatId: string, messageId: number, transcriptionId: string, good: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    await this.rateLimiter.execute(async () => {
+      await client.invoke(
+        new Api.messages.RateTranscribedAudio({
+          peer,
+          msgId: messageId,
+          transcriptionId: bigInt(transcriptionId),
+          good,
+        }),
+      );
+    }, `rateTranscription ${chatId}/${messageId}`);
+  }
+
+  // ─── Fact-check ────────────────────────────────────────────────────────────
+
+  async getFactCheck(
+    chatId: string,
+    messageIds: number[],
+  ): Promise<Array<{ messageId: number; needCheck: boolean; country?: string; text?: string; hash: string }>> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const result = (await client.invoke(
+        new Api.messages.GetFactCheck({ peer, msgId: messageIds }),
+      )) as Api.FactCheck[];
+      return result.map((fc, i) => ({
+        messageId: messageIds[i],
+        needCheck: fc.needCheck ?? false,
+        country: fc.country,
+        text: (fc.text as Api.TextWithEntities | undefined)?.text,
+        hash: fc.hash.toString(),
+      }));
+    }, `getFactCheck ${chatId}`);
+  }
+
+  async editFactCheck(
+    chatId: string,
+    messageId: number,
+    text: string,
+    _opts?: { parseMode?: "md" | "html" },
+  ): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    await this.rateLimiter.execute(async () => {
+      // Build TextWithEntities — basic plain text (no entity parsing for fact-checks)
+      const textObj = new Api.TextWithEntities({ text, entities: [] });
+      await client.invoke(new Api.messages.EditFactCheck({ peer, msgId: messageId, text: textObj }));
+    }, `editFactCheck ${chatId}/${messageId}`);
+  }
+
+  async deleteFactCheck(chatId: string, messageId: number): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    await this.rateLimiter.execute(async () => {
+      await client.invoke(new Api.messages.DeleteFactCheck({ peer, msgId: messageId }));
+    }, `deleteFactCheck ${chatId}/${messageId}`);
+  }
+
+  // ─── Paid reactions ────────────────────────────────────────────────────────
+
+  async sendPaidReaction(
+    chatId: string,
+    messageId: number,
+    count: number,
+    opts?: { private?: boolean },
+  ): Promise<{ count: number }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const randomId = generateRandomBigInt();
+      const params: Record<string, unknown> = { peer, msgId: messageId, count, randomId };
+      if (opts?.private !== undefined) params.private = opts.private;
+      // biome-ignore lint/suspicious/noExplicitAny: dynamic params for optional `private` field
+      await client.invoke(new Api.messages.SendPaidReaction(params as any));
+      return { count };
+    }, `sendPaidReaction ${chatId}/${messageId}`);
+  }
+
+  async togglePaidReactionPrivacy(chatId: string, messageId: number, privateFlag: boolean): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const peer = await this.resolvePeer(chatId);
+    const client = this.client;
+    await this.rateLimiter.execute(async () => {
+      await client.invoke(new Api.messages.TogglePaidReactionPrivacy({ peer, msgId: messageId, private: privateFlag }));
+    }, `togglePaidReactionPrivacy ${chatId}/${messageId}`);
+  }
+
+  async getPaidReactionPrivacy(): Promise<{ private: boolean }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    return this.rateLimiter.execute(async () => {
+      const result = await client.invoke(new Api.messages.GetPaidReactionPrivacy());
+      let list: Api.TypeUpdate[] = [];
+      if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+        list = result.updates;
+      } else if (result instanceof Api.UpdateShort) {
+        list = [result.update];
+      }
+      for (const u of list) {
+        if (u instanceof Api.UpdatePaidReactionPrivacy) {
+          return { private: Boolean(u.private) };
+        }
+      }
+      return { private: false };
+    }, "getPaidReactionPrivacy");
   }
 
   async getForumTopics(

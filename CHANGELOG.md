@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.0] — 2026-04-24
+
+### Added
+- **telegram-vote-poll** — Vote in a poll by option index (single/multi-choice). Empty array retracts vote.
+- **telegram-get-poll-results** — Get aggregated poll results: vote counts, percentages, quiz answer status
+- **telegram-get-poll-voters** — List users who voted for specific poll options (public polls only, paginated)
+- **telegram-close-poll** — Permanently close a poll (irreversible; prevents further voting)
+- **telegram-transcribe-audio** — Start server-side transcription of a voice/video note (Telegram Premium)
+- **telegram-get-transcription** — Poll for updated transcription status (idempotent re-call)
+- **telegram-rate-transcription** — Rate transcription quality (good/poor) to improve speech-to-text
+- **telegram-get-fact-check** — Get fact-check annotations on channel messages (batch up to 100)
+- **telegram-edit-fact-check** — Add/update fact-check annotation (requires fact-checker privileges)
+- **telegram-delete-fact-check** — Remove fact-check annotation (requires fact-checker privileges)
+- **telegram-send-paid-reaction** — Send paid reaction (★ Stars) on a channel post with optional privacy
+- **telegram-toggle-paid-reaction-privacy** — Change leaderboard visibility of your paid reaction
+- **telegram-get-paid-reaction-privacy** — Get your current default paid reaction privacy setting
+
+### Notes
+- `telegram-close-poll`: One-way operation — closed polls cannot be reopened
+- `telegram-transcribe-audio`: Premium feature. Non-Premium accounts have limited free trials; `trialRemainsNum` shows count
+- `telegram-get-transcription`: Idempotent — returns same transcriptionId with updated text once processing completes
+- `telegram-edit-fact-check` / `telegram-delete-fact-check`: Require fact-checker privileges; regular users get permission errors
+- `telegram-send-paid-reaction`: Stars are debited from your Telegram balance; `count` range 1-2500
+- `telegram-toggle-paid-reaction-privacy`: Per-message toggle (Layer 198 API)
+
+### New helpers (exported from `telegram-client`)
+- `summarizePoll(poll, results?)` — summarize a GramJS Poll+PollResults into a compact typed object
+- `extractPollMediaFromUpdates(updates)` — extract poll + results from any Updates envelope
+- `extractPeerId(peer)` — convert TypePeer to string ID
+
+### Testing
+- 29 new mock-only tests (cumulative: 447 total)
+
 ## [1.30.0] — 2026-04-24
 
 ### Added

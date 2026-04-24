@@ -6,6 +6,7 @@ import { registerBoostTools } from "./boosts.js";
 import { registerChatTools } from "./chats.js";
 import { registerContactTools } from "./contacts.js";
 import { registerExtraTools } from "./extras.js";
+import { registerFactCheckTools } from "./fact-check.js";
 import { registerGroupCallTools } from "./group-calls.js";
 import { registerMediaTools } from "./media.js";
 import { registerMessageTools } from "./messages.js";
@@ -15,6 +16,7 @@ import { registerSendMediaTools } from "./send-media.js";
 import { registerStarsTools } from "./stars.js";
 import { registerStickerTools } from "./stickers.js";
 import { registerStoryTools } from "./stories.js";
+import { registerTranscribeTools } from "./transcribe.js";
 
 export function registerTools(server: McpServer, telegram: TelegramService) {
   registerAuthTools(server, telegram);
@@ -24,6 +26,8 @@ export function registerTools(server: McpServer, telegram: TelegramService) {
   registerSendMediaTools(server, telegram);
   registerContactTools(server, telegram);
   registerReactionTools(server, telegram);
+  registerTranscribeTools(server, telegram);
+  registerFactCheckTools(server, telegram);
   registerExtraTools(server, telegram);
   registerAccountTools(server, telegram);
   registerStickerTools(server, telegram);

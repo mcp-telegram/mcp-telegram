@@ -806,6 +806,115 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
     },
   );
 
+  // ─── Poll interaction ──────────────────────────────────────────────────────
+
+  server.registerTool(
+    "telegram-vote-poll",
+    {
+      description: "Vote in a poll by option index (single or multi-choice). Empty array retracts vote.",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        messageId: z.number().int().positive().describe("Message ID of the poll"),
+        optionIndexes: z
+          .array(z.number().int().min(0).max(9))
+          .min(0)
+          .max(10)
+          .describe("Zero-based option indexes. Empty [] retracts vote."),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, messageId, optionIndexes }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.sendPollVote(chatId, messageId, optionIndexes);
+        if (optionIndexes.length === 0) {
+          return ok(`Retracted vote from poll #${messageId}`);
+        }
+        return ok(
+          `Voted in poll #${messageId}: option(s) ${result.chosenLabels.join(", ")} | Total: ${result.totalVoters} voters`,
+        );
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-poll-results",
+    {
+      description: "Get aggregated poll results: vote counts, percentages, quiz answer status",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        messageId: z.number().int().positive().describe("Message ID of the poll"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, messageId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.getPollResults(chatId, messageId);
+        return ok(JSON.stringify(result));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-poll-voters",
+    {
+      description: "List users who voted for specific poll options (public polls only, paginated)",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        messageId: z.number().int().positive().describe("Message ID of the poll"),
+        optionIndex: z
+          .number()
+          .int()
+          .min(0)
+          .max(9)
+          .optional()
+          .describe("Zero-based option index to filter by. Omit to get all voters"),
+        limit: z.number().int().min(1).max(100).default(20).describe("Max voters to return"),
+        offset: z.string().optional().describe("Pagination offset from previous call"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId, messageId, optionIndex, limit, offset }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.getPollVoters(chatId, messageId, { optionIndex, limit, offset });
+        return ok(JSON.stringify(result));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-close-poll",
+    {
+      description: "Close a poll permanently. This is a one-way operation — closed polls cannot be reopened.",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        messageId: z.number().int().positive().describe("Message ID of the poll to close"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, messageId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+      try {
+        const result = await telegram.closePoll(chatId, messageId);
+        return ok(`Closed poll #${messageId} (final: ${result.totalVoters} voters)`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
   server.registerTool(
     "telegram-get-outbox-read-date",
     {

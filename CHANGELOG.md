@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.35.0] — 2026-04-25
+
+### Changed
+
+**Rate limiter — structured stderr events for retries.**
+
+The internal `RateLimiter` previously logged `FLOOD_WAIT` and network retries as
+human-readable strings via `console.error`, and the temporary-server-error
+branch (5xx, etc.) was silent. All three retry branches now emit a single
+structured stderr line per event:
+
+```
+[rate-limiter] event {"event":"flood_wait","context":"list-chats","seconds":30,"attempt":1,"maxRetries":3}
+```
+
+Event types: `flood_wait`, `network_retry`, `temporary_retry`. Each event
+carries:
+
+- `event` — event class (string literal)
+- `context` — caller-supplied operation name (never user input / PII)
+- `attempt` / `maxRetries` — retry counters
+- `seconds` (flood_wait only) or `delayMs` (network/temporary)
+- `error` (network/temporary only) — the upstream Telegram error message
+
+This is a logging contract change, not a behaviour change: retry timing,
+backoff, and error-throwing semantics are identical to 1.34.0.
+
+### Why this matters
+
+Downstream log collectors can now aggregate retry rates by event class and
+caller without parsing free-form English. `mcp-telegram-cloud` v1.12.0+ wires
+this into SigNoz directly. Self-hosters can `grep '\[rate-limiter\] event'` or
+pipe into any structured log pipeline.
+
+### Compatibility
+
+No breaking changes. No new dependencies. No new environment variables.
+Tests: 490/490 pass.
+
 ## [1.34.0] — 2026-04-24
 
 ### Added

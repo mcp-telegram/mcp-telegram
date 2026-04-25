@@ -1,6 +1,10 @@
 /**
  * Rate limiter and retry logic for Telegram API calls.
  * Handles FLOOD_WAIT errors and implements exponential backoff.
+ *
+ * Emits structured events on stderr so downstream log collectors (e.g. cloud
+ * SigNoz) can aggregate by `event` and `context`. Format:
+ *   [rate-limiter] event {"event":"flood_wait","context":"X","seconds":N,...}
  */
 
 export interface RateLimiterOptions {
@@ -67,9 +71,13 @@ export class RateLimiter {
             `Rate limit exceeded after ${this.maxRetries} retries. Telegram requires ${waitSeconds}s wait. Try again later.`,
           );
         }
-        console.error(
-          `[rate-limiter] FLOOD_WAIT for ${context}. Waiting ${waitSeconds}s (attempt ${attempt + 1}/${this.maxRetries})`,
-        );
+        logEvent({
+          event: "flood_wait",
+          context,
+          seconds: waitSeconds,
+          attempt: attempt + 1,
+          maxRetries: this.maxRetries,
+        });
         await sleep(waitSeconds * 1000);
         return this.executeWithRetry(fn, context, attempt + 1, options);
       }
@@ -80,9 +88,14 @@ export class RateLimiter {
           throw new Error(`Network error after ${this.maxRetries} retries: ${errorMessage}. Check your connection.`);
         }
         const delay = Math.min(this.initialRetryDelay * 2 ** attempt, this.maxRetryDelay);
-        console.error(
-          `[rate-limiter] Network error for ${context}. Retrying in ${delay}ms (attempt ${attempt + 1}/${this.maxRetries})`,
-        );
+        logEvent({
+          event: "network_retry",
+          context,
+          delayMs: delay,
+          attempt: attempt + 1,
+          maxRetries: this.maxRetries,
+          error: errorMessage,
+        });
         await sleep(delay);
         return this.executeWithRetry(fn, context, attempt + 1, options);
       }
@@ -93,6 +106,14 @@ export class RateLimiter {
           throw new Error(`Temporary error after ${this.maxRetries} retries: ${errorMessage}`);
         }
         const delay = Math.min(this.initialRetryDelay * 2 ** attempt, this.maxRetryDelay);
+        logEvent({
+          event: "temporary_retry",
+          context,
+          delayMs: delay,
+          attempt: attempt + 1,
+          maxRetries: this.maxRetries,
+          error: errorMessage,
+        });
         await sleep(delay);
         return this.executeWithRetry(fn, context, attempt + 1, options);
       }
@@ -121,4 +142,8 @@ function isTemporaryError(msg: string): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function logEvent(payload: Record<string, string | number>): void {
+  console.error(`[rate-limiter] event ${JSON.stringify(payload)}`);
 }

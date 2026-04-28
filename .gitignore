@@ -23,3 +23,6 @@ docs/.vitepress/dist\ndocs/.vitepress/cache
 # Ralphex (autonomous execution loop) — local only
 .ralphex/
 coverage/
+
+# Output of `mcp-telegram-manifest` CLI
+manifest.json

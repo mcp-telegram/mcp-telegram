@@ -1,15 +1,17 @@
 {
   "name": "@overpod/mcp-telegram",
-  "version": "1.35.0",
+  "version": "1.36.0",
   "description": "MCP server for Telegram userbot — messages, media, reactions, polls & more. Built on GramJS/MTProto.",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
-    "./service": "./dist/telegram-client.js"
+    "./service": "./dist/telegram-client.js",
+    "./manifest": "./dist/manifest.js"
   },
   "bin": {
-    "mcp-telegram": "dist/cli.js"
+    "mcp-telegram": "dist/cli.js",
+    "mcp-telegram-manifest": "dist/manifest.js"
   },
   "files": [
     "dist",
@@ -21,7 +23,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "login": "node dist/qr-login-cli.js",
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/cli.js dist/manifest.js dist/qr-login-cli.js",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "lint": "biome check src/",

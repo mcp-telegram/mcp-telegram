@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.0] — 2026-04-28
+
+### Added
+
+**Tool manifest export — introspect the catalog without standing up an MCP transport.**
+
+A new `@overpod/mcp-telegram/manifest` subpath export and `mcp-telegram-manifest` bin entry let consumers (and downstream cloud distributions) ask the package "what tools do you register, and at what risk tier?" without booting a real Telegram session.
+
+```ts
+import { getToolManifest } from "@overpod/mcp-telegram/manifest";
+
+const m = getToolManifest();
+// {
+//   generatedAt: "2026-04-28T...Z",
+//   toolCount: 181,
+//   tiers: { "read-only": 74, write: 96, destructive: 11 },
+//   tools: [{ name: "telegram-status", tier: "read-only", description: "...", hasInput: false }, ...]
+// }
+```
+
+CLI variant:
+
+```bash
+mcp-telegram-manifest                # writes manifest.json
+mcp-telegram-manifest path/out.json  # writes to path/out.json
+mcp-telegram-manifest -               # writes JSON to stdout
+```
+
+How it works: instantiates an `McpServer`, calls the existing `registerTools()` with a stub service (only types matter — every `telegram.*` call lives inside async tool callbacks, not the registration phase), then introspects the SDK's registered tools and classifies each by `annotations`:
+
+- `destructiveHint: true` → `destructive`
+- `readOnlyHint: true` → `read-only`
+- otherwise → `write`
+
+Opt-in env flags (`MCP_TELEGRAM_ENABLE_STARS`, `MCP_TELEGRAM_ENABLE_GROUP_CALLS`, `MCP_TELEGRAM_ENABLE_QUICK_REPLIES`) are forced ON during introspection so consumers always see the full catalog, then restored to the caller's prior values. The result is cached for the process lifetime.
+
+This is the foundation for upstream parity gates (e.g. cloud distributions that ship a curated whitelist can detect drift in CI by comparing their whitelist against `getToolManifest().tools`).
+
+### Notes
+
+- New public API surface; no breaking changes to existing exports.
+- `src/manifest.ts` and 13 new tests added; total test count: 505.
+- Build now sets executable bits on all `dist/*-cli.js` outputs (was npm-install-time only for `bin` entries).
+
 ## [1.35.0] — 2026-04-25
 
 ### Changed

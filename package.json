@@ -62,10 +62,10 @@
     "dotenv": "^17.4.2",
     "qrcode": "^1.5.4",
     "telegram": "^2.26.22",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.13",
+    "@biomejs/biome": "^2.4.14",
     "@types/node": "^25.6.0",
     "@types/qrcode": "^1.5.6",
     "c8": "^11.0.0",

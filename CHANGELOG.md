@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.1] — 2026-05-04
+
+### Fixed
+
+- Add `big-integer` as a direct dependency. Previously it was imported by `src/telegram-client.ts` and `src/telegram-helpers.ts` but only resolved transitively, which broke `tsc --noEmit` on strict-hoisting installers like pnpm.
+
+### Changed
+
+- Dependency updates (no behavioral changes):
+  - `zod` `^4.3.6` → `^4.4.3` (patch bump, runtime backward-compatible)
+  - `@biomejs/biome` `^2.4.13` → `^2.4.14` (devDep, lint/format only)
+
 ## [1.36.0] — 2026-04-28
 
 ### Added

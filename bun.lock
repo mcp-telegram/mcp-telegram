@@ -6,6 +6,7 @@
       "name": "@overpod/mcp-telegram",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
+        "big-integer": "^1.6.52",
         "dotenv": "^17.4.2",
         "qrcode": "^1.5.4",
         "telegram": "^2.26.22",

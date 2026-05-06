@@ -322,6 +322,7 @@ export class TelegramService {
     const proxy = resolveProxy();
     this.client = new TelegramClient(session, this.apiId, this.apiHash, {
       connectionRetries: 5,
+      useWSS: process.env.TELEGRAM_USE_WSS === "true",
       ...(proxy && { proxy }),
     });
 
@@ -448,6 +449,7 @@ export class TelegramService {
     const proxy = resolveProxy();
     const client = new TelegramClient(session, this.apiId, this.apiHash, {
       connectionRetries: 5,
+      useWSS: process.env.TELEGRAM_USE_WSS === "true",
       ...(proxy && { proxy }),
     });
 

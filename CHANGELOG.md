@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.2] — 2026-05-10
+
+### Changed
+
+- Dependency updates (no behavioral changes, no API surface changes):
+  - `@biomejs/biome` `^2.4.14` → `^2.4.15` (devDep, lint/format only)
+  - `biome.json` schema bumped to 2.4.15 via `biome migrate --write`
+- `npm audit fix` resolved 9 transitive advisories pulled in via `@modelcontextprotocol/sdk`:
+  - `hono` 4.12.9 → 4.12.18 (CSS injection in JSX SSR, JWT NumericDate, Cache `Vary`, etc.)
+  - `fast-uri` 3.1.0 → 3.1.2 (host confusion + path traversal)
+  - `ip-address` 10.1.0 → 10.2.0 (Address6 HTML XSS)
+  - `@hono/node-server` 1.19.11 → 1.19.14 (middleware bypass via repeated slashes)
+  - `express-rate-limit` 8.3.1 → 8.5.1
+- 3 remaining moderate advisories in `vitepress → vite → esbuild` are dev-only (docs site) with no upstream fix available.
+
 ## [1.36.1] — 2026-05-04
 
 ### Fixed

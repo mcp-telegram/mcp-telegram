@@ -1,6 +1,6 @@
 {
   "name": "@overpod/mcp-telegram",
-  "version": "1.36.1",
+  "version": "1.36.2",
   "description": "MCP server for Telegram userbot — messages, media, reactions, polls & more. Built on GramJS/MTProto.",
   "type": "module",
   "main": "dist/index.js",
@@ -66,7 +66,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.14",
+    "@biomejs/biome": "^2.4.15",
     "@types/node": "^25.6.0",
     "@types/qrcode": "^1.5.6",
     "c8": "^11.0.0",

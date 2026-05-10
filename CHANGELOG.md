@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.3] — 2026-05-10
+
+### Fixed
+
+- CI-only fix. The `publish-binaries` job in `.github/workflows/publish.yml` failed for v1.36.2 because `bun install --frozen-lockfile` rejected the `@biomejs/biome` 2.4.14 → 2.4.15 drift in `package.json` (since the bump went through `npm install` which doesn't touch `bun.lock`). Dropped `--frozen-lockfile` from the compile-only job (npm consumers are unaffected — that job already validated the dependency tree via `npm ci` against `package-lock.json`). Bun runner version bumped 1.3.11 → 1.3.13 to pick up registry resolver fixes.
+
+No code changes since v1.36.2. This release exists only to re-trigger `publish-binaries` against the corrected workflow.
+
 ## [1.36.2] — 2026-05-10
 
 ### Changed

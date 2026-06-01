@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.5] — 2026-06-01
+
+### Changed
+
+- Dependency update (devDep only, no behavioral or API changes): `tsx` `^4.22.3` → `^4.22.4`. Used to run the server outside Docker (`dev`/`login` scripts); not part of the published runtime. All three lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `bun.lock`) synced.
+
+## [1.36.4] — 2026-05-28
+
+### Changed
+
+- Dependency update (devDep only): `@biomejs/biome` `^2.4.15` → `^2.4.16` (lint/format only).
+
 ## [1.36.3] — 2026-05-10
 
 ### Fixed

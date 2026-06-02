@@ -22,7 +22,16 @@ jobs:
       - run: npx biome check src/
       - run: npx tsc --noEmit
       - run: npm run build
-      - run: npm publish --access public || echo "Already published, skipping"
+      - name: Publish to npm
+        run: |
+          npm publish --access public 2> publish-err.log && exit 0
+          if grep -q "cannot publish over" publish-err.log; then
+            echo "Version already published — skipping (idempotent re-run)."
+            exit 0
+          fi
+          echo "::error::npm publish failed for a reason other than 'already published':"
+          cat publish-err.log
+          exit 1
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -42,7 +51,15 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Publish to GitHub Packages
-        run: npm publish --access public || echo "Already published, skipping"
+        run: |
+          npm publish --access public 2> publish-err.log && exit 0
+          if grep -q "cannot publish over" publish-err.log; then
+            echo "Version already published — skipping (idempotent re-run)."
+            exit 0
+          fi
+          echo "::error::npm publish to GitHub Packages failed for a reason other than 'already published':"
+          cat publish-err.log
+          exit 1
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

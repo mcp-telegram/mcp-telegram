@@ -133,6 +133,20 @@ TELEGRAM_PROXY_SECRET=ee0000...0000 \
 | `TELEGRAM_PROXY_USERNAME` | Optional proxy auth |
 | `TELEGRAM_PROXY_PASSWORD` | Optional proxy auth |
 
+## WSS Transport (Port 443)
+
+Some VPS/hosting IP ranges (e.g. certain Hostinger, OVH and similar shared-VPS providers) block outbound port `80` to Telegram DC IP blocks as anti-abuse policy, while the same DCs stay reachable on port `443`. The default MTProto TCPFull transport connects on port `80`, so on these hosts the client hangs forever in `Connecting to ...:80/TCPFull...`.
+
+Set `TELEGRAM_USE_WSS=true` to switch the transport to port `443`:
+
+```bash
+TELEGRAM_USE_WSS=true npx @overpod/mcp-telegram
+```
+
+| Variable | Description |
+|----------|-------------|
+| `TELEGRAM_USE_WSS` | When `true`, gramJS uses port `443` instead of `80` for the MTProto TCPFull transport. Default: `false`. Cannot be combined with `TELEGRAM_PROXY_*` (gramJS limitation) — if both are set, `useWSS` is ignored and the proxy takes precedence (a warning is logged). |
+
 ## Next Step
 
 → [Login with QR Code](/getting-started/login)

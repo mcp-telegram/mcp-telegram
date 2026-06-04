@@ -138,7 +138,7 @@ TELEGRAM_USE_WSS=true npx @overpod/mcp-telegram
 
 | Variable | Description |
 |----------|-------------|
-| `TELEGRAM_USE_WSS` | When `true`, gramJS uses port `443` instead of `80` for the MTProto TCPFull transport. Cannot be combined with `TELEGRAM_PROXY_*` (gramJS limitation). |
+| `TELEGRAM_USE_WSS` | When `true`, gramJS uses port `443` instead of `80` for the MTProto TCPFull transport. Default: `false`. Cannot be combined with `TELEGRAM_PROXY_*` (gramJS limitation) — if both are set, `useWSS` is ignored and the proxy takes precedence (a warning is logged). |
 
 ## Installation Options
 

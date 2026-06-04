@@ -129,6 +129,20 @@ TELEGRAM_PROXY_SECRET=ee0000...0000 \
 | `TELEGRAM_PROXY_USERNAME` | 代理用户名（可选） |
 | `TELEGRAM_PROXY_PASSWORD` | 代理密码（可选） |
 
+## WSS 传输（端口 443）
+
+某些 VPS/主机商的 IP 段（例如部分 Hostinger、OVH 等共享 VPS 提供商）会出于反滥用策略封禁到 Telegram 数据中心 IP 段的出站 `80` 端口，而相同的数据中心在 `443` 端口上仍可访问。默认的 MTProto TCPFull 传输使用 `80` 端口连接，因此在这类主机上客户端会一直卡在 `Connecting to ...:80/TCPFull...`。
+
+设置 `TELEGRAM_USE_WSS=true` 即可将传输切换到 `443` 端口：
+
+```bash
+TELEGRAM_USE_WSS=true npx @overpod/mcp-telegram
+```
+
+| 变量 | 说明 |
+|------|------|
+| `TELEGRAM_USE_WSS` | 为 `true` 时，gramJS 使用 `443` 端口而非 `80` 端口进行 MTProto TCPFull 传输。默认：`false`。不能与 `TELEGRAM_PROXY_*` 同时使用（gramJS 限制）—— 若同时设置，将忽略 `useWSS`，以代理为准（并记录一条警告）。 |
+
 ## 下一步
 
 → [二维码登录](/zh/getting-started/login)

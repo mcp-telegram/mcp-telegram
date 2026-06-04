@@ -102,6 +102,22 @@ claude mcp add telegram-personal -s user \
 
 Each account gets its own session file — no conflicts.
 
+### Multiple agents / concurrent clients (shared daemon)
+
+The opposite of multiple accounts: **one** account driven by **many** clients at once — several Claude Code windows, parallel sub-agents, or multiple IDEs. Normally each process opens the same session and they evict one another with `AUTH_KEY_DUPLICATED`. Serve mode fixes this.
+
+Run a single persistent **daemon** that owns the one Telegram connection. Every other process auto-detects the daemon (via a PID lock) and becomes a thin client that proxies tool calls to it over a local Unix socket:
+
+```bash
+# On the host, once: start the daemon (owns the connection, no stdio)
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH mcp-telegram serve
+# (or set MCP_TELEGRAM_DAEMON=1 instead of the `serve` argument)
+```
+
+Then point each MCP client at the same install with the same `TELEGRAM_SESSION_PATH` — no `serve` argument. They connect to the daemon automatically; closing any client never drops the shared connection. Credentials are only required by the daemon (the owner), so client commands can omit `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` and keep them where the daemon runs.
+
+See the **[shared daemon guide](docs/guides/shared-daemon.md)** for a systemd unit and SSH usage.
+
 ### Proxy Support
 
 If Telegram is blocked or you're running in a containerized environment (Docker, K3s), use a SOCKS5 or MTProxy:

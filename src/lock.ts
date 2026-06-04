@@ -79,6 +79,23 @@ export function releaseLock(): void {
 export function releaseSocket(): void {
   try {
     const sock = socketPath();
-    if (existsSync(sock)) unlinkSync(sock);
+    if (!existsSync(sock)) return;
+    // Ownership guard (mirrors releaseLock): never unlink a socket owned by a different,
+    // still-alive process. Otherwise any process that imports this module and exits (e.g. a
+    // one-shot run or a test on the same host) would delete a running daemon's socket file,
+    // leaving the daemon listening in memory but unreachable for new clients.
+    const lock = lockPath();
+    if (existsSync(lock)) {
+      const pid = Number.parseInt(readFileSync(lock, "utf-8").trim(), 10);
+      if (!Number.isNaN(pid) && pid !== process.pid) {
+        try {
+          process.kill(pid, 0); // foreign owner still alive?
+          return; // yes — leave its socket alone
+        } catch {
+          // ESRCH: stale owner — safe to remove
+        }
+      }
+    }
+    unlinkSync(sock);
   } catch {}
 }

@@ -1,4 +1,4 @@
-import { createServer, type Socket } from "node:net";
+import { createServer, type Server, type Socket } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { GlobalLock } from "./global-lock.js";
@@ -27,8 +27,6 @@ function cleanup() {
 }
 
 process.on("exit", cleanup);
-process.on("SIGINT", () => process.exit(0));
-process.on("SIGTERM", () => process.exit(0));
 
 // Serializes tool calls with QR login — login holds the lock for up to minutes,
 // tool calls queue behind it. Prevents tool calls from running against a stale
@@ -148,18 +146,38 @@ async function handleLoginStart(socket: Socket, req: IpcLoginStart, telegram: Te
   }
 }
 
-export async function runMaster(apiId: number, apiHash: string, version: string): Promise<void> {
-  const telegram = new TelegramService(apiId, apiHash);
+export interface OwnerHandle {
+  server: McpServer;
+  srv: Server;
+  gracefulExit: () => Promise<void>;
+}
+
+/**
+ * Bootstrap the connection owner shared by master (stdio) and serve (daemon) modes:
+ * build the tool registry, listen on the IPC socket, install a graceful shutdown that
+ * disconnects Telegram, and auto-connect the single client. No stdio is attached here —
+ * the caller decides whether to also serve a stdio MCP session (master) or not (serve).
+ */
+export async function startOwner(
+  telegram: TelegramService,
+  version: string,
+  opts: { label?: string } = {},
+): Promise<OwnerHandle> {
+  const label = opts.label ?? "mcp-telegram";
 
   const server = new McpServer({ name: "mcp-telegram", version });
   registerTools(server, telegram);
   const mcpServer = server as unknown as McpServerInternal;
 
-  // Remove stale socket file from previous crash before attempting to listen (HIGH-2)
+  // Remove a stale socket file from a previous crash before attempting to listen.
   releaseSocket();
 
   const sock = socketPath();
-  const srv = createServer((socket) => handleClient(socket, mcpServer, telegram));
+  const srv = createServer((socket) => {
+    console.error(`[${label}] client connected`);
+    socket.on("close", () => console.error(`[${label}] client disconnected`));
+    handleClient(socket, mcpServer, telegram);
+  });
 
   await new Promise<void>((resolve, reject) => {
     srv.listen(sock, resolve);
@@ -171,29 +189,53 @@ export async function runMaster(apiId: number, apiHash: string, version: string)
     await chmod(sock, 0o600);
   } catch {}
 
-  console.error(`[mcp-telegram] Master mode — IPC socket ready: ${sock}`);
+  console.error(`[${label}] IPC socket ready: ${sock}`);
 
-  // Parent (Claude Code / MCP client) can close stdio without sending a signal.
-  // Without this, the process keeps running as an orphan with a live Telegram connection,
-  // blocking auth_key from being reused — causes AUTH_KEY_DUPLICATED on next start.
-  process.stdin.on("end", () => process.exit(0));
+  let shuttingDown = false;
+  const gracefulExit = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.error(`[${label}] Shutting down, disconnecting from Telegram...`);
+    try {
+      await telegram.disconnect();
+    } catch (err) {
+      console.error(`[${label}] Disconnect error:`, err);
+    }
+    process.exit(0);
+  };
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("[mcp-telegram] MCP server running on stdio (master)");
+  process.on("SIGINT", gracefulExit);
+  process.on("SIGTERM", gracefulExit);
 
-  // Auto-connect with saved session — catch to avoid unhandled rejection (MEDIUM-2)
+  // Auto-connect with saved session — catch to avoid unhandled rejection.
   telegram
     .loadSession()
     .then(async () => {
       if (await telegram.connect()) {
         const me = await telegram.getMe();
-        console.error(`[mcp-telegram] Auto-connected as @${me.username}`);
+        console.error(`[${label}] connected as @${me.username}`);
       } else if (telegram.lastError) {
-        console.error(`[mcp-telegram] ${telegram.lastError}`);
+        console.error(`[${label}] ${telegram.lastError}`);
       }
     })
     .catch((err: unknown) => {
-      console.error("[mcp-telegram] Auto-connect failed:", err);
+      console.error(`[${label}] Auto-connect failed:`, err);
     });
+
+  return { server, srv, gracefulExit };
+}
+
+export async function runMaster(apiId: number, apiHash: string, version: string): Promise<void> {
+  const telegram = new TelegramService(apiId, apiHash);
+  const { server, gracefulExit } = await startOwner(telegram, version, { label: "mcp-telegram (master)" });
+
+  // Parent (Claude Code / MCP client) can close stdio without sending a signal.
+  // Without this, the process keeps running as an orphan with a live Telegram connection,
+  // blocking auth_key from being reused — causes AUTH_KEY_DUPLICATED on next start.
+  process.stdin.on("end", gracefulExit);
+
+  // Master also serves the launching window directly over stdio.
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("[mcp-telegram] MCP server running on stdio (master)");
 }

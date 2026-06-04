@@ -82,7 +82,7 @@ describe("releaseLock", () => {
 });
 
 describe("releaseSocket", () => {
-  it("removes socket file if it exists", () => {
+  it("removes socket file if it exists (no lock → no owner)", () => {
     writeFileSync(socketPath(), "");
     releaseSocket();
     assert.strictEqual(existsSync(socketPath()), false);
@@ -90,5 +90,26 @@ describe("releaseSocket", () => {
 
   it("no socket file → does not throw", () => {
     assert.doesNotThrow(() => releaseSocket());
+  });
+
+  it("keeps socket when a live foreign process owns the lock", () => {
+    writeFileSync(socketPath(), "");
+    writeFileSync(lockPath(), String(process.ppid)); // ppid is always alive and != our pid
+    releaseSocket();
+    assert.strictEqual(existsSync(socketPath()), true, "must not delete a live foreign owner's socket");
+  });
+
+  it("removes socket when we own the lock", () => {
+    writeFileSync(socketPath(), "");
+    writeFileSync(lockPath(), String(process.pid));
+    releaseSocket();
+    assert.strictEqual(existsSync(socketPath()), false);
+  });
+
+  it("removes socket when the lock owner is a dead PID (stale)", () => {
+    writeFileSync(socketPath(), "");
+    writeFileSync(lockPath(), "999999999");
+    releaseSocket();
+    assert.strictEqual(existsSync(socketPath()), false);
   });
 });

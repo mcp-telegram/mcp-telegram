@@ -17,6 +17,10 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    # release-please-action@v4 still bundles a Node 20 runtime (deprecated on
+    # GitHub runners from 2026-06-16). Opt into Node 24 ahead of the forced cutover.
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - uses: googleapis/release-please-action@v4
         with:

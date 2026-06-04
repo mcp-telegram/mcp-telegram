@@ -128,6 +128,18 @@ npx @overpod/mcp-telegram
 | `TELEGRAM_PROXY_USERNAME` | Optional proxy auth |
 | `TELEGRAM_PROXY_PASSWORD` | Optional proxy auth |
 
+### Connecting via WSS (port 443)
+
+If your VPS or hosting IP is reachable on outbound port `443` but not the default MTProto port `80` (some cloud providers ban port `80` on Telegram DC IP ranges as anti-abuse policy), set:
+
+```bash
+TELEGRAM_USE_WSS=true npx @overpod/mcp-telegram
+```
+
+| Variable | Description |
+|----------|-------------|
+| `TELEGRAM_USE_WSS` | When `true`, gramJS uses port `443` instead of `80` for the MTProto TCPFull transport. Default: `false`. Cannot be combined with `TELEGRAM_PROXY_*` (gramJS limitation) — if both are set, `useWSS` is ignored and the proxy takes precedence (a warning is logged). |
+
 ## Installation Options
 
 ### npx (recommended, zero install)

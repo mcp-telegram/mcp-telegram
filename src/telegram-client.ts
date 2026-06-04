@@ -216,6 +216,21 @@ function resolveProxy(): ProxyInterface | undefined {
   };
 }
 
+// When true, gramJS uses port 443 instead of the default 80 for the MTProto
+// TCPFull transport. Useful on hosts where outbound port 80 to Telegram DC IP
+// ranges is blocked. gramJS cannot combine useWSS with a proxy, so warn early
+// rather than let it fail deep inside connect() with an opaque error.
+function resolveUseWSS(proxy: ProxyInterface | undefined): boolean {
+  const useWSS = process.env.TELEGRAM_USE_WSS === "true";
+  if (useWSS && proxy) {
+    console.error(
+      "[mcp-telegram] TELEGRAM_USE_WSS=true cannot be combined with TELEGRAM_PROXY_* — gramJS does not support SSL transport over a proxy. Ignoring useWSS; the proxy takes precedence.",
+    );
+    return false;
+  }
+  return useWSS;
+}
+
 function ensureSessionDir(filePath: string): void {
   const dir = dirname(filePath);
   if (!existsSync(dir)) {
@@ -322,6 +337,7 @@ export class TelegramService {
     const proxy = resolveProxy();
     this.client = new TelegramClient(session, this.apiId, this.apiHash, {
       connectionRetries: 5,
+      useWSS: resolveUseWSS(proxy),
       ...(proxy && { proxy }),
     });
 
@@ -448,6 +464,7 @@ export class TelegramService {
     const proxy = resolveProxy();
     const client = new TelegramClient(session, this.apiId, this.apiHash, {
       connectionRetries: 5,
+      useWSS: resolveUseWSS(proxy),
       ...(proxy && { proxy }),
     });
 

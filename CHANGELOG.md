@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.0] — 2026-06-04
+
+### Added
+
+- `TELEGRAM_USE_WSS` env-var. When set to `true`, gramJS uses port `443` instead of the default `80` for the MTProto TCPFull transport. This unblocks deployments on VPS/hosting IP ranges where outbound port `80` to Telegram DC IP blocks is dropped (anti-abuse policy on some shared-VPS providers), which otherwise hangs the client forever in `Connecting to ...:80/TCPFull...`. Default is `false`, so existing setups are unaffected. Contributed by Ivan Ponomarev (@Baho73).
+- When `TELEGRAM_USE_WSS=true` is combined with `TELEGRAM_PROXY_*` (which gramJS cannot do — SSL transport over a proxy is unsupported), the conflict is now detected early: a clear warning is logged and `useWSS` is ignored, letting the proxy take precedence, instead of crashing deep inside `connect()`.
+
 ## [1.36.5] — 2026-06-01
 
 ### Changed

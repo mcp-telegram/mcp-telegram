@@ -23,6 +23,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "login": "node dist/qr-login-cli.js",
+    "clean": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prebuild": "npm run clean",
     "build": "tsc && chmod +x dist/cli.js dist/manifest.js dist/qr-login-cli.js",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",

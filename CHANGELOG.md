@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.37.0...v1.37.1) (2026-06-06)
+
+
+### Fixed
+
+* **build:** clean dist/ before tsc so stale artifacts don't ship to npm ([f56676d](https://github.com/mcp-telegram/mcp-telegram/commit/f56676d9b610865145fe595ac806538f7e959741))
+
 ## [1.37.0] — 2026-06-04
 
 ### Added

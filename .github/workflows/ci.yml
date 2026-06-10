@@ -22,3 +22,7 @@ jobs:
       - run: npx biome check src/
       - run: npx tsc --noEmit
       - run: npm run build
+      # Build the docs site so a dead link / broken VitePress fails the PR,
+      # not main. Deploy Docs (docs.yml) only runs on push to main, so without
+      # this a bad doc link is invisible until after merge (PR #49 hit this).
+      - run: npx vitepress build docs

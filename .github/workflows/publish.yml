@@ -61,7 +61,12 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
 
   publish-binaries:
-    if: github.event_name == 'release'
+    # Runs for both `release: published` and a manual `workflow_dispatch` on a tag.
+    # release-please creates the GitHub Release with the default GITHUB_TOKEN, which
+    # does NOT trigger the `release` event (loop-protection) — so real releases are
+    # published via `workflow_dispatch --ref vX.Y.Z`. Gating on `event_name == 'release'`
+    # silently skipped binaries for every release-please tag (v1.37.1, v1.38.0 shipped
+    # with 0 assets). Skip only if no tag can be resolved (e.g. dispatch on a branch).
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -86,7 +91,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Resolve the release tag from either trigger: the `release` event payload,
+      # or the ref a manual dispatch was launched on. Skip the upload if neither
+      # yields a vX.Y.Z tag (e.g. someone dispatches on `main`).
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            echo "name=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release tag resolved (not a release event, not a tag ref) — skipping binary upload."
+            echo "name=" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: oven-sh/setup-bun@v2
+        if: steps.tag.outputs.name != ''
         with:
           bun-version: "1.3.13"
 
@@ -94,17 +115,21 @@ jobs:
       # patch bump to package.json doesn't block standalone binary publishing
       # while bun.lock catches up. Dependency tree is already validated by
       # publish-npm above (npm ci + package-lock.json).
-      - run: bun install
+      - if: steps.tag.outputs.name != ''
+        run: bun install
 
       - name: Compile MCP server binary
+        if: steps.tag.outputs.name != ''
         run: bun build src/index.ts --compile --target ${{ matrix.target }} --outfile ${{ matrix.server }}
 
       - name: Compile login CLI binary
+        if: steps.tag.outputs.name != ''
         run: bun build src/qr-login-cli.ts --compile --target ${{ matrix.target }} --outfile ${{ matrix.login }}
 
       - name: Upload binaries to release
+        if: steps.tag.outputs.name != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} ${{ matrix.server }} --clobber
-          gh release upload ${{ github.event.release.tag_name }} ${{ matrix.login }} --clobber
+          gh release upload ${{ steps.tag.outputs.name }} ${{ matrix.server }} --clobber
+          gh release upload ${{ steps.tag.outputs.name }} ${{ matrix.login }} --clobber

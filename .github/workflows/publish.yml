@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to (re)publish, e.g. v1.38.0. Leave blank to use the dispatched ref."
+        required: false
+        type: string
 
 jobs:
   publish-npm:
@@ -89,20 +94,26 @@ jobs:
             server: mcp-telegram-windows-x64.exe
             login: mcp-telegram-login-windows-x64.exe
     steps:
+      # When re-publishing a past tag via the `tag` input, check out that tag's
+      # source so the compiled binaries match the released code (not main's HEAD).
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
-      # Resolve the release tag from either trigger: the `release` event payload,
-      # or the ref a manual dispatch was launched on. Skip the upload if neither
-      # yields a vX.Y.Z tag (e.g. someone dispatches on `main`).
+      # Resolve the release tag from any trigger: the explicit `tag` input, the
+      # `release` event payload, or the ref a manual dispatch was launched on.
+      # Skip the upload if none yields a vX.Y.Z tag (e.g. dispatch on `main`).
       - name: Resolve release tag
         id: tag
         run: |
-          if [ -n "${{ github.event.release.tag_name }}" ]; then
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
             echo "name=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.ref_type }}" = "tag" ]; then
             echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           else
-            echo "No release tag resolved (not a release event, not a tag ref) — skipping binary upload."
+            echo "No release tag resolved (no tag input, not a release event, not a tag ref) — skipping binary upload."
             echo "name=" >> "$GITHUB_OUTPUT"
           fi
 

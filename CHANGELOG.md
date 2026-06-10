@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.37.1...v1.38.0) (2026-06-10)
+
+
+### Added
+
+* shared daemon (serve mode) for concurrent MCP clients ([#49](https://github.com/mcp-telegram/mcp-telegram/issues/49)) ([7568927](https://github.com/mcp-telegram/mcp-telegram/commit/75689270ffb21ca4f14e9e7673a36af25f36cde5))
+
 ## [1.37.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.37.0...v1.37.1) (2026-06-06)
 
 

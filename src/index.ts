@@ -22,7 +22,9 @@ const API_HASH = process.env.TELEGRAM_API_HASH;
 // runs without them — letting credentials stay only where the daemon runs.
 function requireCreds(): void {
   if (!API_ID || !API_HASH) {
-    console.error("[mcp-telegram] Missing TELEGRAM_API_ID and TELEGRAM_API_HASH (required to own the Telegram connection)");
+    console.error(
+      "[mcp-telegram] Missing TELEGRAM_API_ID and TELEGRAM_API_HASH (required to own the Telegram connection)",
+    );
     console.error("Get your credentials at https://my.telegram.org/apps (API development tools)");
     console.error("Set them in .env or export as environment variables");
     process.exit(1);

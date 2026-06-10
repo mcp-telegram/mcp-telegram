@@ -42,8 +42,11 @@ export function tryAcquireLock(): boolean {
           process.kill(pid, 0);
           // Process is alive — another master owns the lock
           return false;
-        } catch {
-          // ESRCH: process not found — stale lock, take over
+        } catch (err) {
+          // ESRCH: process not found — stale lock, take over.
+          // EPERM: process is alive but owned by another uid we can't signal —
+          // treat as a live owner and DON'T steal the lock.
+          if ((err as NodeJS.ErrnoException).code === "EPERM") return false;
           unlinkSync(lock);
         }
       }
@@ -87,12 +90,15 @@ export function releaseSocket(): void {
     const lock = lockPath();
     if (existsSync(lock)) {
       const pid = Number.parseInt(readFileSync(lock, "utf-8").trim(), 10);
-      if (!Number.isNaN(pid) && pid !== process.pid) {
+      // Ignore non-positive PIDs (e.g. 0) so kill() can't probe our own process group.
+      if (!Number.isNaN(pid) && pid > 0 && pid !== process.pid) {
         try {
           process.kill(pid, 0); // foreign owner still alive?
           return; // yes — leave its socket alone
-        } catch {
-          // ESRCH: stale owner — safe to remove
+        } catch (err) {
+          // ESRCH: stale owner — safe to remove. EPERM: owner is alive under a
+          // different uid (e.g. a systemd daemon) — leave its socket alone too.
+          if ((err as NodeJS.ErrnoException).code === "EPERM") return;
         }
       }
     }

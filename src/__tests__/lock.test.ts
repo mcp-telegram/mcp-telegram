@@ -112,4 +112,13 @@ describe("releaseSocket", () => {
     releaseSocket();
     assert.strictEqual(existsSync(socketPath()), false);
   });
+
+  it("removes socket when the lock PID is non-positive (never probes our own group)", () => {
+    // pid <= 0 must be ignored — process.kill(0, 0) would target our own process
+    // group and falsely report a live owner. Guard skips the kill and removes the socket.
+    writeFileSync(socketPath(), "");
+    writeFileSync(lockPath(), "0");
+    releaseSocket();
+    assert.strictEqual(existsSync(socketPath()), false);
+  });
 });

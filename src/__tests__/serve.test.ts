@@ -41,7 +41,13 @@ function sendAndCollect(
         resolve({ messages, client });
       }
     });
-    client.on("error", reject);
+    client.on("error", (err) => {
+      // Clear the timer and tear down the socket before rejecting, so a late
+      // timeout can't fire a second rejection (and extra destroy) after an error.
+      clearTimeout(timer);
+      client.destroy();
+      reject(err);
+    });
   });
 }
 
@@ -57,8 +63,13 @@ describe("serve owner-core (startOwner)", () => {
     owner = await startOwner(stubTelegram, "test", { label: "serve-test" });
   });
 
-  after(() => {
-    owner?.srv.close();
+  after(async () => {
+    // Await the server actually closing — a UNIX socket server keeps the event
+    // loop alive and the socket path can linger, hanging the suite otherwise.
+    await new Promise<void>((resolve) => {
+      if (!owner?.srv) return resolve();
+      owner.srv.close(() => resolve());
+    });
     rmSync(sessionDir, { recursive: true, force: true });
     if (prevSessionPath === undefined) delete process.env.TELEGRAM_SESSION_PATH;
     else process.env.TELEGRAM_SESSION_PATH = prevSessionPath;
@@ -71,15 +82,11 @@ describe("serve owner-core (startOwner)", () => {
   it("serves two concurrent clients, routing each response to its own request id", async () => {
     const sock = socketPath();
     const [a, b] = await Promise.all([
-      sendAndCollect(
-        sock,
-        [{ type: "tool", id: "A1", tool: "telegram-status", args: {} }],
-        (m) => m.some((x) => x.type === "tool_response"),
+      sendAndCollect(sock, [{ type: "tool", id: "A1", tool: "telegram-status", args: {} }], (m) =>
+        m.some((x) => x.type === "tool_response"),
       ),
-      sendAndCollect(
-        sock,
-        [{ type: "tool", id: "B1", tool: "telegram-status", args: {} }],
-        (m) => m.some((x) => x.type === "tool_response"),
+      sendAndCollect(sock, [{ type: "tool", id: "B1", tool: "telegram-status", args: {} }], (m) =>
+        m.some((x) => x.type === "tool_response"),
       ),
     ]);
 
@@ -109,10 +116,8 @@ describe("serve owner-core (startOwner)", () => {
 
     assert.strictEqual(owner.srv.listening, true);
 
-    const b = await sendAndCollect(
-      sock,
-      [{ type: "tool", id: "D2", tool: "telegram-status", args: {} }],
-      (m) => m.some((x) => x.type === "tool_response"),
+    const b = await sendAndCollect(sock, [{ type: "tool", id: "D2", tool: "telegram-status", args: {} }], (m) =>
+      m.some((x) => x.type === "tool_response"),
     );
     const bResp = b.messages.find((m) => m.type === "tool_response");
     assert.strictEqual((bResp as { id: string }).id, "D2");

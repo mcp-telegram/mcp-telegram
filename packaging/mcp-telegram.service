@@ -1,0 +1,29 @@
+# systemd unit for the mcp-telegram shared daemon (serve mode).
+#
+# Deployment notes (paths are deployment-specific — adjust to your install):
+#   - ExecStart points at the built dist/cli.js with the `serve` subcommand.
+#   - Credentials live in the EnvironmentFile (see mcp-telegram.env.example), NOT here.
+#   - The daemon owns the single Telegram connection and listens on
+#     $(dirname TELEGRAM_SESSION_PATH)/daemon.sock; every other mcp-telegram process
+#     becomes a client and proxies tool calls over that socket.
+#
+# Install:
+#   cp packaging/mcp-telegram.service /etc/systemd/system/mcp-telegram.service
+#   cp packaging/mcp-telegram.env.example /etc/mcp-telegram.env   # then fill in credentials
+#   chmod 600 /etc/mcp-telegram.env
+#   systemctl daemon-reload && systemctl enable --now mcp-telegram
+
+[Unit]
+Description=mcp-telegram shared daemon (serve mode)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/mcp-telegram.env
+ExecStart=/usr/bin/node /opt/mcp-telegram/dist/cli.js serve
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

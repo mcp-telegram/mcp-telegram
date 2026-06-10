@@ -41,7 +41,7 @@ Internally `runMaster` and `runServe` share one `startOwner()` core (socket serv
 
 ## Server setup (systemd)
 
-Templates ship in [`packaging/`](../../packaging/).
+Templates ship in [`packaging/`](https://github.com/mcp-telegram/mcp-telegram/tree/main/packaging) in the repository.
 
 ```bash
 # 1. Build

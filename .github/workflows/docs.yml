@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'CHANGELOG.md'
+      - 'scripts/gen-changelog-docs.ts'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/docs.yml'
@@ -31,7 +33,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx vitepress build docs
+      # docs:build runs predocs:build (gen:changelog) first, so the deployed
+      # site always reflects CHANGELOG.md even if the committed pages lag.
+      - run: npm run docs:build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs/.vitepress/dist

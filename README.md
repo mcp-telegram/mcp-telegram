@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@overpod/mcp-telegram)](https://www.npmjs.com/package/@overpod/mcp-telegram)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.27-green.svg)](https://modelcontextprotocol.io/)
+[![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.29-green.svg)](https://modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![mcp-telegram MCP server](https://glama.ai/mcp/servers/overpod/mcp-telegram/badges/score.svg)](https://glama.ai/mcp/servers/overpod/mcp-telegram)
 
@@ -18,13 +18,15 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 
 ## Features
 
-- **Comprehensive tool coverage** -- the most full-featured Telegram MCP server available (80+ tools)
+- **Comprehensive tool coverage** -- the most full-featured Telegram MCP server available
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API
 - **Userbot** -- operates as your personal account, not a bot
 - **Full-featured** -- messaging, reactions, polls, scheduled messages, stickers, media, contacts, and more
 - **Forum Topics** -- list topics, read per-topic messages, send to specific topics, per-topic unread counts
 - **Stickers** -- search sticker sets, browse installed/recent stickers, send stickers to any chat
 - **Account & profile management** -- update profile, set emoji status, birthday, personal channel, profile photo, manage privacy settings, sessions, auto-delete timers
+- **Chat folders** -- create, edit, delete and reorder folders, toggle folder tags, read suggested folders (v1.33.0)
+- **Global privacy** -- read and set account-wide privacy settings (v1.33.0)
 - **Global search** -- search messages across all chats at once
 - **Real-time polling** -- fetch updates via stateless cursors; agent owns `{pts, qts, date}` state
 - **Inline bots & buttons** -- query inline bots, send results, press callback buttons
@@ -34,6 +36,8 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **Admin controls** -- toggle channel signatures, anti-spam, forum mode, prehistory; approve join requests
 - **Stats** -- channel and supergroup analytics (GetBroadcastStats / GetMegagroupStats)
 - **Boosts & Business** -- boost status, boosters list, Telegram Business chat links CRUD, work hours, location, greeting/away/intro messages
+- **Star gifts** -- browse available and saved gifts, save/convert gifts, manage Stars balance and subscriptions (opt-in via `MCP_TELEGRAM_ENABLE_STARS=1`, v1.34.0)
+- **Shared daemon** -- one background process serves multiple MCP clients over a single Telegram session; see the [shared-daemon guide](https://mcp-telegram.github.io/mcp-telegram/guides/shared-daemon) (v1.38.0)
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
@@ -363,6 +367,8 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Rich Media Sending** | `telegram-send-voice`, `telegram-send-video-note` (round video), `telegram-send-location` (static or live), `telegram-send-venue`, `telegram-send-contact`, `telegram-send-dice` (🎲🎯🎰🏀⚽🎳), `telegram-send-album` (2–10 grouped photos/videos) |
 | **Groups** | `telegram-create-group`, `telegram-edit-group`, `telegram-invite-to-group`, `telegram-join-chat`, `telegram-leave-group`, `telegram-kick-user`, `telegram-ban-user`, `telegram-unban-user`, `telegram-set-admin`, `telegram-remove-admin`, `telegram-get-my-role`, `telegram-set-chat-permissions`, `telegram-set-slow-mode`, `telegram-get-admin-log` |
 | **Chat Info** | `telegram-get-chat-info`, `telegram-get-chat-members`, `telegram-get-chat-folders` |
+| **Folders (v1.33.0)** | `telegram-create-folder`, `telegram-edit-folder`, `telegram-delete-folder`, `telegram-reorder-folders`, `telegram-get-suggested-folders`, `telegram-toggle-folder-tags` |
+| **Global Privacy (v1.33.0)** | `telegram-get-global-privacy-settings`, `telegram-set-global-privacy-settings` |
 | **Invite Links** | `telegram-create-invite-link`, `telegram-get-invite-links`, `telegram-revoke-invite-link` |
 | **Contacts** | `telegram-get-contacts`, `telegram-add-contact`, `telegram-get-contact-requests` |
 | **Moderation** | `telegram-block-user`, `telegram-unblock-user`, `telegram-report-spam` |
@@ -381,7 +387,7 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Read Receipts (v1.30.0)** | `telegram-get-message-read-participants`, `telegram-get-outbox-read-date` |
 | **Boosts** | `telegram-get-my-boosts`, `telegram-get-boosts-status`, `telegram-get-boosts-list` |
 | **Business (v1.32.0)** | `telegram-get-business-chat-links`, `telegram-create-business-chat-link`, `telegram-edit-business-chat-link`, `telegram-delete-business-chat-link`, `telegram-resolve-business-chat-link`, `telegram-set-business-hours`, `telegram-set-business-location`, `telegram-set-business-greeting`, `telegram-set-business-away`, `telegram-set-business-intro` |
-| **Opt-in (env-gated)** | `telegram-get-group-call`, `telegram-get-group-call-participants` (requires `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1`), `telegram-get-stars-status`, `telegram-get-stars-transactions` (requires `MCP_TELEGRAM_ENABLE_STARS=1`), `telegram-get-quick-replies`, `telegram-get-quick-reply-messages` (requires `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1`) |
+| **Opt-in (env-gated)** | `telegram-get-group-call`, `telegram-get-group-call-participants` (requires `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1`); Stars & gifts `telegram-get-stars-status`, `telegram-get-stars-transactions`, `telegram-get-stars-topup-options`, `telegram-get-stars-subscriptions`, `telegram-change-stars-subscription`, `telegram-get-available-star-gifts`, `telegram-get-saved-star-gifts`, `telegram-save-star-gift`, `telegram-convert-star-gift` (requires `MCP_TELEGRAM_ENABLE_STARS=1`); `telegram-get-quick-replies`, `telegram-get-quick-reply-messages` (requires `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1`) |
 
 > **Tip**: Ask your AI assistant *"What Telegram tools are available?"* to get the full list with parameters and descriptions.
 
@@ -392,7 +398,7 @@ Some tools are disabled by default and must be opted in via environment variable
 | Variable | Value | Tools enabled |
 |----------|-------|---------------|
 | `MCP_TELEGRAM_ENABLE_GROUP_CALLS` | `1` | `telegram-get-group-call`, `telegram-get-group-call-participants` |
-| `MCP_TELEGRAM_ENABLE_STARS` | `1` | `telegram-get-stars-status`, `telegram-get-stars-transactions` |
+| `MCP_TELEGRAM_ENABLE_STARS` | `1` | Stars balance & transactions, top-up options, subscriptions, and Star Gifts (browse / save / convert) |
 | `MCP_TELEGRAM_ENABLE_QUICK_REPLIES` | `1` | `telegram-get-quick-replies`, `telegram-get-quick-reply-messages` |
 
 Add these to your `.env` file or MCP client config to enable them.

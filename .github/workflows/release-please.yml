@@ -17,12 +17,11 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
-    # release-please-action@v4 still bundles a Node 20 runtime (deprecated on
-    # GitHub runners from 2026-06-16). Opt into Node 24 ahead of the forced cutover.
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: googleapis/release-please-action@v4
+      # v5's only breaking change vs v4 is the bundled runtime (Node 20 → 24),
+      # so the old FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 opt-in is no longer needed.
+      # Config schema, inputs, and behavior are unchanged.
+      - uses: googleapis/release-please-action@v5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

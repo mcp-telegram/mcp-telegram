@@ -18,7 +18,14 @@ mcp-telegram-login-*
 
 # Bun
 
-docs/.vitepress/dist\ndocs/.vitepress/cache
+docs/.vitepress/dist
+docs/.vitepress/cache
+
+# Changelog pages are generated from CHANGELOG.md by scripts/gen-changelog-docs.ts
+# (predocs:build). Derived artifact — source of truth is CHANGELOG.md.
+docs/changelog.md
+docs/ru/changelog.md
+docs/zh/changelog.md
 
 # Ralphex (autonomous execution loop) — local only
 .ralphex/

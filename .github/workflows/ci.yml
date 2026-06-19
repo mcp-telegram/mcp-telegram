@@ -22,13 +22,10 @@ jobs:
       - run: npx biome check src/
       - run: npx tsc --noEmit
       - run: npm run build
-      # Fail the PR if the committed changelog docs drift from CHANGELOG.md.
-      # Run `npm run gen:changelog` and commit to fix. Checked before the build
-      # below so a stale changelog is caught even if the build would pass.
-      - run: npm run gen:changelog:check
       # Build the docs site so a dead link / broken VitePress fails the PR,
       # not main. Deploy Docs (docs.yml) only runs on push to main, so without
       # this a bad doc link is invisible until after merge (PR #49 hit this).
-      # `vitepress build docs` directly (not docs:build) so predocs:build does
-      # NOT regenerate and mask a stale commit — gen:changelog:check owns that.
-      - run: npx vitepress build docs
+      # docs:build runs predocs:build (gen:changelog) first — the changelog
+      # pages are generated from CHANGELOG.md, not committed, so this both
+      # exercises the generator and produces the pages the build needs.
+      - run: npm run docs:build

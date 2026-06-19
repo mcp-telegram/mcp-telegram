@@ -350,6 +350,63 @@ Tests: 490/490 pass.
 - **Album mixed photo+video** — GramJS accepts mixed arrays via extension-based detection, but this is not covered by tests; recommend uniform media type per album until a live-test checkpoint confirms.
 - **Album flood control** — a 10-item album fans out 10 `messages.UploadMedia` calls inside one rate-limit slot; under heavy contention the later items may still hit `FLOOD_WAIT`. Rate limiter retries apply.
 
+## [1.28.1] - 2026-04-22
+
+### Added
+- **`telegram-logout`** — new tool (Auth category, annotated `DESTRUCTIVE`). Fully logs out: calls `auth.LogOut` on Telegram servers (session disappears from Settings → Devices), destroys the GramJS client, deletes the local session file, and clears in-memory state. Takes no parameters. Handles every state cleanly — connected (server revoke + local wipe), disconnected with a session file (local wipe only, with a notice), no session (`fail` "Not logged in"), and `auth.LogOut` throwing (local wipe still happens, with a "check Settings → Devices manually" hint).
+
+### Changed
+- **`TelegramService.logOut()` hardened** — server-revoke and client-destroy are now split: a successful `auth.LogOut` returns `true` even if `client.destroy()` throws (previously misreported "not confirmed"). The local wipe is verified post-unlink and throws if the session file survives (e.g. read-only Docker mount), instead of falsely reporting success. File removal now always runs even when server-revoke fails (network error, `AUTH_KEY_UNREGISTERED`).
+- **Master cancels active QR login on logout** — a `telegram-logout` request now aborts an in-progress QR login flow before acquiring `globalLock`, instead of queuing behind it for up to 5 minutes.
+
+### Testing
+- 322 unit tests (+10 vs v1.28.0) — `hasLocalSession()`, `logOut()` edge cases (connected / disconnected±file / network error / idempotency / FS-throws / destroy-throws-but-revoke-succeeds), and a Master integration test that logout aborts an active login over a real unix socket.
+
+### Notes & known limitations
+- In a 3-client FIFO scenario (A holds the lock via login, B queues a tool call, C requests logout), logout correctly aborts A, but B still runs before logout because FIFO order is preserved. A priority-aware queue is deferred.
+
+## [1.28.0] - 2026-04-22
+
+### Added
+- **QR login through the IPC daemon** — `mcp-telegram login` now flows through the Master daemon over IPC instead of running as a separate process. The new session reaches the Master's memory immediately, with no editor restart. This fixes the "relogin via `mcp-telegram login`" flavor of `AUTH_KEY_DUPLICATED`/`AUTH_KEY_UNREGISTERED`, where the standalone login wrote a fresh session to disk but the running Master kept the old, now-invalidated auth key in memory and then wiped the just-created session on the next tool call.
+  - `IpcClient.loginFlow(onQr)` — streams QR frames as they refresh (~every 10s).
+  - `handleLoginStart` on Master — runs `startQrLogin` on the shared `TelegramService`.
+  - `GlobalLock` (FIFO mutex) — serializes tool calls with the login flow so other clients queue instead of hitting a stale client mid-relogin.
+  - `AbortController` — `socket.on("close")` aborts the QR loop if the CLI is interrupted (Ctrl+C / terminal closed); `globalLock` releases immediately instead of blocking tool calls for up to 5 minutes.
+  - Session swap now saves to disk first, then adopts in memory and destroys the previous client — prevents orphan Telegram connections accumulating per relogin.
+  - Standalone fallback kept — if no Master is running, `mcp-telegram login` works exactly as before.
+
+### Changed
+- **BREAKING (internal IPC only): IPC protocol is now a discriminated union** with a required `type` tag (`tool` / `tool_response` / `login_start` / `login_qr` / `login_done`). A new 1.28.0 client and an older 1.27.x Master cannot talk — restart your editor / Claude Code after upgrading so the Master daemon is replaced. No public API or invocation change. (Parent-crash detection already kills stale Masters in most cases, so this is transparent for VS Code / Claude Desktop users.)
+
+### Fixed
+- Socket errors on Master now log to stderr instead of being silently dropped.
+- `client.destroy()` in abort branches wrapped in try/catch — guarantees the "QR login aborted" message even if Telegram destroy throws.
+- QR render errors (`QRCode.toString` failure) logged to stderr instead of silently dropped.
+
+### Testing
+- 312 unit tests (was 288) — new suites for `GlobalLock` (FIFO ordering, double-release safety), Master login (QR URL forwarding, abort on socket close), child-process integration via tsx, `IpcClient.loginFlow`, and IPC discriminated-union / legacy-protocol rejection.
+
+## [1.27.1] - 2026-04-22
+
+### Changed
+- Patch release — no new tools, no API changes; pure code-quality and test-coverage work. Refactored `telegram-client.ts` re-exports (eliminates 2 Biome `noUnusedImports` false-positives), replaced unsafe `(e as Error).message` casts with `e instanceof Error` guards in the stats methods, and added `McpRegisteredTool` / `McpServerInternal` types to `ipc-protocol.ts` as a single source of truth (previously duplicated across master.ts and client.ts).
+
+### Testing
+- 286 unit tests (+25 vs v1.27.0) — new branch coverage for `wireIpcProxies` (incl. a safety test that the original `TelegramService` handler is never called after wiring), the rate limiter (`throwOnFloodWait`, retry exhaustion, 5xx, GramJS `errorMessage`), and the IPC protocol parser (malformed JSON, blank lines, partial-line buffering, multiple messages per chunk). `rate-limiter.ts` reached 100% statements.
+
+## [1.27.0] - 2026-04-21
+
+### Added
+- **Master/Client IPC daemon — fixes `AUTH_KEY_DUPLICATED` across concurrent Claude sessions.** Opening multiple Claude sessions used to spawn separate `mcp-telegram` processes that each connected to Telegram with the same session, which Telegram rejected as a duplicate. Now the first process to start becomes the **Master** (holds the single GramJS connection, listens on a Unix socket at `~/.mcp-telegram/daemon.sock`) and every subsequent process becomes a thin **Client** that proxies tool calls to the Master over the socket — one connection, one auth key, no duplicates. Zero config change; same invocation.
+  - New files: `src/lock.ts` (atomic `O_EXCL` PID lockfile + stale-lock detection via `kill -0`), `src/ipc-protocol.ts` (IPC message types + newline-delimited JSON parser), `src/master.ts` (Unix socket server, sequential queue dispatcher), `src/client.ts` (`IpcClient` with timeout + retry, handler proxy).
+  - Security: socket file is `chmod 0o600` (owner-only); the session string never leaves the Master process.
+
+### Fixed
+- Atomic lock via `O_EXCL` prevents a race when multiple sessions start simultaneously; stale socket from a previous crash is removed before `listen` (no `EADDRINUSE`).
+- One-shot connect timeout (not idle) so live connections survive inactivity; 30s IPC call timeout so a stuck Master surfaces a clean error instead of hanging.
+- Sequential `drainQueue()` loop for correct concurrent-request handling; `.catch()` on auto-connect to avoid `unhandledRejection`; idempotent cleanup (`cleanedUp` flag) so SIGINT/SIGTERM don't double-release.
+
 ## [1.26.0] - 2026-04-20
 
 ### Added

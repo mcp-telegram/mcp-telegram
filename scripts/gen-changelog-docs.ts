@@ -46,10 +46,16 @@ function cleanLine(line: string): string {
 /** Conventional-commit scopes that carry no user-facing signal. */
 const NOISE_SCOPE = /^\s*-\s+\*\*(deps|build|ci|chore|docs|test|style|refactor)(\([^)]*\))?:\*\*/i;
 
-/** A single bullet is noise if it's a noise-scoped commit or a plain deps bump. */
+/** A single bullet is noise if it's a noise-scoped commit or a plain deps bump.
+ * Deps wording (e.g. "Dependency update", "bump … → …") is reliable noise; a
+ * bare tool name like "biome"/"tsx" is NOT — it appears in real refactor notes
+ * ("eliminates 2 Biome false-positives"), so we only treat it as a bump when a
+ * version arrow accompanies it. */
 function isNoiseBullet(line: string): boolean {
   if (NOISE_SCOPE.test(line)) return true;
-  return /^\s*-\s+.*\b(dependenc|devdep|bump|lockfile|biome|tsx|npm audit)/i.test(line);
+  if (/^\s*-\s+.*\b(dependenc|devdep|lockfile|npm audit)/i.test(line)) return true;
+  // "bump X → Y" / "X 1.2.3 → 1.2.4" style version bumps
+  return /^\s*-\s+.*\bbump\b/i.test(line) && /[→]|->|\bv?\d+\.\d+\.\d+\b/.test(line);
 }
 
 /** Parse CHANGELOG.md into version entries (newest first, as written). */

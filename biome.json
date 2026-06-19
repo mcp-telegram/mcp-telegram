@@ -29,7 +29,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/index.ts", "src/qr-login-cli.ts", "src/cli.ts"],
+      "includes": ["src/index.ts", "src/qr-login-cli.ts", "src/cli.ts", "scripts/**"],
       "linter": {
         "rules": {
           "suspicious": {

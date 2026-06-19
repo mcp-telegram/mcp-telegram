@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.38.0...v1.38.1) (2026-06-10)
+
+
+### Fixed
+
+* **deps:** bump transitive hono 4.12.18 → 4.12.25 (security) ([f90b32c](https://github.com/mcp-telegram/mcp-telegram/commit/f90b32c61588c92e4f83d938d6b68c83d4deb82f))
+
+
+### Documentation
+
+* **daemon:** fix dead link to packaging/ — point at GitHub, not a relative path ([0574c6a](https://github.com/mcp-telegram/mcp-telegram/commit/0574c6a369b9c0d30311abf374c59f80462b289e))
+
 ## [1.38.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.37.1...v1.38.0) (2026-06-10)
 
 

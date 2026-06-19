@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.2](https://github.com/mcp-telegram/mcp-telegram/compare/v1.38.1...v1.38.2) (2026-06-19)
+
+
+### Documentation
+
+* backfill v1.27–v1.28 in CHANGELOG; bump Pages actions off Node 20 ([#56](https://github.com/mcp-telegram/mcp-telegram/issues/56)) ([7786819](https://github.com/mcp-telegram/mcp-telegram/commit/778681917a2bc133ea8821e2ff8739a3f859b257))
+* generate changelog pages from CHANGELOG.md + refresh README ([#54](https://github.com/mcp-telegram/mcp-telegram/issues/54)) ([4422901](https://github.com/mcp-telegram/mcp-telegram/commit/442290178c5bee43cc6828f794ce468930cbe945))
+
 ## [1.38.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.38.0...v1.38.1) (2026-06-10)
 
 

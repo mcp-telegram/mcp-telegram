@@ -35,7 +35,6 @@
     "test:watch": "tsx --test --watch 'src/**/*.test.ts'",
     "test:coverage": "c8 --all --src src --exclude 'src/**/*.test.ts' --reporter=text tsx --test 'src/**/*.test.ts'",
     "gen:changelog": "tsx scripts/gen-changelog-docs.ts",
-    "gen:changelog:check": "tsx scripts/gen-changelog-docs.ts --check",
     "predocs:dev": "npm run gen:changelog",
     "docs:dev": "vitepress dev docs",
     "predocs:build": "npm run gen:changelog",

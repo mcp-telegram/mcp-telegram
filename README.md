@@ -67,6 +67,14 @@ A QR code will appear in the terminal. Open Telegram on your phone, go to **Sett
 
 > **Custom session path:** set `TELEGRAM_SESSION_PATH=/path/to/session` to store the session file elsewhere.
 
+> **Two-step verification (2FA):** if your account has a cloud password enabled, scanning the QR code is not enough — Telegram also requires the password. Provide it via `TELEGRAM_2FA_PASSWORD` so the login can complete:
+>
+> ```bash
+> TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH TELEGRAM_2FA_PASSWORD=YOUR_PASSWORD npx @overpod/mcp-telegram login
+> ```
+>
+> The password is only used locally to answer Telegram's SRP challenge and is never persisted.
+
 ### 3. Add to Claude
 
 ```bash

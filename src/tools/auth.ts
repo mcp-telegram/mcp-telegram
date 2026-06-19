@@ -67,6 +67,8 @@ export function registerAuthTools(server: McpServer, telegram: TelegramService) 
         `If the QR image is not visible, it's also saved to: ${qrFilePath}`,
         "",
         "After scanning, run **telegram-status** to verify the connection.",
+        "",
+        "If the account has two-step verification (2FA), set the `TELEGRAM_2FA_PASSWORD` environment variable to the cloud password and log in again — scanning alone cannot complete a 2FA login.",
       ].join("\n");
 
       return {

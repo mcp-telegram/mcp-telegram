@@ -8,6 +8,7 @@ import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
 import { CustomFile } from "telegram/client/uploads.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
+import { computeCheck } from "telegram/Password.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
 import { RateLimiter } from "./rate-limiter.js";
@@ -194,6 +195,16 @@ const NOT_CONNECTED_ERROR = "Not connected. Run telegram-status to check or tele
 
 function resolveSessionPath(sessionPath?: string): string {
   return sessionPath ?? process.env.TELEGRAM_SESSION_PATH ?? DEFAULT_SESSION_FILE;
+}
+
+// Cloud password (2FA) for accounts that have two-step verification enabled.
+// QR login alone cannot complete such logins — Telegram answers the imported
+// login token with SESSION_PASSWORD_NEEDED, after which an SRP password check
+// is required. Supplied via env so it works across all login entry points
+// (standalone CLI, daemon IPC, and the telegram-login MCP tool), none of which
+// can reliably prompt interactively mid-flow.
+function resolveTwoFactorPassword(): string | undefined {
+  return process.env.TELEGRAM_2FA_PASSWORD || undefined;
 }
 
 function resolveProxy(): ProxyInterface | undefined {
@@ -525,8 +536,32 @@ export class TelegramService {
         } catch (err: unknown) {
           const error = err as { errorMessage?: string; message?: string };
           if (error.errorMessage === "SESSION_PASSWORD_NEEDED") {
-            await client.disconnect();
-            return { success: false, message: "2FA enabled — QR login not supported with 2FA" };
+            // The QR was scanned, but the account has two-step verification.
+            // Complete the login with an SRP password check if we have the
+            // cloud password; otherwise tell the user how to provide it.
+            const password = resolveTwoFactorPassword();
+            if (!password) {
+              await client.disconnect();
+              return {
+                success: false,
+                message:
+                  "2FA is enabled on this account. Set TELEGRAM_2FA_PASSWORD to your cloud password and run login again.",
+              };
+            }
+            try {
+              const passwordInfo = await client.invoke(new Api.account.GetPassword());
+              const check = await computeCheck(passwordInfo, password);
+              await client.invoke(new Api.auth.CheckPassword({ password: check }));
+              resolved = true;
+              break;
+            } catch (pwErr: unknown) {
+              await client.disconnect();
+              const reason = pwErr instanceof Error ? pwErr.message : String(pwErr);
+              return {
+                success: false,
+                message: `2FA password check failed: ${reason}. Verify TELEGRAM_2FA_PASSWORD is correct.`,
+              };
+            }
           }
         }
 

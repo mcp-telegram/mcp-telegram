@@ -8,6 +8,7 @@ import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
 import { CustomFile } from "telegram/client/uploads.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
+import { computeCheck } from "telegram/Password.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
 import { RateLimiter } from "./rate-limiter.js";
@@ -194,6 +195,61 @@ const NOT_CONNECTED_ERROR = "Not connected. Run telegram-status to check or tele
 
 function resolveSessionPath(sessionPath?: string): string {
   return sessionPath ?? process.env.TELEGRAM_SESSION_PATH ?? DEFAULT_SESSION_FILE;
+}
+
+// Cloud password (2FA) for accounts that have two-step verification enabled.
+// QR login alone cannot complete such logins — Telegram answers the imported
+// login token with SESSION_PASSWORD_NEEDED, after which an SRP password check
+// is required. Supplied via env so it works across all login entry points
+// (standalone CLI, daemon IPC, and the telegram-login MCP tool), none of which
+// can reliably prompt interactively mid-flow.
+function resolveTwoFactorPassword(): string | undefined {
+  return process.env.TELEGRAM_2FA_PASSWORD || undefined;
+}
+
+/** Minimal client surface the 2FA SRP step needs — lets us unit-test the
+ *  branch logic with a stub instead of a live TelegramClient. */
+interface SrpClient {
+  invoke(request: unknown): Promise<unknown>;
+}
+
+/** The SRP digest function (GetPassword response + plaintext → InputCheckPasswordSRP).
+ *  Injectable so tests can exercise the orchestration without GramJS's real crypto. */
+type ComputeCheckFn = (request: Api.account.Password, password: string) => Promise<Api.TypeInputCheckPasswordSRP>;
+
+/**
+ * Complete a QR login that Telegram answered with SESSION_PASSWORD_NEEDED by
+ * running the SRP cloud-password check: GetPassword → computeCheck → CheckPassword.
+ *
+ * Returns a discriminated outcome rather than throwing so the caller owns
+ * connection teardown. The password is only used to answer the SRP challenge
+ * and is never logged or persisted.
+ *
+ * `compute` is injectable for tests; production always uses GramJS `computeCheck`.
+ */
+export async function completeTwoFactorLogin(
+  client: SrpClient,
+  password: string | undefined,
+  compute: ComputeCheckFn = computeCheck,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!password) {
+    return {
+      ok: false,
+      message: "2FA is enabled on this account. Set TELEGRAM_2FA_PASSWORD to your cloud password and run login again.",
+    };
+  }
+  try {
+    const passwordInfo = (await client.invoke(new Api.account.GetPassword())) as Api.account.Password;
+    const check = await compute(passwordInfo, password);
+    await client.invoke(new Api.auth.CheckPassword({ password: check }));
+    return { ok: true };
+  } catch (pwErr: unknown) {
+    const reason = pwErr instanceof Error ? pwErr.message : String(pwErr);
+    return {
+      ok: false,
+      message: `2FA password check failed: ${reason}. Verify TELEGRAM_2FA_PASSWORD is correct.`,
+    };
+  }
 }
 
 function resolveProxy(): ProxyInterface | undefined {
@@ -525,8 +581,21 @@ export class TelegramService {
         } catch (err: unknown) {
           const error = err as { errorMessage?: string; message?: string };
           if (error.errorMessage === "SESSION_PASSWORD_NEEDED") {
-            await client.disconnect();
-            return { success: false, message: "2FA enabled — QR login not supported with 2FA" };
+            // The QR was scanned, but the account has two-step verification.
+            // Complete the login with an SRP password check if we have the
+            // cloud password; otherwise tell the user how to provide it.
+            const outcome = await completeTwoFactorLogin(client, resolveTwoFactorPassword());
+            if (outcome.ok) {
+              resolved = true;
+              break;
+            }
+            // destroy() (not disconnect()) to free the auth_key/socket, matching
+            // every other failure exit in this method — important in daemon mode
+            // where the process lives on across logins.
+            try {
+              await client.destroy();
+            } catch {}
+            return { success: false, message: outcome.message };
           }
         }
 

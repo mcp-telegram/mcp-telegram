@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.39.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.39.0...v1.39.1) (2026-06-21)
+
+
+### Fixed
+
+* **resolve:** recover bare numeric peer IDs that lack access_hash ([#62](https://github.com/mcp-telegram/mcp-telegram/issues/62)) ([678077a](https://github.com/mcp-telegram/mcp-telegram/commit/678077a78ce3a5852e07d5d831f664c3e08a81e3))
+
 ## [1.39.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.38.2...v1.39.0) (2026-06-21)
 
 

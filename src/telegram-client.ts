@@ -1581,10 +1581,72 @@ export class TelegramService {
   private async resolvePeer(chatId: string): Promise<string | ChatEntity> {
     // Normalize '@me' — GramJS only intercepts the plain 'me' string as InputPeerSelf
     if (chatId === "@me") return "me";
-    // Numeric IDs and @usernames work directly
-    if (/^-?\d+$/.test(chatId) || chatId.startsWith("@")) return chatId;
-    // Everything else — resolve via dialogs
+    // @usernames resolve directly via contacts.ResolveUsername
+    if (chatId.startsWith("@")) return chatId;
+    // Bare numeric IDs need an entity with access_hash. GramJS can build an
+    // InputPeer from a raw number only if it's already cached or the account
+    // is a contact / has messaged us — otherwise getInputEntity throws
+    // "Could not find the input entity". A bare positive number is also
+    // ambiguous (GramJS assumes PeerUser, so channel IDs fail outright).
+    // Recover by looking the ID up among dialogs, which yields a full entity
+    // (with access_hash) for both users and channels.
+    if (/^-?\d+$/.test(chatId)) return this.resolveNumericPeer(chatId);
+    // Everything else — resolve display name via dialogs
     return this.resolveChat(chatId);
+  }
+
+  /**
+   * Resolve a bare numeric ID to a cached/dialog entity so GramJS can build a
+   * valid InputPeer. Falls back to the raw ID string if no dialog matches —
+   * GramJS may still resolve it (e.g. a contact or a peer it has messaged),
+   * and we must not regress that path.
+   */
+  private async resolveNumericPeer(chatId: string): Promise<string | ChatEntity> {
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
+
+    const cached = this.entityCache.get(chatId);
+    if (cached) return cached;
+
+    // Direct resolve first — succeeds when GramJS already knows the peer.
+    try {
+      const entity = await this.client.getEntity(chatId);
+      this.entityCache.set(chatId, entity);
+      return entity;
+    } catch {
+      // Fall through to dialog scan.
+    }
+
+    // Scan dialogs for a matching entity. IDs reach us in two shapes:
+    //   • bare positive  (e.g. 1004294063929 for a channel, 8959122940 for a
+    //     user) — this is what list-chats/search emit and what GramJS can't
+    //     disambiguate; match it against any entity's bare id.
+    //   • marked         (-100<id> for channels, -<id> for basic groups) — the
+    //     sign/-100 prefix carries the type, so require the entity to match that
+    //     exact marked form, otherwise a group "-123" could wrongly match a user
+    //     with bare id 123.
+    const isMarked = chatId.startsWith("-");
+    try {
+      const dialogs = await this.client.getDialogs({ limit: 100 });
+      const match = dialogs.find((d) => {
+        const entity = d.entity;
+        if (!entity?.id) return false;
+        const bare = entity.id.toString();
+        if (!isMarked) return chatId === bare;
+        // Marked input must match the entity's marked form.
+        if (entity instanceof Api.Channel) return chatId === `-100${bare}`;
+        if (entity instanceof Api.Chat) return chatId === `-${bare}`;
+        return false;
+      });
+      if (match?.entity) {
+        this.entityCache.set(chatId, match.entity);
+        return match.entity;
+      }
+    } catch {
+      // Dialog fetch failed — fall back to the raw ID below.
+    }
+
+    // Last resort: hand the raw ID to GramJS and let it try GetUsers/GetChannels.
+    return chatId;
   }
 
   async getChatInfo(chatId: string): Promise<{

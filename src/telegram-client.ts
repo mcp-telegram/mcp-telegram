@@ -1014,8 +1014,16 @@ export class TelegramService {
    * the full file (`0` = smallest, larger indexes = bigger previews). This keeps
    * payloads tiny — useful for callers that inline the bytes and pay per byte
    * (e.g. base64 in an LLM context). If the message has no thumbnail at that
-   * index, GramJS returns `undefined`; we transparently fall back to the full
-   * file so the caller always gets bytes. `isThumb` reports which one was served.
+   * index, GramJS returns an empty/`undefined` buffer; we transparently fall
+   * back to the full file so the caller always gets bytes. `isThumb` reports
+   * which one was served.
+   *
+   * Note: GramJS signals "no bytes" inconsistently — `undefined` for a missing
+   * thumbnail, but `Buffer.alloc(0)` for undownloadable media (geo/poll/dice,
+   * documents without a file, and several failure paths). An empty Buffer is
+   * truthy, so we guard on `.length`, not truthiness, in both the fallback and
+   * the final failure check — otherwise a 0-byte buffer would be returned as a
+   * "successful" (but garbage) download.
    */
   async downloadMediaAsBuffer(
     chatId: string,
@@ -1033,11 +1041,11 @@ export class TelegramService {
     let buffer: Buffer | undefined;
     if (options?.thumb !== undefined) {
       buffer = (await this.client.downloadMedia(message, { thumb: options.thumb })) as Buffer | undefined;
-      isThumb = !!buffer;
+      isThumb = !!buffer?.length;
     }
     // No thumb requested, or this media has no thumbnail at that size → full file.
-    if (!buffer) buffer = (await this.client.downloadMedia(message)) as Buffer;
-    if (!buffer) throw new Error("Failed to download media");
+    if (!buffer?.length) buffer = (await this.client.downloadMedia(message)) as Buffer;
+    if (!buffer?.length) throw new Error("Failed to download media");
 
     const mimeType = this.detectMimeType(buffer, message.media);
     return { buffer, mimeType, isThumb };

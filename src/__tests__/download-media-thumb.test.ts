@@ -55,6 +55,7 @@ describe("downloadMediaAsBuffer thumb support", () => {
     const res = await svc.downloadMediaAsBuffer("@test", 1, { thumb: 0 });
     assert.equal(seen, 0, "thumb index forwarded to GramJS");
     assert.deepEqual(res.buffer, THUMB);
+    assert.equal(res.mimeType, "image/jpeg", "mime detected from thumbnail bytes");
     assert.equal(res.isThumb, true);
   });
 
@@ -64,5 +65,21 @@ describe("downloadMediaAsBuffer thumb support", () => {
     const res = await svc.downloadMediaAsBuffer("@test", 1, { thumb: 0 });
     assert.deepEqual(res.buffer, JPEG, "fell back to full file bytes");
     assert.equal(res.isThumb, false, "isThumb false since full file was served");
+  });
+
+  it("falls back to the full file when the thumb download yields an empty buffer", async () => {
+    // GramJS returns Buffer.alloc(0) (truthy!) on some no-thumb paths — must
+    // still fall back to the full file, not return 0 bytes as success.
+    const svc = makeService({ full: JPEG, thumbResult: Buffer.alloc(0) });
+    const res = await svc.downloadMediaAsBuffer("@test", 1, { thumb: 0 });
+    assert.deepEqual(res.buffer, JPEG, "empty thumb buffer fell back to full file");
+    assert.equal(res.isThumb, false);
+  });
+
+  it("throws when the full download yields an empty buffer (undownloadable media)", async () => {
+    // GramJS returns Buffer.alloc(0) for geo/poll/dice and failure paths.
+    // An empty Buffer is truthy, so a naive !buffer guard would let it through.
+    const svc = makeService({ full: Buffer.alloc(0) });
+    await assert.rejects(() => svc.downloadMediaAsBuffer("@test", 1), /Failed to download media/);
   });
 });

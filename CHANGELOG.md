@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.40.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.39.1...v1.40.0) (2026-06-23)
+
+
+### Added
+
+* **media:** add thumbnail option to downloadMediaAsBuffer ([#64](https://github.com/mcp-telegram/mcp-telegram/issues/64)) ([d9f302c](https://github.com/mcp-telegram/mcp-telegram/commit/d9f302c8efde73a8d86467b23d05b8a12650662f))
+
 ## [1.39.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.39.0...v1.39.1) (2026-06-21)
 
 

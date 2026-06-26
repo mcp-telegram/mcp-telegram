@@ -51,9 +51,12 @@ jobs:
       contents: read
       id-token: write
     steps:
+      # Check out the default ref (main on dispatch, the tag on a release event) — NOT
+      # the resolved tag. Unlike publish-binaries (which checks out the tag so compiled
+      # binaries match released code), we publish *metadata*: server.json lives on main
+      # and may be newer than the tag. The version is taken from the tag input below,
+      # not from the checked-out tree, so an older tag without server.json never applies.
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.tag || github.ref }}
       # Resolve the release version from any trigger (same logic as publish-binaries):
       # explicit `tag` input, the release event payload, or a tag ref. Skip if none.
       - name: Resolve version

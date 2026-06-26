@@ -40,6 +40,53 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  publish-mcp-registry:
+    # Publish server metadata to the official MCP Registry (registry.modelcontextprotocol.io).
+    # Runs after publish-npm so the npm package the registry verifies ownership against
+    # already exists. Auth is GitHub OIDC (id-token: write) — no secret needed; the
+    # io.github.mcp-telegram/* namespace is proven by the workflow's own repo identity.
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      # Resolve the release version from any trigger (same logic as publish-binaries):
+      # explicit `tag` input, the release event payload, or a tag ref. Skip if none.
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            echo "No release tag resolved — skipping MCP Registry publish."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - name: Install mcp-publisher
+        if: steps.ver.outputs.version != ''
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+      - name: Pin server.json version to the release tag
+        if: steps.ver.outputs.version != ''
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          jq --arg v "$V" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        if: steps.ver.outputs.version != ''
+        run: ./mcp-publisher login github-oidc
+      - name: Publish to MCP Registry
+        if: steps.ver.outputs.version != ''
+        run: ./mcp-publisher publish
+
   publish-docker:
     runs-on: ubuntu-latest
     permissions:

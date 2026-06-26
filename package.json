@@ -1,6 +1,7 @@
 {
   "name": "@overpod/mcp-telegram",
   "version": "1.40.0",
+  "mcpName": "io.github.mcp-telegram/mcp-telegram",
   "description": "MCP server for Telegram userbot — messages, media, reactions, polls & more. Built on GramJS/MTProto.",
   "type": "module",
   "main": "dist/index.js",

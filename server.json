@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.mcp-telegram/mcp-telegram",
+  "description": "MCP server for Telegram userbot — messages, media, reactions, polls & more. Built on GramJS/MTProto.",
+  "title": "Telegram (mcp-telegram)",
+  "repository": {
+    "url": "https://github.com/mcp-telegram/mcp-telegram",
+    "source": "github"
+  },
+  "version": "1.40.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@overpod/mcp-telegram",
+      "version": "1.40.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TELEGRAM_API_ID",
+          "description": "Telegram API ID from https://my.telegram.org/apps",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "TELEGRAM_API_HASH",
+          "description": "Telegram API hash from https://my.telegram.org/apps",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

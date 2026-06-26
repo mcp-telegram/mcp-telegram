@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.40.0...v1.41.0) (2026-06-26)
+
+
+### Added
+
+* **registry:** publish to the official MCP Registry via GitHub OIDC ([a4f1a71](https://github.com/mcp-telegram/mcp-telegram/commit/a4f1a71f5ca17f7b8deb8eb6bce120c869191e93))
+
+
+### Fixed
+
+* **registry:** checkout default ref, not the tag, for metadata publish ([c49a913](https://github.com/mcp-telegram/mcp-telegram/commit/c49a913d55644eb3eee6797acc3cde0cc1375e70))
+
 ## [1.40.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.39.1...v1.40.0) (2026-06-23)
 
 

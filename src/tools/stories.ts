@@ -9,12 +9,30 @@ import {
   ok,
   READ_ONLY,
   requireConnection,
+  sanitize,
   sanitizeInputText,
   WRITE,
 } from "./shared.js";
 
 const absolutePath = z.string().refine(isSafeAbsolutePath, { message: ABSOLUTE_PATH_ERROR });
 const safeText = z.string().transform(sanitizeInputText);
+
+/** Curated text for the multi-step report flow result (ReportResultSummary).
+ * The base64 `option` bytes are preserved VERBATIM for the next step. */
+function renderReportResult(
+  r:
+    | { kind: "reported" }
+    | { kind: "chooseOption"; title?: string; options: Array<{ text: string; option: string }> }
+    | { kind: "addComment"; optional?: boolean },
+): string {
+  if (r.kind === "reported") return "Report submitted.";
+  if (r.kind === "addComment") {
+    return `Add a comment to continue the report${r.optional ? " (optional)" : " (required)"} — call again with your message.`;
+  }
+  const lines = [r.title ? `Choose a report reason — ${r.title}:` : "Choose a report reason:"];
+  for (const o of r.options) lines.push(`  - ${o.text} → option=${o.option}`);
+  return lines.join("\n");
+}
 
 export function registerStoryTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -486,7 +504,7 @@ export function registerStoryTools(server: McpServer, telegram: TelegramService)
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.reportStory(chatId, ids, option, message);
-        return ok(JSON.stringify(result));
+        return ok(sanitize(renderReportResult(result)));
       } catch (e) {
         return fail(e);
       }

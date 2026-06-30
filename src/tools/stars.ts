@@ -1,10 +1,76 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
+import { fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
 
 export function isStarsEnabled(): boolean {
   return process.env.MCP_TELEGRAM_ENABLE_STARS === "1";
+}
+
+/** Unix seconds → ISO without milliseconds (e.g. 2026-06-29T15:46:31Z). */
+function formatStarsDate(unixSeconds: number): string {
+  const d = new Date(unixSeconds * 1000);
+  return Number.isNaN(d.getTime()) ? String(unixSeconds) : d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/** Compact "123⭐" / "123.5⭐" — drops the nanos fraction when zero (1e9 nanos = 1 Star). */
+function formatStarsAmount(a: { amount: string; nanos: number } | undefined): string {
+  if (!a) return "0⭐";
+  if (!a.nanos) return `${a.amount}⭐`;
+  const frac = String(a.nanos).padStart(9, "0").replace(/0+$/, "");
+  return `${a.amount}.${frac}⭐`;
+}
+
+/** One-line label for a Stars transaction counterparty. */
+function formatStarsPeer(peer: { kind: string; peer?: { kind: string; id: string | number } } | undefined): string {
+  if (!peer) return "?";
+  if (peer.kind === "peer") return peer.peer ? `${peer.peer.kind}:${peer.peer.id}` : "?";
+  return peer.kind; // appStore | playMarket | premiumBot | fragment | ads | api | unsupported
+}
+
+interface StarsTxn {
+  id: string;
+  stars: { amount: string; nanos: number };
+  date: number;
+  peer: { kind: string };
+  refund?: boolean;
+  pending?: boolean;
+  failed?: boolean;
+  gift?: boolean;
+  reaction?: boolean;
+  title?: string;
+}
+
+function renderStarsTxn(t: StarsTxn): string {
+  const flags = [
+    t.refund && "refund",
+    t.pending && "pending",
+    t.failed && "failed",
+    t.gift && "gift",
+    t.reaction && "reaction",
+  ].filter(Boolean);
+  const flagStr = flags.length ? ` [${flags.join(",")}]` : "";
+  const label = t.title ? ` "${t.title}"` : "";
+  return `  [${t.id}] ${formatStarsAmount(t.stars)} ${formatStarsPeer(t.peer)} date=${formatStarsDate(t.date)}${label}${flagStr}`;
+}
+
+/** Curated text for the shared StarsStatusSummary shape (status + transactions).
+ * Replaces a raw JSON.stringify dump — same data, ~50-70% fewer tokens. */
+function renderStarsStatus(r: {
+  balance?: { amount: string; nanos: number };
+  history?: StarsTxn[];
+  nextOffset?: string;
+  subscriptionsMissingBalance?: string;
+}): string {
+  const lines: string[] = [`balance=${formatStarsAmount(r.balance)}`];
+  const history = r.history ?? [];
+  if (history.length > 0) {
+    lines.push(`transactions (${history.length}):`);
+    for (const t of history) lines.push(renderStarsTxn(t));
+  }
+  if (r.subscriptionsMissingBalance) lines.push(`subscriptionsMissingBalance=${r.subscriptionsMissingBalance}`);
+  if (r.nextOffset) lines.push(`nextOffset=${r.nextOffset}`);
+  return lines.join("\n");
 }
 
 export function registerStarsTools(server: McpServer, telegram: TelegramService) {
@@ -29,7 +95,7 @@ export function registerStarsTools(server: McpServer, telegram: TelegramService)
       if (err) return fail(new Error(err));
       try {
         const result = await telegram.getStarsStatus(peer);
-        return ok(JSON.stringify(result));
+        return ok(sanitize(renderStarsStatus(result)));
       } catch (e) {
         return fail(e);
       }
@@ -77,7 +143,7 @@ export function registerStarsTools(server: McpServer, telegram: TelegramService)
           offset,
           limit,
         });
-        return ok(JSON.stringify(result));
+        return ok(sanitize(renderStarsStatus(result)));
       } catch (e) {
         return fail(e);
       }

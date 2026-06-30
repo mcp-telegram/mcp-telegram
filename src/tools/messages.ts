@@ -8,9 +8,28 @@ import {
   ok,
   READ_ONLY,
   requireConnection,
+  sanitize,
   sanitizeInputText,
   WRITE,
 } from "./shared.js";
+
+/** Curated text for a bot callback answer (messages.GetBotCallbackAnswer).
+ * Replaces a raw JSON dump of {alert,hasUrl,nativeUi,message,url,cacheTime}. */
+function renderCallbackAnswer(a: {
+  alert?: boolean;
+  hasUrl?: boolean;
+  nativeUi?: boolean;
+  message?: string;
+  url?: string;
+  cacheTime?: number;
+}): string {
+  const lines: string[] = [];
+  if (a.message) lines.push(a.alert ? `alert: ${a.message}` : `message: ${a.message}`);
+  if (a.url) lines.push(`url: ${a.url}`);
+  if (a.nativeUi) lines.push("opensNativeUi: true");
+  if (lines.length === 0) lines.push("Button pressed — no response from the bot.");
+  return lines.join("\n");
+}
 
 export function registerMessageTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -647,7 +666,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
           buttonIndex: hasIndex ? { row: row as number, column: column as number } : undefined,
           data,
         });
-        return ok(JSON.stringify(answer));
+        return ok(sanitize(renderCallbackAnswer(answer)));
       } catch (e) {
         return fail(e);
       }

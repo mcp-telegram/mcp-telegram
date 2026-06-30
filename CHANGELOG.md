@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.0...v1.41.1) (2026-06-30)
+
+
+### Performance
+
+* **tools:** curate stars/press-button/report-story output to cut response tokens ([06d3fa1](https://github.com/mcp-telegram/mcp-telegram/commit/06d3fa113eb287237aff6c4d866785b06e9cd660))
+
 ## [1.41.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.40.0...v1.41.0) (2026-06-26)
 
 

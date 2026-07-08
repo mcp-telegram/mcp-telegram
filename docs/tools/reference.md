@@ -5,7 +5,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Auth
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-status` | Check connection status and get account info |
 | `telegram-login` | Generate QR code for authentication |
 | `telegram-logout` | Revoke session on Telegram and delete the local session file |
@@ -13,7 +13,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Messaging
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-send-message` | Send a message to any chat (user, group, channel) |
 | `telegram-edit-message` | Edit a previously sent message |
 | `telegram-delete-message` | Delete one or more messages |
@@ -33,7 +33,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Reading
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-list-chats` | List your chats with filters (users, groups, channels) |
 | `telegram-read-messages` | Read recent messages from a chat with pagination |
 | `telegram-search-messages` | Search messages in a specific chat by keyword |
@@ -49,7 +49,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Drafts
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-save-draft` | Save a text draft in a chat (empty clears the draft) |
 | `telegram-get-drafts` | List all chats with saved drafts |
 | `telegram-clear-drafts` | Clear a chat's draft, or wipe drafts in all chats (requires `confirmAllChats: true`) |
@@ -57,7 +57,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Forum Topics
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-list-topics` | List topics in a forum group |
 | `telegram-read-topic-messages` | Read messages from a specific topic |
 | `telegram-create-topic` | Create a new topic in a forum group |
@@ -73,7 +73,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Poll Interaction (v1.31.0)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-vote-poll` | Vote in a poll by option index. Empty `optionIndexes: []` retracts your vote |
 | `telegram-get-poll-results` | Get aggregated results: vote counts, percentages, quiz correct-answer flags |
 | `telegram-get-poll-voters` | List users who voted for specific options (public polls only, paginated) |
@@ -82,7 +82,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Reactions
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-send-reaction` | React to a message with an emoji |
 | `telegram-get-reactions` | Get reactions on a message |
 | `telegram-set-default-reaction` | Set your account's default quick-reaction emoji |
@@ -92,7 +92,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Paid Reactions (v1.31.0)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-send-paid-reaction` | Send ★ Stars as a paid reaction on a channel post (`count` 1–2500, optional `private` flag) |
 | `telegram-toggle-paid-reaction-privacy` | Toggle leaderboard visibility of your paid reaction on a specific post |
 | `telegram-get-paid-reaction-privacy` | Get your current default paid reaction privacy setting |
@@ -100,7 +100,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Audio Transcription (v1.31.0)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-transcribe-audio` | Start server-side transcription of a voice/video note (Telegram Premium). Returns `transcriptionId`; if `pending:true` poll with `telegram-get-transcription` |
 | `telegram-get-transcription` | Poll for updated transcription status — idempotent, same `transcriptionId`, updated text once complete |
 | `telegram-rate-transcription` | Rate transcription quality as good or poor to improve Telegram speech-to-text |
@@ -108,7 +108,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Fact-check (v1.31.0)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-fact-check` | Fetch fact-check annotations on up to 100 channel messages; most messages have no annotation |
 | `telegram-edit-fact-check` | Add or update a fact-check annotation (requires fact-checker privileges) |
 | `telegram-delete-fact-check` | Remove a fact-check annotation (requires fact-checker privileges) |
@@ -116,7 +116,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Stickers
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-send-sticker` | Send a sticker to a chat |
 | `telegram-get-installed-stickers` | List your installed sticker packs |
 | `telegram-get-recent-stickers` | Show recently used stickers |
@@ -126,7 +126,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Media
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-send-file` | Send a file, photo, or document |
 | `telegram-download-media` | Download media from a message |
 | `telegram-get-profile-photo` | Get a user's or chat's profile photo |
@@ -135,7 +135,7 @@ MCP Telegram provides a comprehensive tool set organized by category. All tools 
 ## Rich Media Sending (v1.29.0)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-send-voice` | Send a voice note (OGG/Opus recommended). Shows as a waveform UI. |
 | `telegram-send-video-note` | Send a round video message (MP4, square recommended, ≤60s) |
 | `telegram-send-location` | Send a geographic location; optional `livePeriod` (60–86400s) makes it live-updating |
@@ -149,7 +149,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Groups
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-create-group` | Create a new group |
 | `telegram-edit-group` | Edit group title, description, or photo |
 | `telegram-invite-to-group` | Invite users to a group |
@@ -168,7 +168,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Chat Info
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-chat-info` | Get detailed chat info (title, members, photo, etc.) |
 | `telegram-get-chat-members` | List members of a group or channel |
 | `telegram-get-chat-folders` | List your chat folders |
@@ -176,7 +176,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Invite Links
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-create-invite-link` | Create an invite link with optional limits |
 | `telegram-get-invite-links` | List existing invite links |
 | `telegram-revoke-invite-link` | Revoke an invite link |
@@ -184,7 +184,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Contacts
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-contacts` | List your contacts |
 | `telegram-add-contact` | Add a new contact |
 | `telegram-get-contact-requests` | View pending contact requests |
@@ -192,7 +192,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Moderation
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-block-user` | Block a user |
 | `telegram-unblock-user` | Unblock a user |
 | `telegram-report-spam` | Report spam |
@@ -207,7 +207,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Account
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-sessions` | List active sessions (devices) |
 | `telegram-terminate-session` | Terminate a session |
 | `telegram-set-privacy` | Configure privacy settings (phone, last seen, etc.) |
@@ -223,7 +223,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Chat Settings
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-mute-chat` | Mute or unmute chat notifications |
 | `telegram-archive-chat` | Move a chat to/from the Archive folder |
 | `telegram-pin-chat` | Pin or unpin a dialog in the chat list |
@@ -232,7 +232,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Admin Toggles & Customization
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-toggle-channel-signatures` | Toggle post signatures on a channel |
 | `telegram-toggle-anti-spam` | Toggle native anti-spam in a supergroup (admin with `ban_users`) |
 | `telegram-toggle-forum-mode` | Enable/disable forum mode (disabling removes all topics; requires `confirm: true`) |
@@ -250,7 +250,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Inline Bots & Buttons
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-inline-query` | Query an inline bot in a chat context (queryId TTL ≈ 1 min) |
 | `telegram-inline-query-send` | Send an inline bot result by queryId + result id |
 | `telegram-press-button` | Press a callback button on a message by row/col or raw data |
@@ -261,7 +261,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 Cursors are client-owned — the agent stores `{pts, qts, date}` between calls and passes them in.
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-state` | Initialize a polling cursor (`pts`, `qts`, `date`, `seq`) |
 | `telegram-get-updates` | Fetch global updates since a known cursor (falls back to history hint on `DifferenceTooLong`) |
 | `telegram-get-channel-updates` | Fetch per-channel updates since a known channel cursor |
@@ -269,7 +269,7 @@ Cursors are client-owned — the agent stores `{pts, qts, date}` between calls a
 ## Stories
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-all-stories` | List stories across peers with pagination state |
 | `telegram-get-peer-stories` | List stories posted by one peer |
 | `telegram-get-stories-by-id` | Fetch specific story items by id |
@@ -278,7 +278,7 @@ Cursors are client-owned — the agent stores `{pts, qts, date}` between calls a
 ## Stories (write, v1.30.0)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-send-story` | Publish a photo or video story with privacy controls (everyone/contacts/close_friends/selected), period, pinning, no-forward flag |
 | `telegram-edit-story` | Edit an existing story: replace media, update caption, or change privacy rules |
 | `telegram-delete-stories` | Delete one or more stories (irreversible; requires `confirm: true`) |
@@ -308,7 +308,7 @@ Cursors are client-owned — the agent stores `{pts, qts, date}` between calls a
 ## Profile (write, v1.32.0)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-set-emoji-status` | Set custom animated emoji status next to your name. Pass `documentId` (from `telegram-list-emoji-statuses`) or `collectibleId`; omit both to clear. Optional `untilUnix` expiry. **Requires Telegram Premium.** |
 | `telegram-list-emoji-statuses` | Browse emoji statuses available for your account. `kind`: `default`, `recent`, `channel_default`, `collectible`. Returns `documentId`, `until`, collectible `title`/`slug`. |
 | `telegram-clear-recent-emoji-statuses` | Clear the "recent" emoji status picker list. |
@@ -323,7 +323,7 @@ Cursors are client-owned — the agent stores `{pts, qts, date}` between calls a
 Requires **Telegram Business** subscription unless noted otherwise.
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-business-chat-links` | List your Telegram Business chat links (read-only; no Business subscription required to read). |
 | `telegram-create-business-chat-link` | Create a `t.me/m/...` deep-link with pre-filled message and optional admin `title`. Returns JSON with `link`, `slug`, `message`, `views`. |
 | `telegram-edit-business-chat-link` | Update an existing link by `slug`. Same options as create. |
@@ -338,21 +338,46 @@ Requires **Telegram Business** subscription unless noted otherwise.
 ## Boosts
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-my-boosts` | List boost slots assigned by your account |
 | `telegram-get-boosts-status` | Boost status for a channel/supergroup |
 | `telegram-get-boosts-list` | List boosters for a channel (admin) |
+
+## Chat Folders (v1.33.0)
+
+| Tool | Description |
+| ------ | ------------- |
+| `telegram-create-folder` | Create a chat folder — auto-include whole categories via type flags or list specific chats |
+| `telegram-edit-folder` | Edit an existing folder by ID; omitted fields keep their current values |
+| `telegram-delete-folder` | Delete a folder by ID (chats remain in All Chats; system folders can't be deleted) |
+| `telegram-reorder-folders` | Reorder folders by specifying the new order of folder IDs |
+| `telegram-toggle-folder-tags` | Enable/disable folder tags — colored labels in chat lists (Premium) |
+| `telegram-get-suggested-folders` | Get Telegram's suggested folder templates (e.g. Unread, Personal, Work) |
+
+## Global Privacy (v1.33.0)
+
+| Tool | Description |
+|------|-------------|
+| `telegram-get-global-privacy-settings` | Read account-wide privacy: auto-archive of new non-contacts, archived-unmuted, hidden read receipts, Premium-only DMs |
+| `telegram-set-global-privacy-settings` | Update account-wide privacy settings; omitted fields keep current values (some require Premium) |
 
 ## Opt-In (env-gated)
 
 These tools are only registered when the corresponding environment flag is set.
 
 | Tool | Env flag |
-|------|----------|
+| ------ | ---------- |
 | `telegram-get-group-call` | `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` |
 | `telegram-get-group-call-participants` | `MCP_TELEGRAM_ENABLE_GROUP_CALLS=1` |
 | `telegram-get-stars-status` | `MCP_TELEGRAM_ENABLE_STARS=1` |
 | `telegram-get-stars-transactions` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-get-stars-topup-options` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-get-stars-subscriptions` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-change-stars-subscription` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-get-available-star-gifts` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-get-saved-star-gifts` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-save-star-gift` | `MCP_TELEGRAM_ENABLE_STARS=1` |
+| `telegram-convert-star-gift` | `MCP_TELEGRAM_ENABLE_STARS=1` |
 | `telegram-get-quick-replies` | `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` |
 | `telegram-get-quick-reply-messages` | `MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1` |
 

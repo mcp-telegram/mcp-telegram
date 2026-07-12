@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.2](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.1...v1.41.2) (2026-07-12)
+
+
+### Fixed
+
+* **client:** cap gramJS logger at ERROR to prevent reconnect-storm log flooding ([0c3ed8f](https://github.com/mcp-telegram/mcp-telegram/commit/0c3ed8fad3e2b82a9f2a16fc7ec195ddb004992c))
+
 ## [1.41.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.0...v1.41.1) (2026-07-08)
 
 

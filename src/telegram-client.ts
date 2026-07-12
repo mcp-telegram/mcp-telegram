@@ -7,6 +7,7 @@ import bigInt from "big-integer";
 import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
 import { CustomFile } from "telegram/client/uploads.js";
+import { Logger, LogLevel } from "telegram/extensions/Logger.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { computeCheck } from "telegram/Password.js";
 import { StringSession } from "telegram/sessions/index.js";
@@ -287,6 +288,27 @@ function resolveUseWSS(proxy: ProxyInterface | undefined): boolean {
   return useWSS;
 }
 
+// gramJS defaults its internal logger to INFO, which emits a line for every
+// reconnect attempt ("Handling reconnect!", "connection closed", ...). On a
+// host with a flaky path to the Telegram DC this becomes a tight reconnect
+// storm that can grow the container stdout log to tens of GB and fill the
+// disk. Cap it at ERROR by default so a storm can never flood stdout; allow
+// override via TELEGRAM_LOG_LEVEL (none|error|warn|info|debug) for debugging.
+function resolveBaseLogger(): Logger {
+  const raw = (process.env.TELEGRAM_LOG_LEVEL || "error").toLowerCase();
+  const level =
+    raw === "none"
+      ? LogLevel.NONE
+      : raw === "warn"
+        ? LogLevel.WARN
+        : raw === "info"
+          ? LogLevel.INFO
+          : raw === "debug"
+            ? LogLevel.DEBUG
+            : LogLevel.ERROR;
+  return new Logger(level);
+}
+
 function ensureSessionDir(filePath: string): void {
   const dir = dirname(filePath);
   if (!existsSync(dir)) {
@@ -394,6 +416,7 @@ export class TelegramService {
     this.client = new TelegramClient(session, this.apiId, this.apiHash, {
       connectionRetries: 5,
       useWSS: resolveUseWSS(proxy),
+      baseLogger: resolveBaseLogger(),
       ...(proxy && { proxy }),
     });
 
@@ -521,6 +544,7 @@ export class TelegramService {
     const client = new TelegramClient(session, this.apiId, this.apiHash, {
       connectionRetries: 5,
       useWSS: resolveUseWSS(proxy),
+      baseLogger: resolveBaseLogger(),
       ...(proxy && { proxy }),
     });
 

@@ -1,4 +1,4 @@
-# MCP Telegram
+# Telegram MCP Server
 
 [![npm](https://img.shields.io/npm/v/@overpod/mcp-telegram)](https://www.npmjs.com/package/@overpod/mcp-telegram)
 [![npm downloads](https://img.shields.io/npm/dm/@overpod/mcp-telegram)](https://www.npmjs.com/package/@overpod/mcp-telegram)
@@ -14,7 +14,7 @@
   <img src="assets/demo.gif" alt="MCP Telegram demo — connect and summarize chats in Claude" width="700">
 </p>
 
-An MCP (Model Context Protocol) server that connects AI assistants like Claude to Telegram via the MTProto protocol. Unlike bots, this runs as a **userbot** -- it operates under your personal Telegram account using [GramJS](https://github.com/nicedoc/gramjs), giving full access to your chats, contacts, and message history.
+**Telegram MCP Server** — a Model Context Protocol server that connects AI assistants like Claude and ChatGPT to Telegram via the MTProto protocol. Unlike bots, this runs as a **userbot** -- it operates under your personal Telegram account using [GramJS](https://github.com/nicedoc/gramjs), giving full access to your chats, contacts, and message history.
 
 ## Features
 

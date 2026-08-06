@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.3](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.2...v1.41.3) (2026-08-06)
+
+
+### Documentation
+
+* **seo:** lead README with "Telegram MCP Server" keyword ([e8a3902](https://github.com/mcp-telegram/mcp-telegram/commit/e8a3902f02f7be7e948c3b0c4a0bd0a1fec67254))
+
 ## [1.41.2](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.1...v1.41.2) (2026-07-12)
 
 

@@ -1,0 +1,14 @@
+# Normalize line endings to LF in the repository AND in the working tree on every OS.
+#
+# Without this, Git on Windows checks out with core.autocrlf=true, every source file gets
+# CRLF, and `biome check src/` reports a formatting diff on all 85 files — the Windows CI
+# job added for issue #69 failed exactly this way, and any Windows contributor would hit
+# the same wall running lint locally. `eol=lf` (not just `text=auto`) is what pins the
+# working-tree ending regardless of the user's core.autocrlf setting.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted.
+*.gif binary
+*.png binary
+*.jpg binary
+*.ico binary

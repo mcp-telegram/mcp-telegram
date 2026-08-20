@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.4](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.3...v1.41.4) (2026-08-20)
+
+
+### Fixed
+
+* **rate-limiter:** detect GramJS FloodWaitError so flood retries actually run ([b1686b0](https://github.com/mcp-telegram/mcp-telegram/commit/b1686b05357d4e2185bceb3be7c0587681d4361f))
+* **tools:** telegram-get-my-role must pass InputPeerSelf, not InputUserSelf ([61da6de](https://github.com/mcp-telegram/mcp-telegram/commit/61da6de70eecfe5e8aa0d45e8bb0a21e812c2d8c))
+
+
+### Documentation
+
+* **seo:** align site title, meta description and tool count (59 -&gt; 181) with README ([c2cc076](https://github.com/mcp-telegram/mcp-telegram/commit/c2cc0761ff24418a5734cafb573b4afa40995ac6))
+
 ## [1.41.3](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.2...v1.41.3) (2026-08-06)
 
 

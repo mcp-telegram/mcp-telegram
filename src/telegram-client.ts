@@ -359,7 +359,10 @@ export class TelegramService {
         // Fix permissions on existing files
         try {
           await chmod(this.sessionPath, 0o600);
-        } catch {}
+        } catch {
+          // Best-effort hardening: the session is already loaded and usable, so a
+          // filesystem that refuses chmod (mounted volume, Windows) must not fail login.
+        }
         return true;
       }
     }
@@ -372,7 +375,10 @@ export class TelegramService {
         await writeFile(this.sessionPath, raw, { encoding: "utf-8", mode: 0o600 });
         try {
           await unlink(LEGACY_SESSION_FILE);
-        } catch {}
+        } catch {
+          // Best-effort cleanup: migration to the new path already succeeded, so a
+          // leftover legacy file is cosmetic and must not fail the migration.
+        }
         return true;
       }
     }
@@ -452,7 +458,10 @@ export class TelegramService {
 
       try {
         await this.client.disconnect();
-      } catch {}
+      } catch {
+        // Already on the connection-error path: a failing disconnect must not mask
+        // the original error recorded in this.lastError above.
+      }
       this.client = null;
       return false;
     }
@@ -553,7 +562,9 @@ export class TelegramService {
       if (signal?.aborted) {
         try {
           await client.destroy();
-        } catch {}
+        } catch {
+          // Abort path: the caller cancelled during connect, so teardown is best-effort.
+        }
         return { success: false, message: "QR login aborted" };
       }
 
@@ -618,7 +629,9 @@ export class TelegramService {
             // where the process lives on across logins.
             try {
               await client.destroy();
-            } catch {}
+            } catch {
+              // Failure exit: the login outcome is already decided, so teardown is best-effort.
+            }
             return { success: false, message: outcome.message };
           }
         }
@@ -644,7 +657,9 @@ export class TelegramService {
       if (signal?.aborted && !resolved) {
         try {
           await client.destroy();
-        } catch {}
+        } catch {
+          // Abort path: teardown is best-effort, the abort result is returned regardless.
+        }
         return { success: false, message: "QR login aborted" };
       }
 
@@ -670,7 +685,9 @@ export class TelegramService {
     } catch (err: unknown) {
       try {
         await client.destroy();
-      } catch {}
+      } catch {
+        // Teardown must not mask `err`, which is the error actually reported to the caller.
+      }
       return { success: false, message: `Login failed: ${(err as Error).message}` };
     }
   }
@@ -2142,8 +2159,13 @@ export class TelegramService {
     const me = await this.getMe();
 
     if (entity instanceof Api.Channel) {
+      // `channels.getParticipant#a0ab6cc6 channel:InputChannel participant:InputPeer` — the
+      // participant field is an InputPeer, not an InputUser. Passing InputUserSelf compiles
+      // (GramJS types both as TypeEntityLike) but fails at request-serialization time with
+      // "Cannot cast InputUserSelf to any kind of InputPeer", which made this tool fail 100%
+      // of its production calls. InputPeerSelf is the correct self reference here.
       const result = await this.client.invoke(
-        new Api.channels.GetParticipant({ channel: entity, participant: new Api.InputUserSelf() }),
+        new Api.channels.GetParticipant({ channel: entity, participant: new Api.InputPeerSelf() }),
       );
       return {
         role: this.getParticipantRole(result.participant),
@@ -2959,7 +2981,10 @@ export class TelegramService {
       if (entity instanceof Api.Channel) {
         return Boolean(entity.forum);
       }
-    } catch {}
+    } catch {
+      // Probe semantics: an unresolvable chat simply is not a forum, so report false
+      // instead of turning a lookup miss into a tool error.
+    }
     return false;
   }
 
@@ -3058,7 +3083,10 @@ export class TelegramService {
         if (exported instanceof Api.ChatInviteExported) {
           inviteLink = exported.link;
         }
-      } catch {}
+      } catch {
+        // The invite link is optional enrichment (needs admin rights); the chat data
+        // returned below is still valid without it.
+      }
 
       return { id: channelId, title, type: forum ? "forum" : "supergroup", inviteLink };
     }

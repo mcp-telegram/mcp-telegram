@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.5](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.4...v1.41.5) (2026-08-20)
+
+
+### Fixed
+
+* **daemon:** rebuild the client when MTProto drops instead of wedging on a sticky connected flag ([#71](https://github.com/mcp-telegram/mcp-telegram/issues/71)) ([d646fd8](https://github.com/mcp-telegram/mcp-telegram/commit/d646fd83c982998353650fee1f5232899ce10bb6))
+* **ipc:** map the daemon socket to a named pipe on win32 so the server starts on Windows ([#69](https://github.com/mcp-telegram/mcp-telegram/issues/69)) ([95e4ede](https://github.com/mcp-telegram/mcp-telegram/commit/95e4ede4f6bea3be0e0cbba543e467e294a308df))
+* **test:** quote the test glob so npm test actually runs the suite on Windows ([77ec84d](https://github.com/mcp-telegram/mcp-telegram/commit/77ec84d620dd401f4a79f0052a37384855031ebc))
+
 ## [1.41.4](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.3...v1.41.4) (2026-08-20)
 
 

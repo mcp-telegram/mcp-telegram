@@ -1,6 +1,6 @@
 # Tools Reference
 
-MCP Telegram provides a comprehensive tool set organized by category. All tools are auto-discoverable — your AI client will see them with full parameter descriptions when connected.
+Telegram MCP Server provides 181 tools organized by category. All tools are auto-discoverable — your AI client will see them with full parameter descriptions when connected.
 
 ## Auth
 

@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: MCP Telegram
+  name: Telegram MCP Server
   text: 将 AI 连接到 Telegram
   tagline: 功能完备的 userbot — 消息、群组、贴纸、联系人、搜索等。支持 Claude、ChatGPT、Cursor 及任何 MCP 客户端。
   actions:

@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: MCP Telegram
+  name: Telegram MCP Server
   text: Connect AI to Your Telegram
   tagline: Full-featured userbot — messages, groups, stickers, contacts, search, and more. Works with Claude, ChatGPT, Cursor, and any MCP client.
   actions:

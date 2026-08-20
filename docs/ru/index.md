@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: MCP Telegram
+  name: Telegram MCP Server
   text: Подключите ИИ к Telegram
   tagline: Полнофункциональный userbot — сообщения, группы, стикеры, контакты, поиск и многое другое. Работает с Claude, ChatGPT, Cursor и любым MCP-клиентом.
   actions:

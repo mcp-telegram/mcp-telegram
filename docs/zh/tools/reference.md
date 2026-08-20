@@ -1,6 +1,6 @@
 # 工具参考
 
-MCP Telegram 提供按类别组织的完整工具集。所有工具通过 MCP 自动发现。
+Telegram MCP Server 提供按类别组织的 181 个工具。所有工具通过 MCP 自动发现。
 
 ## 认证
 

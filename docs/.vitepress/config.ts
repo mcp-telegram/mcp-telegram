@@ -3,6 +3,10 @@ import { version } from "../../package.json";
 
 const DOCS_VERSION = `v${version}`;
 
+// Keep in sync with the generated manifest: `npm run build && node dist/manifest.js /tmp/manifest.json`
+// then read `.toolCount` (same number as the rows in docs/**/tools/reference.md).
+const TOOL_COUNT = 181;
+
 const enNav = [
   { text: "Guide", link: "/getting-started/credentials" },
   { text: "Platforms", link: "/platforms/claude-desktop" },
@@ -59,7 +63,7 @@ const enSidebar = [
   {
     text: "Reference",
     items: [
-      { text: "All Tools (59)", link: "/tools/reference" },
+      { text: `All Tools (${TOOL_COUNT})`, link: "/tools/reference" },
       { text: "Changelog", link: "/changelog" },
       { text: "Troubleshooting", link: "/troubleshooting" },
       { text: "FAQ", link: "/faq" },
@@ -99,7 +103,7 @@ const ruSidebar = [
   {
     text: "Справочник",
     items: [
-      { text: "Все инструменты (59)", link: "/ru/tools/reference" },
+      { text: `Все инструменты (${TOOL_COUNT})`, link: "/ru/tools/reference" },
       { text: "Список изменений", link: "/ru/changelog" },
       { text: "Решение проблем", link: "/ru/troubleshooting" },
       { text: "FAQ", link: "/ru/faq" },
@@ -139,7 +143,7 @@ const zhSidebar = [
   {
     text: "参考",
     items: [
-      { text: "所有工具 (59)", link: "/zh/tools/reference" },
+      { text: `所有工具 (${TOOL_COUNT})`, link: "/zh/tools/reference" },
       { text: "更新日志", link: "/zh/changelog" },
       { text: "故障排除", link: "/zh/troubleshooting" },
       { text: "常见问题", link: "/zh/faq" },
@@ -150,8 +154,8 @@ const zhSidebar = [
 const base = "/mcp-telegram/";
 
 export default defineConfig({
-  title: "MCP Telegram",
-  description: "Connect AI assistants to Telegram via MTProto protocol — comprehensive userbot tool coverage",
+  title: "Telegram MCP Server",
+  description: `Telegram MCP Server — connect Claude, ChatGPT and other AI assistants to Telegram via the MTProto protocol. ${TOOL_COUNT} userbot tools: messages, media, reactions, polls, stories.`,
   base,
   head: [
     [
@@ -194,6 +198,7 @@ export default defineConfig({
     ru: {
       label: "Русский",
       lang: "ru",
+      description: `Telegram MCP Server — подключите Claude, ChatGPT и других ИИ-ассистентов к Telegram по протоколу MTProto. ${TOOL_COUNT} инструмент userbot: сообщения, медиа, реакции, опросы, истории.`,
       themeConfig: {
         nav: ruNav,
         sidebar: ruSidebar,
@@ -209,6 +214,7 @@ export default defineConfig({
     zh: {
       label: "中文",
       lang: "zh-CN",
+      description: `Telegram MCP Server — 通过 MTProto 协议将 Claude、ChatGPT 等 AI 助手连接到 Telegram。${TOOL_COUNT} 个 userbot 工具：消息、媒体、表情回应、投票、快拍。`,
       themeConfig: {
         nav: zhNav,
         sidebar: zhSidebar,

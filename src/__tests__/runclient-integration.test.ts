@@ -11,7 +11,10 @@ import { socketPath } from "../lock.js";
 
 // Run the TypeScript entry directly via tsx — avoids depending on a compiled
 // dist/ which is gitignored and may be absent (CI, clean checkout) or stale.
-const TSX_BIN = join(process.cwd(), "node_modules", ".bin", "tsx");
+// On Windows the npm shim is `tsx.cmd`; the extensionless `tsx` there is a POSIX shell
+// script that spawn() cannot execute (ENOENT), which failed both tests in this file on the
+// Windows runner.
+const TSX_BIN = join(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
 const ENTRY = join(process.cwd(), "src", "index.ts");
 
 let testDir: string;

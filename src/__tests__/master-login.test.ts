@@ -1,9 +1,9 @@
 import assert from "node:assert";
 import { connect, createServer, type Server } from "node:net";
-import { after, before, describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import { encodeMessage, type IpcMessage, parseMessages } from "../ipc-protocol.js";
 import { handleClient } from "../master.js";
-import { cleanupIpcEndpoint, makeIpcEndpoint } from "./helpers/ipc-endpoint.js";
+import { cleanupIpcEndpoint, makeIpcEndpoint } from "./ipc-endpoint.helper.js";
 
 type McpServerInternal = Parameters<typeof handleClient>[1];
 type TelegramServiceLike = Parameters<typeof handleClient>[2];
@@ -68,18 +68,26 @@ describe("master handleLoginStart", () => {
   let server: Server;
   let sockPath: string;
 
-  before(() => {
-    // Platform-appropriate endpoint: a filesystem path is rejected by listen() on win32.
-    sockPath = makeIpcEndpoint("mcp-master-login");
+  // Every endpoint ever opened, so `after` can clean them all up on POSIX.
+  const endpoints: string[] = [];
+
+  after(() => {
+    server?.close();
+    for (const e of endpoints) cleanupIpcEndpoint(e);
   });
 
-  after(() => server?.close());
+  async function startServer(telegram: TelegramServiceLike) {
+    // A FRESH endpoint per server, rather than reusing one name. Two reasons, both win32:
+    // net.listen() rejects filesystem paths there at all (issue #69, hence makeIpcEndpoint),
+    // and close() is asynchronous — rebinding the same pipe name immediately raced the old
+    // server's teardown and every test after the first failed with EADDRINUSE.
+    const previous = server;
+    if (previous) await new Promise<void>((resolve) => previous.close(() => resolve()));
 
-  function startServer(telegram: TelegramServiceLike) {
-    server?.close();
-    cleanupIpcEndpoint(sockPath);
+    sockPath = makeIpcEndpoint("mcp-master-login");
+    endpoints.push(sockPath);
     server = createServer((socket) => handleClient(socket, emptyMcp, telegram));
-    return new Promise<void>((resolve) => server.listen(sockPath, resolve));
+    await new Promise<void>((resolve) => server.listen(sockPath, resolve));
   }
 
   it("forwards QR URLs via login_qr, then login_done success", async () => {

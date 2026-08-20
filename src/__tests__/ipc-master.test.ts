@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { connect, createServer, type Server } from "node:net";
-import { after, before, describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import {
   encodeMessage,
   type IpcMessage,
@@ -9,7 +9,7 @@ import {
   parseMessages,
 } from "../ipc-protocol.js";
 import { handleClient } from "../master.js";
-import { cleanupIpcEndpoint, makeIpcEndpoint } from "./helpers/ipc-endpoint.js";
+import { cleanupIpcEndpoint, makeIpcEndpoint } from "./ipc-endpoint.helper.js";
 
 type McpServerInternal = Parameters<typeof handleClient>[1];
 type TelegramServiceLike = Parameters<typeof handleClient>[2];
@@ -70,22 +70,27 @@ describe("handleClient / drainQueue", () => {
   let server: Server;
   let sockPath: string;
 
-  before(async () => {
-    // Not a hardcoded "<tmp>/x.sock": net.listen() rejects filesystem paths on win32, so
-    // hardcoding one reproduces issue #69 inside the test harness itself.
-    sockPath = makeIpcEndpoint("mcp-master-test");
-  });
+  // Every endpoint ever opened, so `after` can clean them all up on POSIX.
+  const endpoints: string[] = [];
 
   after(() => {
     server?.close();
+    for (const e of endpoints) cleanupIpcEndpoint(e);
   });
 
-  function startServer(tools: Record<string, ToolFn>) {
-    server?.close();
-    cleanupIpcEndpoint(sockPath);
+  async function startServer(tools: Record<string, ToolFn>) {
+    // A FRESH endpoint per server, rather than reusing one name. Two reasons, both win32:
+    // net.listen() rejects filesystem paths there at all (issue #69, hence makeIpcEndpoint),
+    // and close() is asynchronous — rebinding the same pipe name immediately raced the old
+    // server's teardown and every test after the first failed with EADDRINUSE.
+    const previous = server;
+    if (previous) await new Promise<void>((resolve) => previous.close(() => resolve()));
+
+    sockPath = makeIpcEndpoint("mcp-master-test");
+    endpoints.push(sockPath);
     const mock = makeMockServer(tools);
     server = createServer((socket) => handleClient(socket, mock, stubTelegram));
-    return new Promise<void>((resolve) => server.listen(sockPath, resolve));
+    await new Promise<void>((resolve) => server.listen(sockPath, resolve));
   }
 
   it("unknown tool → error response", async () => {

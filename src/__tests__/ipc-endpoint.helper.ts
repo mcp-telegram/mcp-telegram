@@ -10,8 +10,8 @@ import { join } from "node:path";
  * namespace, so a filesystem path fails with `listen EACCES`. That made every IPC test fail
  * on a Windows runner even though the shipped code was already fixed.
  *
- * Not named *.test.ts on purpose — the `src/**\/*.test.ts` glob would otherwise try to run
- * this module as a test file.
+ * Named *.helper.ts, not *.test.ts, so the `src/**` + `*.test.ts` runner glob does not try to
+ * execute this module as a test file.
  */
 export function makeIpcEndpoint(label: string): string {
   const unique = `${label}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

@@ -3,7 +3,7 @@ import { connect, createServer, type Server } from "node:net";
 import { after, before, describe, it } from "node:test";
 import { encodeMessage, type IpcToolRequest, type IpcToolResponse, parseMessages } from "../ipc-protocol.js";
 import { handleClient } from "../master.js";
-import { cleanupIpcEndpoint, makeIpcEndpoint } from "./helpers/ipc-endpoint.js";
+import { cleanupIpcEndpoint, makeIpcEndpoint } from "./ipc-endpoint.helper.js";
 
 /**
  * Regression tests for the second half of issue #71.

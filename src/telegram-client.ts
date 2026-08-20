@@ -409,8 +409,63 @@ export class TelegramService {
     }
   }
 
+  /**
+   * True when our sticky `connected` flag disagrees with GramJS about the live transport.
+   *
+   * `this.connected` is set in connect() and cleared only by disconnect()/clearSession()/
+   * logOut() — never when the MTProto socket dies. So once GramJS exhausts its
+   * `connectionRetries` budget the flag stays true, ensureConnected() keeps returning true,
+   * and every tool call is issued on a dead client and hangs forever (issue #71).
+   *
+   * GramJS exposes the real state via `get connected()` -> `_sender && _sender.isConnected()`.
+   * Only an explicit `false` counts as dead — deliberately not "any non-true value". The
+   * getter yields `undefined` when there is no sender yet, and a GramJS upgrade that renamed
+   * or dropped the property would read as `undefined` too; under a `!== true` test that would
+   * tear down and rebuild the client on every single call, a reconnect storm worse than the
+   * bug being fixed. With `=== false` an unknown signal degrades to the old behaviour, while
+   * the reported failure (sender present, transport down) still reads `false` and recovers.
+   */
+  private isTransportDead(): boolean {
+    return this.client !== null && this.client.connected === false;
+  }
+
+  /**
+   * Tear down a client whose transport is gone so connect() can rebuild from the saved
+   * session. This is the in-process equivalent of killing the master: same session string,
+   * fresh sender. No-op when there is no client.
+   */
+  private async dropDeadClient(): Promise<void> {
+    const dead = this.client;
+    this.connected = false;
+    this.client = null;
+    this.entityCache.clear();
+    if (!dead) return;
+    try {
+      await dead.destroy();
+    } catch {
+      // The transport is already gone — destroy() failing is the expected case here and
+      // must not stop us from rebuilding the client below.
+    }
+  }
+
+  /**
+   * Force the next ensureConnected() to revalidate instead of trusting the cached flag.
+   * Called when a caller observed a symptom the flag can't see (e.g. a tool call that hung
+   * past its budget), so recovery doesn't have to wait for GramJS to notice.
+   */
+  markUnhealthy(reason: string): void {
+    if (!this.connected && !this.client) return;
+    this.lastError = `Connection marked unhealthy: ${reason}`;
+    this.connected = false;
+  }
+
   async connect(): Promise<boolean> {
-    if (this.connected && this.client) return true;
+    if (this.connected && this.client && !this.isTransportDead()) return true;
+
+    // Either we were never connected, or the flag is stale and the sender underneath is
+    // dead. Drop whatever is there before building a new client, otherwise the old sender
+    // leaks and its update loop keeps spinning on timeouts alongside the new one.
+    await this.dropDeadClient();
 
     if (!this.sessionString) {
       const loaded = await this.loadSession();
@@ -479,10 +534,11 @@ export class TelegramService {
 
   /** Ensure connection is active, auto-reconnect if session exists */
   async ensureConnected(): Promise<boolean> {
-    if (this.connected && this.client) {
+    if (this.connected && this.client && !this.isTransportDead()) {
       return true;
     }
-    // Try to reconnect with saved session
+    // Not connected, or connected-by-flag only with a dead sender underneath.
+    // connect() drops the stale client and rebuilds from the saved session.
     return this.connect();
   }
 
@@ -534,7 +590,7 @@ export class TelegramService {
   }
 
   isConnected(): boolean {
-    return this.connected;
+    return this.connected && !this.isTransportDead();
   }
 
   async startQrLogin(

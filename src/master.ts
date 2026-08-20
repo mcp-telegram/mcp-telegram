@@ -15,6 +15,14 @@ import { releaseLock, releaseSocket, socketPath } from "./lock.js";
 import { TelegramService } from "./telegram-client.js";
 import { registerTools } from "./tools/index.js";
 
+// Ceiling for a single tool call inside the master. Must stay just under the client's
+// IPC_CALL_TIMEOUT_MS (30s, src/client.ts): past that the caller has already given up, so
+// nothing is lost by abandoning the call — but without this the master stays wedged. A call
+// issued on a dead MTProto client never settles, and because handleToolRequest holds
+// globalLock for its whole duration, one stuck call blocks every tool call from every
+// connected client, not just its own (issue #71).
+const TOOL_CALL_TIMEOUT_MS = 28_000;
+
 let cleanedUp = false;
 
 function cleanup() {
@@ -38,7 +46,43 @@ const globalLock = new GlobalLock();
 type ActiveLogin = { socket: Socket; abort: AbortController };
 let activeLogin: ActiveLogin | null = null;
 
-export function handleClient(socket: Socket, mcpServer: McpServerInternal, telegram: TelegramService) {
+/**
+ * Resolve to the handler's result, or reject once `ms` elapses.
+ *
+ * The underlying promise is left running — it cannot be cancelled — but it no longer holds
+ * globalLock or the client's response, so the daemon keeps serving. The timer is unref'd so
+ * a pending timeout never keeps the process alive on shutdown.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Tool call timed out after ${ms}ms: ${label}`)), ms);
+    timer.unref?.();
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+export interface HandleClientOptions {
+  /** Override the per-call ceiling. Exists so tests can exercise the timeout path without
+   *  waiting out the 28s production budget; production callers use the default. */
+  toolCallTimeoutMs?: number;
+}
+
+export function handleClient(
+  socket: Socket,
+  mcpServer: McpServerInternal,
+  telegram: TelegramService,
+  opts: HandleClientOptions = {},
+) {
+  const toolCallTimeoutMs = opts.toolCallTimeoutMs ?? TOOL_CALL_TIMEOUT_MS;
   let buf = "";
   let processing = false;
   const queue: IpcMessage[] = [];
@@ -53,7 +97,7 @@ export function handleClient(socket: Socket, mcpServer: McpServerInternal, teleg
       const msg = queue.shift();
       if (!msg) break;
       if (msg.type === "tool") {
-        await handleToolRequest(socket, msg, mcpServer);
+        await handleToolRequest(socket, msg, mcpServer, telegram, toolCallTimeoutMs);
       } else if (msg.type === "login_start") {
         await handleLoginStart(socket, msg, telegram);
       }
@@ -89,7 +133,13 @@ function send(socket: Socket, msg: IpcMessage): void {
   if (!socket.destroyed) socket.write(encodeMessage(msg));
 }
 
-async function handleToolRequest(socket: Socket, req: IpcToolRequest, mcpServer: McpServerInternal) {
+async function handleToolRequest(
+  socket: Socket,
+  req: IpcToolRequest,
+  mcpServer: McpServerInternal,
+  telegram?: TelegramService,
+  timeoutMs: number = TOOL_CALL_TIMEOUT_MS,
+) {
   const tool = mcpServer._registeredTools[req.tool];
   const response: IpcToolResponse = { type: "tool_response", id: req.id };
 
@@ -103,9 +153,16 @@ async function handleToolRequest(socket: Socket, req: IpcToolRequest, mcpServer:
     }
     const unlock = await globalLock.acquire();
     try {
-      response.result = await tool.handler(req.args ?? {}, {});
+      response.result = await withTimeout(tool.handler(req.args ?? {}, {}), timeoutMs, req.tool);
     } catch (err) {
       response.error = err instanceof Error ? err.message : String(err);
+      // A call that burns the whole budget is the signature of a dead MTProto transport that
+      // our cached `connected` flag still reports as live. Flag it so the NEXT call
+      // revalidates and reconnects, instead of every subsequent call hanging the same way.
+      if (err instanceof Error && err.message.startsWith("Tool call timed out")) {
+        console.error(`[mcp-telegram] ${err.message} — marking Telegram connection unhealthy`);
+        telegram?.markUnhealthy(`tool call timed out: ${req.tool}`);
+      }
     } finally {
       unlock();
     }
@@ -187,7 +244,12 @@ export async function startOwner(
   const { chmod } = await import("node:fs/promises");
   try {
     await chmod(sock, 0o600);
-  } catch {}
+  } catch {
+    // Best-effort hardening of the IPC endpoint. Expected to fail on win32, where `sock` is
+    // a named pipe rather than a file (see socketPath()); the pipe's default DACL already
+    // restricts it to the creating user's session. Also fails on filesystems without POSIX
+    // modes. Neither case is worth refusing to serve over.
+  }
 
   console.error(`[${label}] IPC socket ready: ${sock}`);
 

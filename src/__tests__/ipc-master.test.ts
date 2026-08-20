@@ -1,8 +1,5 @@
 import assert from "node:assert";
-import { rmSync } from "node:fs";
 import { connect, createServer, type Server } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import {
   encodeMessage,
@@ -12,6 +9,7 @@ import {
   parseMessages,
 } from "../ipc-protocol.js";
 import { handleClient } from "../master.js";
+import { cleanupIpcEndpoint, makeIpcEndpoint } from "./helpers/ipc-endpoint.js";
 
 type McpServerInternal = Parameters<typeof handleClient>[1];
 type TelegramServiceLike = Parameters<typeof handleClient>[2];
@@ -73,7 +71,9 @@ describe("handleClient / drainQueue", () => {
   let sockPath: string;
 
   before(async () => {
-    sockPath = join(tmpdir(), `mcp-master-test-${process.pid}-${Date.now()}.sock`);
+    // Not a hardcoded "<tmp>/x.sock": net.listen() rejects filesystem paths on win32, so
+    // hardcoding one reproduces issue #69 inside the test harness itself.
+    sockPath = makeIpcEndpoint("mcp-master-test");
   });
 
   after(() => {
@@ -82,7 +82,7 @@ describe("handleClient / drainQueue", () => {
 
   function startServer(tools: Record<string, ToolFn>) {
     server?.close();
-    rmSync(sockPath, { force: true });
+    cleanupIpcEndpoint(sockPath);
     const mock = makeMockServer(tools);
     server = createServer((socket) => handleClient(socket, mock, stubTelegram));
     return new Promise<void>((resolve) => server.listen(sockPath, resolve));

@@ -1,11 +1,9 @@
 import assert from "node:assert";
-import { rmSync } from "node:fs";
 import { connect, createServer, type Server } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { encodeMessage, type IpcToolRequest, type IpcToolResponse, parseMessages } from "../ipc-protocol.js";
 import { handleClient } from "../master.js";
+import { cleanupIpcEndpoint, makeIpcEndpoint } from "./helpers/ipc-endpoint.js";
 
 /**
  * Regression tests for the second half of issue #71.
@@ -21,8 +19,8 @@ type McpServerInternal = Parameters<typeof handleClient>[1];
 type TelegramServiceLike = Parameters<typeof handleClient>[2];
 type ToolFn = (args: Record<string, unknown>) => Promise<unknown>;
 
-const TMP_DIR = join(tmpdir(), `mcp-telegram-tool-timeout-test-${process.pid}`);
-const SOCK = join(TMP_DIR, "t.sock");
+// Platform-appropriate endpoint — a filesystem path is rejected by listen() on win32.
+const SOCK = makeIpcEndpoint("mcp-tool-timeout");
 // Short enough to keep the suite fast, long enough that a fast tool wins the race on a
 // loaded CI box.
 const TIMEOUT_MS = 120;
@@ -48,9 +46,7 @@ let server: Server;
 let spy: ReturnType<typeof makeSpyTelegram>;
 
 before(async () => {
-  rmSync(TMP_DIR, { recursive: true, force: true });
-  const { mkdirSync } = await import("node:fs");
-  mkdirSync(TMP_DIR, { recursive: true });
+  cleanupIpcEndpoint(SOCK);
 
   spy = makeSpyTelegram();
   const mcp = makeMockServer({
@@ -65,7 +61,7 @@ before(async () => {
 
 after(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
-  rmSync(TMP_DIR, { recursive: true, force: true });
+  cleanupIpcEndpoint(SOCK);
 });
 
 /** Send requests on one socket and collect `expected` responses. */

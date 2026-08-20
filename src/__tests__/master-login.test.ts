@@ -1,11 +1,9 @@
 import assert from "node:assert";
-import { rmSync } from "node:fs";
 import { connect, createServer, type Server } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { encodeMessage, type IpcMessage, parseMessages } from "../ipc-protocol.js";
 import { handleClient } from "../master.js";
+import { cleanupIpcEndpoint, makeIpcEndpoint } from "./helpers/ipc-endpoint.js";
 
 type McpServerInternal = Parameters<typeof handleClient>[1];
 type TelegramServiceLike = Parameters<typeof handleClient>[2];
@@ -71,14 +69,15 @@ describe("master handleLoginStart", () => {
   let sockPath: string;
 
   before(() => {
-    sockPath = join(tmpdir(), `mcp-master-login-${process.pid}-${Date.now()}.sock`);
+    // Platform-appropriate endpoint: a filesystem path is rejected by listen() on win32.
+    sockPath = makeIpcEndpoint("mcp-master-login");
   });
 
   after(() => server?.close());
 
   function startServer(telegram: TelegramServiceLike) {
     server?.close();
-    rmSync(sockPath, { force: true });
+    cleanupIpcEndpoint(sockPath);
     server = createServer((socket) => handleClient(socket, emptyMcp, telegram));
     return new Promise<void>((resolve) => server.listen(sockPath, resolve));
   }
@@ -193,7 +192,7 @@ describe("master handleLoginStart", () => {
     } as McpServerInternal;
 
     server?.close();
-    rmSync(sockPath, { force: true });
+    cleanupIpcEndpoint(sockPath);
     server = createServer((socket) => handleClient(socket, mockWithTool, telegram));
     await new Promise<void>((resolve) => server.listen(sockPath, resolve));
 
@@ -250,7 +249,7 @@ describe("master handleLoginStart", () => {
     } as McpServerInternal;
 
     server?.close();
-    rmSync(sockPath, { force: true });
+    cleanupIpcEndpoint(sockPath);
     server = createServer((socket) => handleClient(socket, mockWithLogout, telegram));
     await new Promise<void>((resolve) => server.listen(sockPath, resolve));
 

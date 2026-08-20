@@ -5,6 +5,7 @@ import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
+import { socketPath } from "../lock.js";
 
 /** Integration test: client subprocess must exit when its master socket closes. */
 
@@ -22,7 +23,15 @@ beforeEach(() => {
   testDir = join(tmpdir(), `mcp-runclient-test-${process.pid}-${Date.now()}`);
   mkdirSync(testDir, { recursive: true });
   lockFile = join(testDir, "daemon.lock");
-  sockFile = join(testDir, "daemon.sock");
+  // Derive the endpoint through the production helper instead of hardcoding
+  // "<dir>/daemon.sock". The spawned child computes it via socketPath() from
+  // TELEGRAM_SESSION_PATH, so a hardcoded path lets the two silently disagree — and on win32
+  // it must be a named pipe, which is the whole point of issue #69.
+  const prev = process.env.TELEGRAM_SESSION_PATH;
+  process.env.TELEGRAM_SESSION_PATH = join(testDir, "session");
+  sockFile = socketPath();
+  if (prev === undefined) delete process.env.TELEGRAM_SESSION_PATH;
+  else process.env.TELEGRAM_SESSION_PATH = prev;
 });
 
 afterEach(async () => {
@@ -32,7 +41,11 @@ afterEach(async () => {
   }
   try {
     rmSync(testDir, { recursive: true, force: true });
-  } catch {}
+  } catch {
+    // Best-effort cleanup: each test gets a fresh uniquely-named temp dir, so a leftover
+    // cannot leak into another test. On Windows the just-killed child process can still hold
+    // a handle briefly, and throwing here would mask the real assertion failure.
+  }
 });
 
 function waitExit(child: ChildProcess, timeoutMs: number): Promise<number | null> {

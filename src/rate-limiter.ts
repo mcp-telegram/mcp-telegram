@@ -58,9 +58,8 @@ export class RateLimiter {
         (error as { errorMessage?: string }).errorMessage || (error as Error).message || String(error);
 
       // FLOOD_WAIT — wait the exact time Telegram requires (or throw immediately if requested)
-      const floodMatch = errorMessage.match(/FLOOD_WAIT[_]?(\d+)/i);
-      if (floodMatch) {
-        const waitSeconds = Number.parseInt(floodMatch[1], 10);
+      const waitSeconds = extractFloodWaitSeconds(error, errorMessage);
+      if (waitSeconds !== null) {
         if (options?.throwOnFloodWait) {
           throw new Error(
             `Rate limit: Telegram requires a ${waitSeconds}s wait for ${context}. Try again in ${Math.ceil(waitSeconds / 60)} minute(s).`,
@@ -130,6 +129,41 @@ export class RateLimiter {
     this.slotQueue = nextSlot;
     return nextSlot;
   }
+}
+
+/**
+ * Extract the required wait from a Telegram flood error, in seconds.
+ *
+ * Two shapes reach us and BOTH must be handled:
+ *  - a raw string like `FLOOD_WAIT_358` (how Telegram names the error on the wire, and what
+ *    our own wrappers/tests re-throw);
+ *  - a GramJS `FloodWaitError` object, whose `message` is `"A wait of 358 seconds is required
+ *    (caused by folders.EditPeerFolders)"`, whose `errorMessage` is just `"FLOOD"` (set by the
+ *    FloodError base class) and which carries the number in a `seconds` property.
+ *
+ * Matching only `/FLOOD_WAIT_(\d+)/` missed the second shape entirely, so the retry/backoff
+ * below never ran for real GramJS errors: production logged zero `flood_wait` events over 30
+ * days while raw "A wait of N seconds is required" errors leaked to users (e.g. archive-chat).
+ *
+ * Returns null when the error is not a flood error.
+ */
+export function extractFloodWaitSeconds(error: unknown, errorMessage: string): number | null {
+  const named = errorMessage.match(/FLOOD_WAIT[_]?(\d+)/i);
+  if (named) return Number.parseInt(named[1], 10);
+
+  const seconds = (error as { seconds?: unknown }).seconds;
+  if (typeof seconds === "number" && Number.isFinite(seconds) && seconds >= 0) {
+    // Guard on the message too: `seconds` alone is too generic a property name to treat any
+    // error carrying it as a flood error.
+    if (/A wait of \d+ seconds is required/i.test((error as Error)?.message ?? "") || /FLOOD/i.test(errorMessage)) {
+      return seconds;
+    }
+  }
+
+  const phrased = ((error as Error)?.message ?? errorMessage).match(/A wait of (\d+) seconds is required/i);
+  if (phrased) return Number.parseInt(phrased[1], 10);
+
+  return null;
 }
 
 function isNetworkError(msg: string): boolean {

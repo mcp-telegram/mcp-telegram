@@ -22,6 +22,11 @@ jobs:
       - run: npx biome check src/
       - run: npx tsc --noEmit
       - run: npm run build
+      # The suite (534 tests / 171 suites, ~7s) used to run only on developer
+      # machines, so a regression could reach main with a green PR. Verified to
+      # pass in a clean checkout with no .env and no session file present, so it
+      # needs no secrets and stays hermetic.
+      - run: npm test
       # Build the docs site so a dead link / broken VitePress fails the PR,
       # not main. Deploy Docs (docs.yml) only runs on push to main, so without
       # this a bad doc link is invisible until after merge (PR #49 hit this).

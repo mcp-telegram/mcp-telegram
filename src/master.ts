@@ -137,7 +137,7 @@ async function handleToolRequest(
   socket: Socket,
   req: IpcToolRequest,
   mcpServer: McpServerInternal,
-  telegram?: TelegramService,
+  telegram: TelegramService,
   timeoutMs: number = TOOL_CALL_TIMEOUT_MS,
 ) {
   const tool = mcpServer._registeredTools[req.tool];
@@ -161,7 +161,7 @@ async function handleToolRequest(
       // revalidates and reconnects, instead of every subsequent call hanging the same way.
       if (err instanceof Error && err.message.startsWith("Tool call timed out")) {
         console.error(`[mcp-telegram] ${err.message} — marking Telegram connection unhealthy`);
-        telegram?.markUnhealthy(`tool call timed out: ${req.tool}`);
+        telegram.markUnhealthy(`tool call timed out: ${req.tool}`);
       }
     } finally {
       unlock();

@@ -76,7 +76,7 @@ describe("master handleLoginStart", () => {
     for (const e of endpoints) cleanupIpcEndpoint(e);
   });
 
-  async function startServer(telegram: TelegramServiceLike) {
+  async function startServer(telegram: TelegramServiceLike, mcp: McpServerInternal = emptyMcp) {
     // A FRESH endpoint per server, rather than reusing one name. Two reasons, both win32:
     // net.listen() rejects filesystem paths there at all (issue #69, hence makeIpcEndpoint),
     // and close() is asynchronous — rebinding the same pipe name immediately raced the old
@@ -86,7 +86,7 @@ describe("master handleLoginStart", () => {
 
     sockPath = makeIpcEndpoint("mcp-master-login");
     endpoints.push(sockPath);
-    server = createServer((socket) => handleClient(socket, emptyMcp, telegram));
+    server = createServer((socket) => handleClient(socket, mcp, telegram));
     await new Promise<void>((resolve) => server.listen(sockPath, resolve));
   }
 
@@ -199,10 +199,9 @@ describe("master handleLoginStart", () => {
       },
     } as McpServerInternal;
 
-    server?.close();
-    cleanupIpcEndpoint(sockPath);
-    server = createServer((socket) => handleClient(socket, mockWithTool, telegram));
-    await new Promise<void>((resolve) => server.listen(sockPath, resolve));
+    // Must go through startServer: rebinding the existing endpoint by hand raced the old
+    // server's asynchronous close() and failed with EADDRINUSE on win32 named pipes.
+    await startServer(telegram, mockWithTool);
 
     // Client A: starts login, then closes socket → triggers abort.
     await new Promise<void>((resolve) => {
@@ -256,10 +255,8 @@ describe("master handleLoginStart", () => {
       },
     } as McpServerInternal;
 
-    server?.close();
-    cleanupIpcEndpoint(sockPath);
-    server = createServer((socket) => handleClient(socket, mockWithLogout, telegram));
-    await new Promise<void>((resolve) => server.listen(sockPath, resolve));
+    // Must go through startServer — see the EADDRINUSE note above.
+    await startServer(telegram, mockWithLogout);
 
     // Client A: start QR login and keep the socket open (do NOT close it).
     const a = connect(sockPath);

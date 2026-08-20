@@ -11,10 +11,12 @@ import { socketPath } from "../lock.js";
 
 // Run the TypeScript entry directly via tsx — avoids depending on a compiled
 // dist/ which is gitignored and may be absent (CI, clean checkout) or stale.
-// On Windows the npm shim is `tsx.cmd`; the extensionless `tsx` there is a POSIX shell
-// script that spawn() cannot execute (ENOENT), which failed both tests in this file on the
-// Windows runner.
-const TSX_BIN = join(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
+// Invoke tsx's CLI through the current node binary instead of the node_modules/.bin shim.
+// The shim is a POSIX shell script that spawn() cannot execute on Windows, and its `tsx.cmd`
+// sibling cannot be spawned either: since the CVE-2024-27980 fix, Node refuses to spawn
+// .cmd/.bat without `shell: true` and throws EINVAL. Going straight to cli.mjs sidesteps both
+// and needs no shell quoting.
+const TSX_CLI = join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
 const ENTRY = join(process.cwd(), "src", "index.ts");
 
 let testDir: string;
@@ -76,7 +78,7 @@ describe("runClient integration", () => {
     writeFileSync(lockFile, String(process.pid), { mode: 0o600 });
 
     const session = join(testDir, "session");
-    const child = spawn(TSX_BIN, [ENTRY], {
+    const child = spawn(process.execPath, [TSX_CLI, ENTRY], {
       env: {
         ...process.env,
         TELEGRAM_API_ID: "12345",
@@ -102,7 +104,7 @@ describe("runClient integration", () => {
     writeFileSync(lockFile, String(process.pid), { mode: 0o600 });
     const session = join(testDir, "session");
 
-    const child = spawn(TSX_BIN, [ENTRY], {
+    const child = spawn(process.execPath, [TSX_CLI, ENTRY], {
       env: {
         ...process.env,
         TELEGRAM_API_ID: "12345",

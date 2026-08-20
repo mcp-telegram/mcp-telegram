@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -14,7 +15,29 @@ export function lockPath(): string {
   return join(resolveSessionDir(), "daemon.lock");
 }
 
+const WIN_PIPE_PREFIX = "\\\\.\\pipe\\mcp-telegram-";
+
+/**
+ * Windows has no filesystem-path IPC in Node: `net.Server.listen(path)` only accepts the
+ * named-pipe namespace (`\\.\pipe\...`), so listening on `<sessionDir>/daemon.sock` fails
+ * with `listen EACCES` and the master dies before it ever reaches Telegram.
+ *
+ * The name is derived from the session dir so two accounts (different TELEGRAM_SESSION_PATH)
+ * get separate pipes, and it is lower-cased first because Windows paths are case-insensitive:
+ * otherwise a master started via `C:\Users\x` and a client started via `c:\users\x` would look
+ * for each other on two different pipes and both would try to become master.
+ */
+function winPipeName(dir: string): string {
+  const normalized = dir.toLowerCase();
+  const slug = normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  // Pipe names are length-capped. Hash long dirs instead of truncating, so two deep paths
+  // sharing a prefix can't collapse onto one pipe and cross-talk between accounts.
+  if (slug.length <= 64) return WIN_PIPE_PREFIX + slug;
+  return WIN_PIPE_PREFIX + createHash("sha1").update(normalized).digest("hex").slice(0, 32);
+}
+
 export function socketPath(): string {
+  if (process.platform === "win32") return winPipeName(resolveSessionDir());
   return join(resolveSessionDir(), "daemon.sock");
 }
 
@@ -103,5 +126,10 @@ export function releaseSocket(): void {
       }
     }
     unlinkSync(sock);
-  } catch {}
+  } catch {
+    // Best-effort cleanup, called from a process.on("exit") handler where throwing would
+    // turn an orderly shutdown into a crash. A leftover socket file is recoverable: the
+    // next master calls releaseSocket() again before listening. On win32 socketPath() is a
+    // named pipe, existsSync() is false and we return before ever reaching unlinkSync.
+  }
 }

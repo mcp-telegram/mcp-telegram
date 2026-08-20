@@ -17,7 +17,11 @@ beforeEach(() => {
 afterEach(() => {
   try {
     rmSync(testDir, { recursive: true, force: true });
-  } catch {}
+  } catch {
+    // Temp-dir cleanup is best-effort: each test gets a fresh uniquely-named dir, so a
+    // leftover cannot leak into another test. Throwing here would mask the real assertion
+    // failure that is usually the reason the dir is in an odd state.
+  }
   delete process.env.TELEGRAM_SESSION_PATH;
 });
 
@@ -81,7 +85,79 @@ describe("releaseLock", () => {
   });
 });
 
-describe("releaseSocket", () => {
+/**
+ * Regression tests for issue #69 — "Windows + Node: server crashes at startup".
+ *
+ * Node's `net.Server.listen(path)` only accepts the named-pipe namespace on win32, so the
+ * master died with `listen EACCES` on `<sessionDir>/daemon.sock` and every MCP client on
+ * Windows saw the server exit immediately. socketPath() must therefore return a pipe name
+ * there — and, critically, the SAME name for master and client, or both become master.
+ *
+ * process.platform is stubbed because socketPath() reads it per call; this keeps the
+ * behaviour testable from CI on any host OS, not only from a Windows runner.
+ */
+describe("socketPath() platform mapping", () => {
+  const realPlatform = process.platform;
+  const setPlatform = (value: NodeJS.Platform) =>
+    Object.defineProperty(process, "platform", { value, configurable: true });
+  afterEach(() => setPlatform(realPlatform));
+
+  it("posix → a daemon.sock file inside the session dir", () => {
+    setPlatform("linux");
+    assert.strictEqual(socketPath(), join(testDir, "daemon.sock"));
+  });
+
+  it("win32 → a \\\\.\\pipe\\ name, never a filesystem path", () => {
+    setPlatform("win32");
+    const sock = socketPath();
+    assert.ok(sock.startsWith("\\\\.\\pipe\\"), `expected a named pipe, got ${sock}`);
+    assert.ok(!sock.includes("daemon.sock"), "must not hand a filesystem path to listen()");
+  });
+
+  // These use FORWARD slashes on purpose. socketPath() derives the dir via path.dirname(),
+  // and on a POSIX host that is the POSIX implementation regardless of a stubbed
+  // process.platform: dirname("C:\\Users\\x\\session") returns ".", which collapses every
+  // input to one empty slug and makes distinctness assertions pass vacuously. Windows accepts
+  // "/" as a separator, so forward slashes keep the fixtures Windows-valid while still
+  // exercising the real name derivation from a Mac/Linux runner.
+  it("win32 → case-insensitive: two spellings of one dir yield ONE pipe", () => {
+    // If master resolved C:/Users/x and a client resolved c:/users/x to different pipes, the
+    // client would never find the master and would elect itself master too — two daemons,
+    // two Telegram sessions on one account.
+    setPlatform("win32");
+    process.env.TELEGRAM_SESSION_PATH = "C:/Users/Alex/.mcp-telegram/session";
+    const upper = socketPath();
+    process.env.TELEGRAM_SESSION_PATH = "c:/users/alex/.mcp-telegram/session";
+    assert.strictEqual(socketPath(), upper);
+    assert.ok(upper.length > "\\\\.\\pipe\\mcp-telegram-".length, "suffix must not be empty");
+  });
+
+  it("win32 → different session dirs yield different pipes (accounts stay isolated)", () => {
+    setPlatform("win32");
+    process.env.TELEGRAM_SESSION_PATH = "C:/Users/Alex/acct-a/session";
+    const a = socketPath();
+    process.env.TELEGRAM_SESSION_PATH = "C:/Users/Alex/acct-b/session";
+    assert.notStrictEqual(socketPath(), a);
+  });
+
+  it("win32 → very long dirs stay short and still stay distinct (hashed, not truncated)", () => {
+    // Pipe names are length-capped. Truncating would collapse two deep paths sharing a
+    // prefix onto one pipe, cross-wiring two accounts; hashing keeps them apart.
+    setPlatform("win32");
+    const deep = `C:/Users/Alex/${"nested/".repeat(30)}`;
+    process.env.TELEGRAM_SESSION_PATH = `${deep}alpha/session`;
+    const a = socketPath();
+    process.env.TELEGRAM_SESSION_PATH = `${deep}beta/session`;
+    const b = socketPath();
+    assert.notStrictEqual(a, b, "long paths must not collide");
+    assert.ok(a.length < 120, `pipe name too long: ${a.length}`);
+    assert.ok(a.startsWith("\\\\.\\pipe\\"));
+  });
+});
+
+// On win32 socketPath() is a named pipe, not a file: writeFileSync/existsSync don't apply
+// and the pipe vanishes with its owning process, so there is no stale-socket cleanup to test.
+describe("releaseSocket", { skip: process.platform === "win32" ? "POSIX-only: socket is a file" : false }, () => {
   it("removes socket file if it exists (no lock → no owner)", () => {
     writeFileSync(socketPath(), "");
     releaseSocket();

@@ -8,10 +8,21 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      # Windows failing must not cancel the Linux jobs (and vice versa) — a
+      # platform-specific break should be reported as exactly that.
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         node-version: [22, 24]
+        # Issue #69: the npm package could not start AT ALL on Windows — the IPC endpoint
+        # was a filesystem path, which net.listen() rejects there with EACCES — and a
+        # Linux-only matrix could never see it. One Windows job guards the platform split
+        # in socketPath() without tripling CI time.
+        include:
+          - os: windows-latest
+            node-version: 22
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -22,7 +33,7 @@ jobs:
       - run: npx biome check src/
       - run: npx tsc --noEmit
       - run: npm run build
-      # The suite (534 tests / 171 suites, ~7s) used to run only on developer
+      # The suite (568 tests / 180 suites, ~7s) used to run only on developer
       # machines, so a regression could reach main with a green PR. Verified to
       # pass in a clean checkout with no .env and no session file present, so it
       # needs no secrets and stays hermetic.
@@ -33,4 +44,7 @@ jobs:
       # docs:build runs predocs:build (gen:changelog) first — the changelog
       # pages are generated from CHANGELOG.md, not committed, so this both
       # exercises the generator and produces the pages the build needs.
+      # Linux-only: the docs output is platform-independent, so building it on
+      # every OS would only add minutes without covering any extra risk.
       - run: npm run docs:build
+        if: runner.os == 'Linux'

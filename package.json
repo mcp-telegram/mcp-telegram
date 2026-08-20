@@ -26,7 +26,7 @@
     "login": "node dist/qr-login-cli.js",
     "clean": "node --eval \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "prebuild": "npm run clean",
-    "build": "tsc && chmod +x dist/cli.js dist/manifest.js dist/qr-login-cli.js",
+    "build": "tsc && node --eval \"for (const f of ['dist/cli.js','dist/manifest.js','dist/qr-login-cli.js']) require('node:fs').chmodSync(f, 0o755)\"",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "lint": "biome check src/",

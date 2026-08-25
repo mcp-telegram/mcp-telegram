@@ -154,8 +154,16 @@ const zhSidebar = [
 const base = "/mcp-telegram/";
 
 export default defineConfig({
-  title: "Telegram MCP Server",
-  description: `Telegram MCP Server — connect Claude, ChatGPT and other AI assistants to Telegram via the MTProto protocol. ${TOOL_COUNT} userbot tools: messages, media, reactions, polls, stories.`,
+  // Titled "Self-Hosted Docs", not plain "Telegram MCP Server", on purpose.
+  // This site (mcp-telegram.github.io) documents running the OSS server
+  // yourself; mcp-telegram.com is the hosted product. Both used to target the
+  // identical string "Telegram MCP Server", so we competed with ourselves for
+  // one query while ranking ~17th on it — two weak pages instead of one strong
+  // one. The content genuinely differs (install/CLI/tool reference here vs
+  // signup/quickstart there), so a cross-site canonical would be wrong; naming
+  // each for what it actually is, is the honest fix.
+  title: "Telegram MCP Server — Self-Hosted Docs",
+  description: `Self-hosting docs for the open-source Telegram MCP Server: install the npm package or Docker image, log in over MTProto and wire it into Claude, ChatGPT, Cursor or Codex. ${TOOL_COUNT} userbot tools: messages, media, reactions, polls, stories. For the hosted version see mcp-telegram.com.`,
   base,
   head: [
     [
@@ -198,7 +206,8 @@ export default defineConfig({
     ru: {
       label: "Русский",
       lang: "ru",
-      description: `Telegram MCP Server — подключите Claude, ChatGPT и других ИИ-ассистентов к Telegram по протоколу MTProto. ${TOOL_COUNT} инструмент userbot: сообщения, медиа, реакции, опросы, истории.`,
+      title: "Telegram MCP Server — документация по self-hosted",
+      description: `Документация по самостоятельному запуску open-source Telegram MCP Server: установка npm-пакета или Docker-образа, вход по MTProto, подключение к Claude, ChatGPT, Cursor и Codex. ${TOOL_COUNT} инструмент userbot: сообщения, медиа, реакции, опросы, истории. Облачная версия — на mcp-telegram.com.`,
       themeConfig: {
         nav: ruNav,
         sidebar: ruSidebar,
@@ -214,7 +223,8 @@ export default defineConfig({
     zh: {
       label: "中文",
       lang: "zh-CN",
-      description: `Telegram MCP Server — 通过 MTProto 协议将 Claude、ChatGPT 等 AI 助手连接到 Telegram。${TOOL_COUNT} 个 userbot 工具：消息、媒体、表情回应、投票、快拍。`,
+      title: "Telegram MCP Server — 自托管文档",
+      description: `开源 Telegram MCP Server 的自托管文档：安装 npm 包或 Docker 镜像，通过 MTProto 登录，并接入 Claude、ChatGPT、Cursor 或 Codex。${TOOL_COUNT} 个 userbot 工具：消息、媒体、表情回应、投票、快拍。托管版本请访问 mcp-telegram.com。`,
       themeConfig: {
         nav: zhNav,
         sidebar: zhSidebar,

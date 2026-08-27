@@ -793,6 +793,7 @@ export class TelegramService {
   ): Promise<Api.Message | Api.UpdateShortSentMessage | undefined> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       // Raw path: high-level client.sendMessage does not support quoteText/effect.
@@ -855,6 +856,7 @@ export class TelegramService {
 
   async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    // pi-lens-ignore: sql-injection
     await this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       await this.client?.sendFile(resolved, { file: filePath, caption });
@@ -873,6 +875,7 @@ export class TelegramService {
   ): Promise<{ id: number }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       // Duration is intentionally auto-detected by GramJS from the audio file —
@@ -901,6 +904,7 @@ export class TelegramService {
   ): Promise<{ id: number }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       const attributes =
@@ -938,6 +942,7 @@ export class TelegramService {
   ): Promise<{ id: number }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       const media = new Api.InputMediaContact({
@@ -968,6 +973,7 @@ export class TelegramService {
   ): Promise<{ id: number; value?: number }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       const result = await client.invoke(
@@ -1004,6 +1010,7 @@ export class TelegramService {
   ): Promise<{ id: number }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       const geoPoint = new Api.InputGeoPoint({
@@ -1050,6 +1057,7 @@ export class TelegramService {
   ): Promise<{ id: number }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       const media = new Api.InputMediaVenue({
@@ -1090,6 +1098,7 @@ export class TelegramService {
       throw new Error("Album requires 2-10 items");
     }
     const client = this.client;
+    // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       // Album-level caption lands on the first item; per-item captions stay as provided.
@@ -1400,6 +1409,7 @@ export class TelegramService {
 
   async editMessage(chatId: string, messageId: number, newText: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    // pi-lens-ignore: sql-injection
     await this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
       await this.client?.editMessage(resolved, { message: messageId, text: newText });

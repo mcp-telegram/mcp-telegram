@@ -62,7 +62,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       annotations: WRITE,
     },
     async ({ chatId, text, replyTo, parseMode, topicId, quoteText, effect }) => {
-      const tooLong = checkMessageLength(text);
+      const tooLong = checkMessageLength(text, parseMode);
       if (tooLong) return fail(new Error(tooLong));
 
       const err = await requireConnection(telegram);
@@ -188,6 +188,8 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       annotations: WRITE,
     },
     async ({ chatId, messageId, text }) => {
+      // telegram-edit-message takes no parseMode, so the text is sent verbatim and its raw
+      // length is exactly what Telegram measures.
       const tooLong = checkMessageLength(text);
       if (tooLong) return fail(new Error(tooLong));
 

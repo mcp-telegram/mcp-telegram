@@ -101,12 +101,21 @@ export const MAX_MESSAGE_LENGTH = 4096;
  *
  * Deliberately NOT auto-splitting: silently turning one requested message into three is a
  * visible, unrequested action in someone else's chat.
+ *
+ * Returns null (defer to Telegram) whenever `parseMode` is set — see the comment inside.
  */
-export function checkMessageLength(text: string, field = "text"): string | null {
+export function checkMessageLength(text: string, parseMode?: string): string | null {
+  // Telegram applies the cap to the PARSED message, not to the markup source: GramJS strips
+  // `<b>`/`**` into entities before sending, so a 4097-char HTML source can carry a legal
+  // 4090-char message. Since parsed <= raw, `raw <= limit` always implies the message fits,
+  // but `raw > limit` proves nothing once markup is in play. Rather than reimplement the
+  // GramJS parsers here, only decide locally when raw and parsed are the same string, and
+  // otherwise leave the verdict to Telegram (i.e. the pre-existing behaviour).
+  if (parseMode) return null;
   if (text.length <= MAX_MESSAGE_LENGTH) return null;
   const over = text.length - MAX_MESSAGE_LENGTH;
   return (
-    `Message ${field} is ${text.length} characters — Telegram's limit is ${MAX_MESSAGE_LENGTH} (${over} over). ` +
+    `Message text is ${text.length} characters — Telegram's limit is ${MAX_MESSAGE_LENGTH} (${over} over). ` +
     `Split it into separate messages, or send it as a file with telegram-send-file.`
   );
 }

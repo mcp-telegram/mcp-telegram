@@ -15,19 +15,31 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Mints the OIDC token npm exchanges for a short-lived publish credential.
+      # This is the ONLY publish credential — there is no NPM_TOKEN secret anymore.
       id-token: write
     steps:
       - uses: actions/checkout@v6
+      # NOTE: deliberately no `registry-url:`. Passing it makes setup-node write an
+      # .npmrc containing `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`; with the
+      # token gone that env var is undefined and npm aborts resolving the config before
+      # it ever attempts the OIDC exchange. npm already defaults to registry.npmjs.org.
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
           cache: npm
       - run: npm ci
       - run: npx biome check src/
       - run: npx tsc --noEmit
       - run: npm run build
-      - name: Publish to npm
+      # Trusted publishing (OIDC) landed in npm 11.5.1; Node 22 still bundles npm 10.x.
+      # Upgraded AFTER install/build so dependencies are resolved by the same npm the CI
+      # workflow validates, keeping this step's blast radius to `npm publish` alone.
+      # Pinned to the 11.x line rather than `latest` so a future npm major cannot silently
+      # change publish behaviour on a release day.
+      - name: Install npm with trusted-publishing support
+        run: npm install -g npm@^11.5.1
+      - name: Publish to npm (OIDC trusted publisher — no token)
         run: |
           npm publish --access public 2> publish-err.log && exit 0
           if grep -q "cannot publish over" publish-err.log; then
@@ -37,8 +49,6 @@ jobs:
           echo "::error::npm publish failed for a reason other than 'already published':"
           cat publish-err.log
           exit 1
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-mcp-registry:
     # Publish server metadata to the official MCP Registry (registry.modelcontextprotocol.io).

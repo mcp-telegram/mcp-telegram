@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
 import {
+  checkMessageLength,
   DESTRUCTIVE,
   fail,
   formatReactions,
@@ -61,6 +62,9 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       annotations: WRITE,
     },
     async ({ chatId, text, replyTo, parseMode, topicId, quoteText, effect }) => {
+      const tooLong = checkMessageLength(text);
+      if (tooLong) return fail(new Error(tooLong));
+
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
@@ -184,6 +188,9 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       annotations: WRITE,
     },
     async ({ chatId, messageId, text }) => {
+      const tooLong = checkMessageLength(text);
+      if (tooLong) return fail(new Error(tooLong));
+
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 

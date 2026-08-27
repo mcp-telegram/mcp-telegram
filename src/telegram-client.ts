@@ -194,6 +194,28 @@ const SESSION_STRING_RE = /^[A-Za-z0-9+/=]+$/;
 const MIN_SESSION_LENGTH = 100;
 const NOT_CONNECTED_ERROR = "Not connected. Run telegram-status to check or telegram-login to authenticate.";
 
+/**
+ * Telegram's invite-bearing requests (`messages.createChat`, `messages.addChatUser`,
+ * `channels.inviteToChannel`) do NOT return `Updates`. Their TL return type is
+ * `messages.InvitedUsers`, which wraps the real `Updates` alongside the list of
+ * users the server refused to add. GramJS types the field loosely enough that a
+ * `result as unknown as Api.Updates` cast compiles while `.chats` is always
+ * `undefined` at runtime.
+ *
+ * Both helpers tolerate the legacy bare-`Updates` shape so they stay correct if a
+ * layer bump reverts the wrapper.
+ */
+function unwrapInvitedUsers(result: unknown): Api.Updates {
+  if (result instanceof Api.messages.InvitedUsers) return result.updates as Api.Updates;
+  return result as Api.Updates;
+}
+
+/** User IDs Telegram declined to invite (privacy settings, Premium-only DMs, limits). */
+function missingInviteeIds(result: unknown): string[] {
+  if (!(result instanceof Api.messages.InvitedUsers)) return [];
+  return (result.missingInvitees ?? []).map((m) => m.userId.toString());
+}
+
 function resolveSessionPath(sessionPath?: string): string {
   return sessionPath ?? process.env.TELEGRAM_SESSION_PATH ?? DEFAULT_SESSION_FILE;
 }
@@ -3088,7 +3110,7 @@ export class TelegramService {
     supergroup?: boolean;
     forum?: boolean;
     description?: string;
-  }): Promise<{ id: string; title: string; type: string; inviteLink?: string }> {
+  }): Promise<{ id: string; title: string; type: string; inviteLink?: string; missingInvitees?: string[] }> {
     if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
 
     const { title, users, supergroup = false, forum = false, description } = options;
@@ -3110,6 +3132,7 @@ export class TelegramService {
       const channelId = chat.id.toString();
 
       // Invite users
+      let missingInvitees: string[] = [];
       if (users.length > 0) {
         const inputUsers: Api.TypeInputUser[] = [];
         for (const u of users) {
@@ -3123,12 +3146,13 @@ export class TelegramService {
           }
         }
         if (inputUsers.length > 0) {
-          await this.client.invoke(
+          const invited = await this.client.invoke(
             new Api.channels.InviteToChannel({
               channel: chat as Api.Channel,
               users: inputUsers,
             }),
           );
+          missingInvitees = missingInviteeIds(invited);
         }
       }
 
@@ -3144,7 +3168,13 @@ export class TelegramService {
         // returned below is still valid without it.
       }
 
-      return { id: channelId, title, type: forum ? "forum" : "supergroup", inviteLink };
+      return {
+        id: channelId,
+        title,
+        type: forum ? "forum" : "supergroup",
+        inviteLink,
+        ...(missingInvitees.length > 0 && { missingInvitees }),
+      };
     }
 
     // Create basic group via messages.CreateChat
@@ -3171,11 +3201,21 @@ export class TelegramService {
       }),
     );
 
-    const updates = result as unknown as Api.Updates;
+    // messages.CreateChat returns `messages.InvitedUsers` ({ updates, missingInvitees }),
+    // not `Updates` directly — reading `.chats` off the raw result always yielded
+    // undefined and threw "Failed to create group" for a group Telegram had already
+    // created. See unwrapInvitedUsers().
+    const updates = unwrapInvitedUsers(result);
     const chat = updates.chats?.[0];
     if (!chat) throw new Error("Failed to create group");
 
-    return { id: chat.id.toString(), title, type: "group" };
+    const missingInvitees = missingInviteeIds(result);
+    return {
+      id: chat.id.toString(),
+      title,
+      type: "group",
+      ...(missingInvitees.length > 0 && { missingInvitees }),
+    };
   }
 
   async inviteToGroup(chatId: string, users: string[]): Promise<{ invited: string[]; failed: string[] }> {
@@ -3194,14 +3234,19 @@ export class TelegramService {
         }
         const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
 
+        let res: unknown;
         if (entity instanceof Api.Channel) {
-          await this.client.invoke(new Api.channels.InviteToChannel({ channel: entity, users: [inputUser] }));
+          res = await this.client.invoke(new Api.channels.InviteToChannel({ channel: entity, users: [inputUser] }));
         } else if (entity instanceof Api.Chat) {
-          await this.client.invoke(
+          res = await this.client.invoke(
             new Api.messages.AddChatUser({ chatId: entity.id, userId: inputUser, fwdLimit: 50 }),
           );
         }
-        invited.push(u);
+        // Telegram answers 200 while silently declining users whose privacy settings
+        // forbid the invite; they come back in `missingInvitees`. Reporting those as
+        // invited made the tool claim work it had not done.
+        if (missingInviteeIds(res).length > 0) failed.push(u);
+        else invited.push(u);
       } catch {
         failed.push(u);
       }

@@ -174,6 +174,12 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
           `Created ${result.type}: ${result.title}`,
           `ID: ${result.id}`,
           ...(result.inviteLink ? [`Invite link: ${result.inviteLink}`] : []),
+          ...(result.missingInvitees?.length
+            ? [
+                `Not added (${result.missingInvitees.length}): ${result.missingInvitees.join(", ")} — ` +
+                  "their privacy settings block invites from you. Send them the invite link instead.",
+              ]
+            : []),
         ];
         return ok(lines.join("\n"));
       } catch (e) {

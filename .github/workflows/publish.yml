@@ -84,20 +84,61 @@ jobs:
             exit 0
           fi
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-      - name: Install mcp-publisher
+      # Idempotency guard. The registry rejects a re-publish of an existing version with a
+      # hard 400 ('invalid version: cannot publish duplicate version'), so a second dispatch
+      # of an already-released tag turned a green release red — while npm/docker/binaries all
+      # re-ran happily. Ask the registry first and skip instead of failing.
+      #
+      # Fails OPEN on purpose: only a confident "already there" skips. A network blip, an API
+      # change, or unparseable JSON falls through to the publish attempt, so a genuine first
+      # publish is never silently swallowed — worst case we get today's behaviour.
+      - name: Check whether this version is already in the registry
         if: steps.ver.outputs.version != ''
+        id: exists
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          NAME=$(jq -r '.name' server.json)
+          ENC=$(jq -rn --arg n "$NAME" '$n|@uri')
+          URL="https://registry.modelcontextprotocol.io/v0/servers/$ENC/versions"
+
+          if ! BODY=$(curl -fsS --max-time 30 "$URL"); then
+            echo "Registry lookup failed — proceeding with publish (fail-open)."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # NOTE: plain `jq -r`, not `jq -e` — `-e` exits 1 when the result is `false`, which is
+          # indistinguishable from a real jq failure and made an absent version look unparseable.
+          FOUND=$(printf '%s' "$BODY" | jq -r --arg v "$V" 'any(.servers[]?.server.version; . == $v)' 2>/dev/null) || FOUND=""
+
+          case "$FOUND" in
+            true)
+              echo "::notice::$NAME@$V is already in the MCP Registry — skipping (idempotent re-run)."
+              echo "found=true" >> "$GITHUB_OUTPUT"
+              ;;
+            false)
+              echo "$NAME@$V not yet in the registry — publishing."
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unexpected registry response (jq returned '$FOUND') — proceeding with publish (fail-open)."
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+      - name: Install mcp-publisher
+        if: steps.ver.outputs.version != '' && steps.exists.outputs.found != 'true'
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
       - name: Pin server.json version to the release tag
-        if: steps.ver.outputs.version != ''
+        if: steps.ver.outputs.version != '' && steps.exists.outputs.found != 'true'
         run: |
           V="${{ steps.ver.outputs.version }}"
           jq --arg v "$V" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
       - name: Authenticate to MCP Registry (GitHub OIDC)
-        if: steps.ver.outputs.version != ''
+        if: steps.ver.outputs.version != '' && steps.exists.outputs.found != 'true'
         run: ./mcp-publisher login github-oidc
       - name: Publish to MCP Registry
-        if: steps.ver.outputs.version != ''
+        if: steps.ver.outputs.version != '' && steps.exists.outputs.found != 'true'
         run: ./mcp-publisher publish
 
   publish-docker:

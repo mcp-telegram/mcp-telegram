@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.6](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.5...v1.41.6) (2026-08-27)
+
+
+### Fixed
+
+* **groups:** unwrap messages.InvitedUsers so basic-group creation stops failing after the group is created ([1ec97ff](https://github.com/mcp-telegram/mcp-telegram/commit/1ec97ff1aefd41a13c16c608427c6e1add087821))
+* **messages:** defer the length check to Telegram when parseMode is set, since markup is not the sent text ([cc7f80e](https://github.com/mcp-telegram/mcp-telegram/commit/cc7f80e7d6297435544e541010d6a1782244dffc))
+* **messages:** reject over-long message text locally instead of round-tripping into MESSAGE_TOO_LONG ([70e16f2](https://github.com/mcp-telegram/mcp-telegram/commit/70e16f23bc87cf37ac560adc3962807f6bbe4d1e))
+
+
+### Documentation
+
+* name the GitHub Pages site Self-Hosted Docs so it stops competing with the cloud site ([252eb76](https://github.com/mcp-telegram/mcp-telegram/commit/252eb765831475af2da0441b2e4e6911be05c275))
+
 ## [1.41.5](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.4...v1.41.5) (2026-08-20)
 
 

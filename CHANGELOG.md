@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.7](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.6...v1.41.7) (2026-09-10)
+
+
+### Documentation
+
+* **registry:** brand the MCP Registry listing as Chatroost, mark it unofficial and advertise the hosted remote endpoint ([e27634a](https://github.com/mcp-telegram/mcp-telegram/commit/e27634ad343aba6e2f371b7e0198423e8f60e0ad))
+
 ## [1.41.6](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.5...v1.41.6) (2026-08-27)
 
 

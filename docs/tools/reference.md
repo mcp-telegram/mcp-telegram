@@ -1,6 +1,6 @@
 # Tools Reference
 
-Telegram MCP Server provides 181 tools organized by category. All tools are auto-discoverable — your AI client will see them with full parameter descriptions when connected.
+Telegram MCP Server provides 182 tools organized by category. All tools are auto-discoverable — your AI client will see them with full parameter descriptions when connected.
 
 ## Auth
 
@@ -200,7 +200,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 ## Profiles
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `telegram-get-profile` | Get a user's profile info |
 | `telegram-get-saved-music` | List the songs pinned to a user's profile |
 | `telegram-update-profile` | Update your own profile (name, bio, username) |

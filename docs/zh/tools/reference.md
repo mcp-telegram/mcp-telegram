@@ -1,6 +1,6 @@
 # 工具参考
 
-Telegram MCP Server 提供按类别组织的 181 个工具。所有工具通过 MCP 自动发现。
+Telegram MCP Server 提供按类别组织的 182 个工具。所有工具通过 MCP 自动发现。
 
 ## 认证
 
@@ -200,8 +200,9 @@ Telegram MCP Server 提供按类别组织的 181 个工具。所有工具通过 
 ## 个人资料
 
 | 工具 | 说明 |
-|------|------|
+| ------ | ------ |
 | `telegram-get-profile` | 获取用户资料 |
+| `telegram-get-saved-music` | 列出用户资料中置顶的歌曲 |
 | `telegram-update-profile` | 更新自己的资料（姓名、简介、用户名） |
 
 ## 账户

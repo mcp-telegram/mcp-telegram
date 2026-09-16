@@ -211,8 +211,8 @@ export default defineConfig({
       themeConfig: {
         nav: ruNav,
         sidebar: ruSidebar,
-        outlineTitle: "На этой странице",
-        lastUpdatedText: "Обновлено",
+        outline: { label: "На этой странице" },
+        lastUpdated: { text: "Обновлено" },
         docFooter: { prev: "Назад", next: "Далее" },
         editLink: {
           pattern: "https://github.com/mcp-telegram/mcp-telegram/edit/main/docs/:path",
@@ -228,8 +228,8 @@ export default defineConfig({
       themeConfig: {
         nav: zhNav,
         sidebar: zhSidebar,
-        outlineTitle: "本页目录",
-        lastUpdatedText: "最后更新",
+        outline: { label: "本页目录" },
+        lastUpdated: { text: "最后更新" },
         docFooter: { prev: "上一页", next: "下一页" },
         editLink: {
           pattern: "https://github.com/mcp-telegram/mcp-telegram/edit/main/docs/:path",

@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { getToolManifest } from "../manifest.js";
 
 /**

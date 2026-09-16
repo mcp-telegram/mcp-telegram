@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.42.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.7...v1.42.0) (2026-09-16)
+
+
+### Added
+
+* **profiles:** Add telegram-get-saved-music ([#79](https://github.com/mcp-telegram/mcp-telegram/issues/79)) ([f9440dd](https://github.com/mcp-telegram/mcp-telegram/commit/f9440ddfe68f1da2e48351cb22682e3e8ddeb172))
+
+
+### Fixed
+
+* **docs:** restore ru/zh outline and last-updated labels dropped by the VitePress 2 rename ([65907ad](https://github.com/mcp-telegram/mcp-telegram/commit/65907adc88d7c6ac9c136f541e2985d3c2006025))
+
+
+### Documentation
+
+* cover telegram-get-saved-music in en/ru/zh and bump the tool count to 182 ([e58ac9d](https://github.com/mcp-telegram/mcp-telegram/commit/e58ac9d051f25134764c9e362537bada15264b69))
+
 ## [1.41.7](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.6...v1.41.7) (2026-09-10)
 
 

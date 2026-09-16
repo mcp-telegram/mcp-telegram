@@ -202,6 +202,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 | Tool | Description |
 |------|-------------|
 | `telegram-get-profile` | Get a user's profile info |
+| `telegram-get-saved-music` | List the songs pinned to a user's profile |
 | `telegram-update-profile` | Update your own profile (name, bio, username) |
 
 ## Account

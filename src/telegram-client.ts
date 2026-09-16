@@ -12,6 +12,7 @@ import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { computeCheck } from "telegram/Password.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
+import { getInputUser } from "telegram/Utils.js";
 import { RateLimiter } from "./rate-limiter.js";
 import type {
   AllStoriesSummary,
@@ -36,6 +37,7 @@ import type {
   ReadParticipantsSummary,
   ReportResultSummary,
   ResolvedBusinessChatLinkSummary,
+  SavedMusicSummary,
   StarsStatusSummary,
   StoriesByIdSummary,
   StoryPrivacy,
@@ -78,11 +80,14 @@ import {
   summarizeQuickReplyMessages,
   summarizeReadParticipants,
   summarizeReportResult,
+  summarizeSavedMusic,
   summarizeStarsStatus,
   summarizeStoriesById,
   summarizeStoryViewsList,
   summarizeUpdatesDifference,
 } from "./telegram-helpers.js";
+import type { SavedMusicResponse } from "./tl/saved-music.js";
+import { GetSavedMusicRequest } from "./tl/saved-music.js";
 
 export type {
   AllStoriesSummary,
@@ -118,6 +123,8 @@ export type {
   ReadParticipantsSummary,
   ReportResultSummary,
   ResolvedBusinessChatLinkSummary,
+  SavedMusicSummary,
+  SavedMusicTrack,
   StarsAmountSummary,
   StarsStatusSummary,
   StarsSubscriptionPricingSummary,
@@ -173,6 +180,7 @@ export {
   summarizeQuickReplyMessages,
   summarizeReadParticipants,
   summarizeReportResult,
+  summarizeSavedMusic,
   summarizeStarsAmount,
   summarizeStarsStatus,
   summarizeStarsSubscription,
@@ -2372,6 +2380,38 @@ export class TelegramService {
       businessWorkHours,
       businessLocation,
     };
+  }
+
+  /**
+   * List the songs pinned to a user's profile (`users.getSavedMusic`).
+   *
+   * The request class is hand-rolled (`./tl/saved-music.ts`) because GramJS is pinned at TL
+   * layer 198, which predates this method.
+   */
+  async getSavedMusic(userId?: string, opts: { offset?: number; limit?: number } = {}): Promise<SavedMusicSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const offset = opts.offset ?? 0;
+    const limit = opts.limit ?? 50;
+    // resolvePeer first: getInputEntity alone throws "Could not find the input entity" for
+    // display-name fragments and uncached bare numeric ids. "me" is the self default.
+    const resolved = await this.resolvePeer(userId ?? "me");
+    // The InputPeer → InputUser conversion is mandatory. getBytes() delegates field 2 to the
+    // object's own constructor id, and unlike generated requests this class has no AUTO_CASTS
+    // resolve() to repair an InputPeer. getInputUser also rejects channels/groups loudly.
+    const id = getInputUser(await this.client.getInputEntity(resolved));
+    return this.rateLimiter.execute(
+      async () => {
+        const request = new GetSavedMusicRequest(id, offset, limit);
+        // invoke() is typed over a closed union of generated classes, which a hand-rolled
+        // request cannot join; the outbound cast collapses the return type, so restore it.
+        const response = (await this.client?.invoke(request as unknown as Api.AnyRequest)) as
+          | SavedMusicResponse
+          | undefined;
+        if (!response) throw new Error("users.getSavedMusic returned nothing");
+        return summarizeSavedMusic(response, offset);
+      },
+      `getSavedMusic ${userId ?? "me"}`,
+    );
   }
 
   // ─── Profiles & Media ──────────────────────────────────────────────────────

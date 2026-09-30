@@ -46,6 +46,7 @@ import type {
 } from "./telegram-helpers.js";
 import {
   buildReplyTo,
+  topicReplyOptions,
   buildStoryPrivacyRules,
   describeAdminLogAction,
   describeAdminLogDetails,
@@ -848,17 +849,9 @@ export class TelegramService {
         // Return a minimal UpdateShortSentMessage — it only carries `id`, avoiding fake peerId/date.
         return new Api.UpdateShortSentMessage({ id, pts: 0, ptsCount: 0, date: Math.floor(Date.now() / 1000) });
       }
-      if (topicId) {
-        return await client.sendMessage(resolved, {
-          message: text,
-          topMsgId: topicId,
-          ...(replyTo ? { replyTo } : {}),
-          ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
-        });
-      }
       return await client.sendMessage(resolved, {
         message: text,
-        ...(replyTo ? { replyTo } : {}),
+        ...topicReplyOptions(replyTo, topicId),
         ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
       });
     }, `sendMessage to ${chatId}`);
@@ -927,8 +920,7 @@ export class TelegramService {
         voiceNote: true,
         caption: opts.caption,
         parseMode: opts.parseMode,
-        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+        ...topicReplyOptions(opts.replyTo, opts.topicId),
       });
       return { id: message.id };
     }, `sendVoice to ${chatId}`);
@@ -963,8 +955,7 @@ export class TelegramService {
       const message = await client.sendFile(resolved, {
         file: filePath,
         videoNote: true,
-        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+        ...topicReplyOptions(opts.replyTo, opts.topicId),
         ...(attributes ? { attributes } : {}),
       });
       return { id: message.id };
@@ -1163,8 +1154,7 @@ export class TelegramService {
         caption: captions,
         ...(named ? { forceDocument: true } : {}),
         parseMode: opts.parseMode,
-        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+        ...topicReplyOptions(opts.replyTo, opts.topicId),
       })) as unknown as Api.Message | Api.Message[] | undefined;
       const ids = Array.isArray(result)
         ? result.filter((m): m is Api.Message => m instanceof Api.Message).map((m) => m.id)

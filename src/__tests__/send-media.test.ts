@@ -8,7 +8,13 @@ import { CustomFile } from "telegram/client/uploads.js";
 import { Api } from "telegram/tl/index.js";
 import { getAttributes } from "telegram/Utils.js";
 import { TelegramService } from "../telegram-client.js";
-import { buildReplyTo, extractDiceResult, extractMessageId, generateRandomBigInt } from "../telegram-helpers.js";
+import {
+  buildReplyTo,
+  extractDiceResult,
+  extractMessageId,
+  generateRandomBigInt,
+  topicReplyOptions,
+} from "../telegram-helpers.js";
 import { isSafeAbsolutePath } from "../tools/shared.js";
 
 const TMP_DIR = join(tmpdir(), `mcp-telegram-sendmedia-test-${process.pid}`);
@@ -133,6 +139,20 @@ describe("buildReplyTo", () => {
     const r = buildReplyTo(99, 17);
     assert.strictEqual(r?.replyToMsgId, 99);
     assert.strictEqual(r?.topMsgId, 17);
+  });
+});
+
+describe("topicReplyOptions (GramJS high-level sendMessage/sendFile)", () => {
+  // GramJS reads topMsgId only when replyTo is set; a bare topMsgId posted into General.
+  it("posts into a topic by replying to its root when only topicId is given", () => {
+    assert.deepStrictEqual(topicReplyOptions(undefined, 17), { replyTo: 17, topMsgId: 17 });
+  });
+  it("keeps an explicit reply inside the topic", () => {
+    assert.deepStrictEqual(topicReplyOptions(99, 17), { replyTo: 99, topMsgId: 17 });
+  });
+  it("passes a plain reply through and omits everything when neither is set", () => {
+    assert.deepStrictEqual(topicReplyOptions(5), { replyTo: 5 });
+    assert.deepStrictEqual(topicReplyOptions(), {});
   });
 });
 
@@ -462,6 +482,26 @@ describe("TelegramService.sendVoice", () => {
     assert.strictEqual(opts.parseMode, "md");
     // Duration is auto-detected by GramJS — we must not override it client-side
     assert.strictEqual(opts.attributes, undefined);
+  });
+
+  it("posts into a topic without replyTo by replying to the topic root (GramJS drops a bare topMsgId)", async () => {
+    const service = makeService();
+    const captured: Record<string, unknown> = {};
+    const client: MockClient = {
+      invoke: async () => undefined,
+      getInputEntity: async () => ({}),
+      sendFile: async (_peer: unknown, opts: Record<string, unknown>) => {
+        captured.opts = opts;
+        return { id: 1 } as unknown as Api.Message;
+      },
+    };
+    primeConnected(service, client);
+
+    await service.sendVoice("chat", "/tmp/x.ogg", { topicId: 42 });
+
+    const opts = captured.opts as Record<string, unknown>;
+    assert.strictEqual(opts.replyTo, 42);
+    assert.strictEqual(opts.topMsgId, 42);
   });
 
   it("wraps the audio as CustomFile when a fileName is given so the codec is detectable", async () => {

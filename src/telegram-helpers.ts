@@ -17,6 +17,19 @@ export function buildReplyTo(replyTo?: number, topicId?: number): Api.InputReply
   });
 }
 
+/**
+ * Reply options for GramJS's high-level `sendMessage` / `sendFile`.
+ *
+ * GramJS only reads `topMsgId` when `replyTo` is also set (it builds InputReplyToMessage
+ * inside `if (replyTo != undefined)`), so `{ topMsgId }` alone was silently dropped and a
+ * message "sent to topic N" landed in General. Posting into a topic means replying to its
+ * root message, the same rule as {@link buildReplyTo}.
+ */
+export function topicReplyOptions(replyTo?: number, topicId?: number): { replyTo?: number; topMsgId?: number } {
+  if (topicId) return { replyTo: replyTo ?? topicId, topMsgId: topicId };
+  return replyTo ? { replyTo } : {};
+}
+
 /** Cryptographically random 64-bit bigInt for TL randomId (SendMedia/SendMultiMedia require it). */
 export function generateRandomBigInt(): bigInt.BigInteger {
   return bigInt(randomBytes(8).toString("hex"), 16);

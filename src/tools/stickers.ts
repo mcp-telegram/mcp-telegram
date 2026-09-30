@@ -111,7 +111,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
     "telegram-send-sticker",
     {
       description:
-        "Send a sticker from a sticker set to a chat. First use telegram-get-sticker-set to browse available stickers and find the index",
+        "Send a sticker from a sticker set to a chat. The sticker is identified by the set's short name and its index in that set, as listed by telegram-get-sticker-set.",
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
         stickerSet: z.string().describe("Short name of the sticker set (e.g. 'HotCherry')"),

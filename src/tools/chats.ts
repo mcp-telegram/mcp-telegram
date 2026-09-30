@@ -356,7 +356,8 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
   server.registerTool(
     "telegram-set-admin",
     {
-      description: "Promote a user to admin in a supergroup or channel with full permissions",
+      description:
+        "Promote a user to admin in a supergroup or channel. Grants: change info, post, edit and delete messages, ban users, invite users, pin messages, manage voice chats. Does not grant the right to add other admins.",
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
         userId: z.string().describe("User ID or username to promote"),

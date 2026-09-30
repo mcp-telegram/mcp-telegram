@@ -706,7 +706,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
     "telegram-get-updates",
     {
       description:
-        "Fetch new messages, deleted messages, and other updates since a previously-known {pts, qts, date} cursor (from telegram-get-state or a prior call). Returns compact newMessages[], deletedMessageIds[], otherUpdates[] (className only), and the new cursor state. isFinal=false means more updates are queued — call again with the returned state. If Telegram reports the gap is too long, a fallback hint is returned suggesting to resync via telegram-read-messages per chat. The server does not store the cursor; each call takes the {pts, qts, date} returned by the previous one.",
+        "Fetch new messages, deleted messages, and other updates since a previously-known {pts, qts, date} cursor (from telegram-get-state or a prior call). Returns compact newMessages[], deletedMessageIds[], otherUpdates[] (className only), and the new cursor state. isFinal=false means more updates are queued — call again with the returned state. If Telegram reports the gap is too long, the result says so and the history has to be re-read per chat. The server does not store the cursor; each call takes the {pts, qts, date} returned by the previous one.",
       inputSchema: {
         pts: z.number().int().describe("Last known pts (from telegram-get-state or prior telegram-get-updates)"),
         qts: z.number().int().describe("Last known qts (secret-chat / encrypted stream cursor; 0 if unknown)"),
@@ -744,7 +744,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
     "telegram-get-channel-updates",
     {
       description:
-        "Fetch new messages and updates for a single channel/supergroup since a known per-channel pts cursor. Separate from the global cursor used by telegram-get-updates. Returns compact newMessages[], otherUpdates[], and new {pts, isFinal, timeout?}. If the channel gap is too long, Telegram returns a dialog snapshot — this tool forwards it and hints to resync via telegram-read-messages. The server does not store the cursor; each call takes the pts returned by the previous one.",
+        "Fetch new messages and updates for a single channel/supergroup since a known per-channel pts cursor. Separate from the global cursor used by telegram-get-updates. Returns compact newMessages[], otherUpdates[], and new {pts, isFinal, timeout?}. If the channel gap is too long, Telegram returns a dialog snapshot instead, and this tool forwards it. The server does not store the cursor; each call takes the pts returned by the previous one.",
       inputSchema: {
         chatId: z.string().describe("Channel or supergroup ID or username"),
         pts: z.number().int().describe("Last known per-channel pts"),

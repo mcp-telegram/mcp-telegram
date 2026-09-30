@@ -8,7 +8,7 @@ export function registerTranscribeTools(server: McpServer, telegram: TelegramSer
     "telegram-transcribe-audio",
     {
       description:
-        "Request server-side transcription of a voice note or video note (Telegram Premium feature). Returns immediately with transcriptionId — if pending:true, call telegram-get-transcription to poll for completion.",
+        "Request server-side transcription of a voice note or video note (Telegram Premium feature). Returns immediately with a transcriptionId; pending:true means the text is not ready yet, and telegram-get-transcription returns it once it is.",
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
         messageId: z.number().int().positive().describe("Message ID of the voice or video note"),

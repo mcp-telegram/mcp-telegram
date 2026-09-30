@@ -8,7 +8,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
     "telegram-get-sticker-set",
     {
       description:
-        "Get all stickers from a sticker set by its short name. Returns each sticker with index and emoji. Use the index with telegram-send-sticker to send a specific sticker",
+        "Get all stickers from a sticker set by its short name. Returns each sticker with index and emoji. The index identifies the sticker in telegram-send-sticker.",
       inputSchema: {
         shortName: z
           .string()
@@ -46,8 +46,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-search-sticker-sets",
     {
-      description:
-        "Search for sticker sets by name or keyword. Returns matching sticker pack names that can be used with telegram-get-sticker-set",
+      description: "Search for sticker sets by name or keyword. Returns the short names of matching sticker packs.",
       inputSchema: {
         query: z.string().describe("Search query (e.g. 'cat', 'love', 'pepe', 'anime')"),
       },
@@ -80,8 +79,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-get-installed-stickers",
     {
-      description:
-        "List all sticker sets installed by the user. Returns pack names and short names for use with other sticker tools",
+      description: "List all sticker sets installed by the user. Returns pack titles and short names.",
       inputSchema: {},
       annotations: READ_ONLY,
     },

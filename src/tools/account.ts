@@ -462,7 +462,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
     "telegram-set-emoji-status",
     {
       description:
-        "Set your profile emoji status (custom animated emoji shown next to your name). Requires Telegram Premium. Pass documentId or collectibleId to set — omit both to clear the status. Use telegram-list-emoji-statuses to browse available IDs.",
+        "Set your profile emoji status (custom animated emoji shown next to your name). Requires Telegram Premium. Pass documentId or collectibleId to set — omit both to clear the status. Available IDs are listed by telegram-list-emoji-statuses.",
       inputSchema: {
         documentId: z
           .string()
@@ -701,7 +701,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
     "telegram-delete-profile-photo",
     {
       description:
-        "Delete one or more profile photos by their photo IDs. Use telegram-get-profile-photo to obtain the current photo ID. Returns which IDs were deleted and which were not found.",
+        "Delete one or more profile photos by their photo IDs. Photo IDs are the ones telegram-get-profile-photo returns. Returns which IDs were deleted and which were not found.",
       inputSchema: {
         photoIds: z
           .array(z.string().regex(/^\d{1,20}$/, "must be a numeric photo ID"))

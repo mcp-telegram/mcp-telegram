@@ -28,7 +28,7 @@ export function registerGroupCallTools(server: McpServer, telegram: TelegramServ
           .max(500)
           .optional()
           .describe(
-            "Max participants to include (default 0 — metadata only; use telegram-get-group-call-participants for pagination)",
+            "Max participants to include (default 0 — metadata only; paginated lists are in telegram-get-group-call-participants)",
           ),
       },
       annotations: READ_ONLY,

@@ -794,7 +794,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
     "telegram-get-broadcast-stats",
     {
       description:
-        "Get broadcast channel statistics: followers, views/shares/reactions per post & story, notification percent, recent post interactions. Broadcast channels only (use telegram-get-megagroup-stats for supergroups). Admin rights required; some channels may require Telegram Premium to expose stats",
+        "Get broadcast channel statistics: followers, views/shares/reactions per post & story, notification percent, recent post interactions. Broadcast channels only (supergroup statistics are in telegram-get-megagroup-stats). Admin rights required; some channels may require Telegram Premium to expose stats",
       inputSchema: {
         chatId: z.string().describe("Broadcast channel ID or username"),
         includeGraphs: z
@@ -824,7 +824,7 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
     "telegram-get-megagroup-stats",
     {
       description:
-        "Get supergroup statistics: members, messages, viewers, posters (current vs previous period), top posters/admins/inviters. Supergroups only (use telegram-get-broadcast-stats for broadcast channels). Admin rights required. Telegram rate-limits this endpoint to roughly 1 request per 30 minutes per channel — expect FLOOD_WAIT on rapid repeat calls",
+        "Get supergroup statistics: members, messages, viewers, posters (current vs previous period), top posters/admins/inviters. Supergroups only (broadcast channel statistics are in telegram-get-broadcast-stats). Admin rights required. Telegram rate-limits this endpoint to roughly 1 request per 30 minutes per channel — expect FLOOD_WAIT on rapid repeat calls",
       inputSchema: {
         chatId: z.string().describe("Supergroup ID or username"),
         includeGraphs: z

@@ -46,7 +46,6 @@ import type {
 } from "./telegram-helpers.js";
 import {
   buildReplyTo,
-  topicReplyOptions,
   buildStoryPrivacyRules,
   describeAdminLogAction,
   describeAdminLogDetails,
@@ -86,6 +85,7 @@ import {
   summarizeStoriesById,
   summarizeStoryViewsList,
   summarizeUpdatesDifference,
+  topicReplyOptions,
 } from "./telegram-helpers.js";
 import type { SavedMusicResponse } from "./tl/saved-music.js";
 import { GetSavedMusicRequest } from "./tl/saved-music.js";

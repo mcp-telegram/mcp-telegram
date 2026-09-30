@@ -24,7 +24,7 @@ export function registerSendMediaTools(server: McpServer, telegram: TelegramServ
       inputSchema: {
         chatId: z.string().describe("Chat ID or username (e.g. @username or numeric ID)"),
         filePath: absolutePath.describe(
-          "Absolute local filesystem path to audio file (OGG/Opus preferred; M4A/MP3 also accepted). URLs are rejected.",
+          "Absolute local filesystem path to audio file (OGG/Opus arrives as a voice message; other formats arrive as a regular audio file). URLs are rejected.",
         ),
         caption: safeText.optional().describe("Optional caption shown below the voice note"),
         replyTo: z.number().int().positive().optional().describe("Message ID to reply to"),

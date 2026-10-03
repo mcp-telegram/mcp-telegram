@@ -1200,27 +1200,67 @@ export class TelegramService {
   async downloadMediaAsBuffer(
     chatId: string,
     messageId: number,
-    options?: { thumb?: number },
-  ): Promise<{ buffer: Buffer; mimeType: string; isThumb: boolean }> {
+    options?: { thumb?: number; maxBytes?: number; signal?: AbortSignal },
+  ): Promise<{ buffer: Buffer; mimeType: string; isThumb: boolean; fileName?: string }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const maxBytes = options?.maxBytes;
+    if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes <= 0)) {
+      throw new Error("maxBytes must be a positive safe integer");
+    }
+    const guard = (downloaded = 0): void => {
+      options?.signal?.throwIfAborted();
+      if (maxBytes !== undefined && downloaded > maxBytes) throw new Error(`Media exceeds ${maxBytes} byte limit`);
+    };
+    guard();
     const resolved = await this.resolvePeer(chatId);
     const messages = await this.client.getMessages(resolved, { ids: [messageId] });
+    guard();
     const message = messages[0];
     if (!message) throw new Error(`Message ${messageId} not found`);
     if (!message.media) throw new Error(`Message ${messageId} has no media`);
-
+    // SAFETY: GramJS media variants expose document metadata only on documents;
+    // every field here is optional, and actual downloaded bytes are separately
+    // bounded even when metadata is absent or understates the size.
+    const document = (
+      message.media as unknown as { document?: { size?: { toString(): string }; attributes?: { fileName?: string }[] } }
+    ).document;
+    const checkFullSize = (): void => {
+      if (document?.size !== undefined) guard(Number(document.size.toString()));
+    };
+    // GramJS invokes this after each chunk (at most 512 KiB). A thrown error
+    // closes its iterator; the final guard also covers cached photo sizes,
+    // which don't invoke progressCallback. Metadata denies large documents
+    // BEFORE GramJS allocates the full file. signal is cooperative, not a way
+    // to cancel a currently blocked MTProto request.
+    const progressCallback = (downloaded: { toString(): string }): void => guard(Number(downloaded.toString()));
+    const guarded = maxBytes !== undefined || options?.signal ? { progressCallback } : {};
     let isThumb = false;
     let buffer: Buffer | undefined;
     if (options?.thumb !== undefined) {
-      buffer = (await this.client.downloadMedia(message, { thumb: options.thumb })) as Buffer | undefined;
+      buffer = (await this.client.downloadMedia(message, { thumb: options.thumb, ...guarded })) as Buffer | undefined;
       isThumb = !!buffer?.length;
     }
     // No thumb requested, or this media has no thumbnail at that size → full file.
-    if (!buffer?.length) buffer = (await this.client.downloadMedia(message)) as Buffer;
+    if (!buffer?.length) {
+      checkFullSize();
+      buffer = (await this.client.downloadMedia(message, guarded)) as Buffer;
+    }
     if (!buffer?.length) throw new Error("Failed to download media");
+    guard(buffer.length);
 
     const mimeType = this.detectMimeType(buffer, message.media);
-    return { buffer, mimeType, isThumb };
+    const fileName = document?.attributes?.find((a) => typeof a.fileName === "string")?.fileName;
+    return { buffer, mimeType, isThumb, ...(fileName !== undefined && { fileName }) };
+  }
+
+  /** Explicit capability for cloud callers: old core versions fail closed
+   * instead of silently ignoring a size cap passed as an unknown option. */
+  async downloadMediaBounded(
+    chatId: string,
+    messageId: number,
+    options: { maxBytes: number; thumb?: number; signal?: AbortSignal },
+  ): Promise<{ buffer: Buffer; mimeType: string; isThumb: boolean; fileName?: string }> {
+    return this.downloadMediaAsBuffer(chatId, messageId, options);
   }
 
   /** Detect MIME type from buffer magic bytes, falling back to media metadata */

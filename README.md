@@ -128,6 +128,8 @@ TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH mcp-telegram serve
 
 Then point each MCP client at the same install with the same `TELEGRAM_SESSION_PATH` — no `serve` argument. They connect to the daemon automatically; closing any client never drops the shared connection. Credentials are only required by the daemon (the owner), so client commands can omit `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` and keep them where the daemon runs.
 
+MCP hosts that speak Streamable HTTP can also skip the per-session client entirely: start the daemon with `--http-port 8933` and connect to `http://127.0.0.1:8933/mcp` with the bearer token from `http-token` next to the session (loopback only; browser origins rejected).
+
 See the **[shared daemon guide](docs/guides/shared-daemon.md)** for a systemd unit and SSH usage.
 
 ### Proxy Support

@@ -3333,7 +3333,20 @@ export class TelegramService {
     // created. See unwrapInvitedUsers().
     const updates = unwrapInvitedUsers(result);
     const chat = updates.chats?.[0];
-    if (!chat) throw new Error("Failed to create group");
+    if (!chat) {
+      // invoke() already resolved without throwing, so this is not a transport or
+      // RPC error (those surface on their own via invoke()); it's Telegram
+      // acknowledging the request without handing back the chat we expected. The
+      // clearest signal available at this point is what did come back, so report
+      // that shape instead of a dead-end message: how many invitees Telegram
+      // declined (a full house can accompany a chat-less response) and the raw
+      // update/chat counts, so this is at least attributable in telemetry.
+      const missing = missingInviteeIds(result);
+      const declinedNote = missing.length > 0 ? `; ${missing.length} invitee(s) declined` : "";
+      throw new Error(
+        `Failed to create group: Telegram's response had no chat (updates: ${updates.updates?.length ?? 0}, chats: ${updates.chats?.length ?? 0}${declinedNote})`,
+      );
+    }
 
     const missingInvitees = missingInviteeIds(result);
     return {

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.2](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.1...v1.43.2) (2026-10-03)
+
+
+### Fixed
+
+* **media:** bound private media downloads before buffering ([436aa3f](https://github.com/mcp-telegram/mcp-telegram/commit/436aa3f49366d81a63d8f3bee18bb458ca7c7a15))
+* **messages:** sending into a forum topic without replyTo lands in that topic, not in General ([9a23fba](https://github.com/mcp-telegram/mcp-telegram/commit/9a23fba572e02233f08a2393f329f0a648750936))
+* **tools:** describe set-admin rights accurately and state tool relationships as facts, not orders ([#101](https://github.com/mcp-telegram/mcp-telegram/issues/101)) ([fbac57e](https://github.com/mcp-telegram/mcp-telegram/commit/fbac57e103440d494cd7757053eb4bac4a1cf8d0))
+* **tools:** descriptions state which tool provides an ID as a fact instead of telling the model to call it ([b3d4aca](https://github.com/mcp-telegram/mcp-telegram/commit/b3d4aca44d1d2036a53430e40dfcccd28d184cd9))
+
+
+### Documentation
+
+* link the public roadmap board ([cd4cd92](https://github.com/mcp-telegram/mcp-telegram/commit/cd4cd926a1e535e0f969a7e6a2305c48ec517979))
+* **tools:** send-voice says only OGG/Opus arrives as a voice message ([2edac09](https://github.com/mcp-telegram/mcp-telegram/commit/2edac098ecdfd1e74cb4ef22346134e06d0a2108))
+
 ## [1.43.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.0...v1.43.1) (2026-09-29)
 
 

@@ -16,9 +16,10 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         node-version: [22, 24]
-        # Issue #69: the npm package could not start AT ALL on Windows — the IPC endpoint
-        # was a filesystem path, which net.listen() rejects there with EACCES — and a
-        # Linux-only matrix could never see it. One Windows job guards the platform split
+        # Issue #69: the npm package could not start AT ALL on Windows. The
+        # IPC endpoint was a filesystem path, which net.listen() rejects there
+        # with EACCES; a Linux-only matrix could never see it. One Windows job
+        # guards the platform split
         # in socketPath() without tripling CI time.
         include:
           - os: windows-latest
@@ -38,6 +39,15 @@ jobs:
       # pass in a clean checkout with no .env and no session file present, so it
       # needs no secrets and stays hermetic.
       - run: npm test
+      # Cloud compiles core with Bun and --frozen-lockfile. npm CI alone cannot
+      # catch a stale bun.lock after dependency updates; validate it without
+      # replacing npm's node_modules, using the Docker image's Bun version.
+      - uses: oven-sh/setup-bun@v2
+        if: runner.os == 'Linux' && matrix.node-version == 22
+        with:
+          bun-version: "1.4.0"
+      - run: bun install --frozen-lockfile --ignore-scripts --lockfile-only
+        if: runner.os == 'Linux' && matrix.node-version == 22
       # Build the docs site so a dead link / broken VitePress fails the PR,
       # not main. Deploy Docs (docs.yml) only runs on push to main, so without
       # this a bad doc link is invisible until after merge (PR #49 hit this).

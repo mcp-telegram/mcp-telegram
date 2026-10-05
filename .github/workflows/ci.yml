@@ -42,7 +42,7 @@ jobs:
       # Cloud compiles core with Bun and --frozen-lockfile. npm CI alone cannot
       # catch a stale bun.lock after dependency updates; validate it without
       # replacing npm's node_modules, using the Docker image's Bun version.
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: runner.os == 'Linux' && matrix.node-version == 22
         with:
           bun-version: "1.4.0"

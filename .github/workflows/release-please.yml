@@ -19,9 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # v5's only breaking change vs v4 is the bundled runtime (Node 20 → 24),
-      # so the old FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 opt-in is no longer needed.
+      # so the old FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 opt-in is no longer
+      # needed.
       # Config schema, inputs, and behavior are unchanged.
-      - uses: googleapis/release-please-action@v5
+      # v5.0.0
+      - uses:
+          "googleapis/release-please-action\
+          @45996ed1f6d02564a971a2fa1b5860e934307cf7"
+
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

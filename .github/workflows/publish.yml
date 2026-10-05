@@ -6,7 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to (re)publish, e.g. v1.38.0. Leave blank to use the dispatched ref."
+        description:
+          "Release tag to (re)publish, e.g. v1.38.0. Leave blank to use the di\
+          spatched ref."
         required: false
         type: string
 
@@ -16,26 +18,36 @@ jobs:
     permissions:
       contents: read
       # Mints the OIDC token npm exchanges for a short-lived publish credential.
-      # This is the ONLY publish credential — there is no NPM_TOKEN secret anymore.
+      # This is the ONLY publish credential — there is no NPM_TOKEN secret
+      # anymore.
       id-token: write
     steps:
-      - uses: actions/checkout@v6
-      # NOTE: deliberately no `registry-url:`. Passing it makes setup-node write an
-      # .npmrc containing `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`; with the
-      # token gone that env var is undefined and npm aborts resolving the config before
-      # it ever attempts the OIDC exchange. npm already defaults to registry.npmjs.org.
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # NOTE: deliberately no `registry-url:`. Passing it makes setup-node write
+      # an
+      # .npmrc containing `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`;
+      # with the
+      # token gone that env var is undefined and npm aborts resolving the config
+      # before
+      # it ever attempts the OIDC exchange. npm already defaults to
+      # registry.npmjs.org.
+      # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-          cache: npm
+          package-manager-cache: false
       - run: npm ci
       - run: npx biome check src/
       - run: npx tsc --noEmit
       - run: npm run build
-      # Trusted publishing (OIDC) landed in npm 11.5.1; Node 22 still bundles npm 10.x.
-      # Upgraded AFTER install/build so dependencies are resolved by the same npm the CI
-      # workflow validates, keeping this step's blast radius to `npm publish` alone.
-      # Pinned to the 11.x line rather than `latest` so a future npm major cannot silently
+      # Trusted publishing (OIDC) landed in npm 11.5.1; Node 22 still bundles
+      # npm 10.x.
+      # Upgraded AFTER install/build so dependencies are resolved by the same
+      # npm the CI
+      # workflow validates, keeping this step's blast radius to `npm publish`
+      # alone.
+      # Pinned to the 11.x line rather than `latest` so a future npm major
+      # cannot silently
       # change publish behaviour on a release day.
       - name: Install npm with trusted-publishing support
         run: npm install -g npm@^11.5.1
@@ -46,52 +58,79 @@ jobs:
             echo "Version already published — skipping (idempotent re-run)."
             exit 0
           fi
-          echo "::error::npm publish failed for a reason other than 'already published':"
+          echo "::error::npm publish failed for a reason other than 'already \
+          published':"
           cat publish-err.log
           exit 1
 
   publish-mcp-registry:
-    # Publish server metadata to the official MCP Registry (registry.modelcontextprotocol.io).
-    # Runs after publish-npm so the npm package the registry verifies ownership against
-    # already exists. Auth is GitHub OIDC (id-token: write) — no secret needed; the
-    # io.github.mcp-telegram/* namespace is proven by the workflow's own repo identity.
+    # Publish server metadata to the official MCP Registry
+    # (registry.modelcontextprotocol.io).
+    # Runs after publish-npm so the npm package the registry verifies ownership
+    # against
+    # already exists. Auth is GitHub OIDC (id-token: write) — no secret needed;
+    # the
+    # io.github.mcp-telegram/* namespace is proven by the workflow's own repo
+    # identity.
     needs: publish-npm
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     steps:
-      # Check out the default ref (main on dispatch, the tag on a release event) — NOT
-      # the resolved tag. Unlike publish-binaries (which checks out the tag so compiled
-      # binaries match released code), we publish *metadata*: server.json lives on main
-      # and may be newer than the tag. The version is taken from the tag input below,
-      # not from the checked-out tree, so an older tag without server.json never applies.
-      - uses: actions/checkout@v6
-      # Resolve the release version from any trigger (same logic as publish-binaries):
-      # explicit `tag` input, the release event payload, or a tag ref. Skip if none.
+      # Check out the default ref (main on dispatch, the tag on a release event)
+      # — NOT
+      # the resolved tag. Unlike publish-binaries (which checks out the tag so
+      # compiled
+      # binaries match released code), we publish *metadata*: server.json lives
+      # on main
+      # and may be newer than the tag. The version is taken from the tag input
+      # below,
+      # not from the checked-out tree, so an older tag without server.json never
+      # applies.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Resolve the release version from any trigger (same logic as
+      # publish-binaries):
+      # explicit `tag` input, the release event payload, or a tag ref. Skip if
+      # none.
       - name: Resolve version
         id: ver
+        env:
+          RELEASE_TAG_INPUT: ${{ inputs.tag }}
+          RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ -n "${{ inputs.tag }}" ]; then
-            TAG="${{ inputs.tag }}"
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-            TAG="${{ github.event.release.tag_name }}"
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            TAG="${{ github.ref_name }}"
+          if [ -n "$RELEASE_TAG_INPUT" ]; then
+            TAG="$RELEASE_TAG_INPUT"
+          elif [ -n "$RELEASE_EVENT_TAG" ]; then
+            TAG="$RELEASE_EVENT_TAG"
+          elif [ "$RELEASE_REF_TYPE" = "tag" ]; then
+            TAG="$RELEASE_REF_NAME"
           else
             echo "No release tag resolved — skipping MCP Registry publish."
             echo "version=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*$ ]]; then
+            echo "Invalid release tag" >&2
+            exit 1
+          fi
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-      # Idempotency guard. The registry rejects a re-publish of an existing version with a
-      # hard 400 ('invalid version: cannot publish duplicate version'), so a second dispatch
-      # of an already-released tag turned a green release red — while npm/docker/binaries all
+      # Idempotency guard. The registry rejects a re-publish of an existing
+      # version with a
+      # hard 400 ('invalid version: cannot publish duplicate version'), so a
+      # second dispatch
+      # of an already-released tag turned a green release red — while
+      # npm/docker/binaries all
       # re-ran happily. Ask the registry first and skip instead of failing.
       #
-      # Fails OPEN on purpose: only a confident "already there" skips. A network blip, an API
-      # change, or unparseable JSON falls through to the publish attempt, so a genuine first
-      # publish is never silently swallowed — worst case we get today's behaviour.
+      # Fails OPEN on purpose: only a confident "already there" skips. A network
+      # blip, an API
+      # change, or unparseable JSON falls through to the publish attempt, so a
+      # genuine first
+      # publish is never silently swallowed — worst case we get today's
+      # behaviour.
       - name: Check whether this version is already in the registry
         if: steps.ver.outputs.version != ''
         id: exists
@@ -99,7 +138,8 @@ jobs:
           V="${{ steps.ver.outputs.version }}"
           NAME=$(jq -r '.name' server.json)
           ENC=$(jq -rn --arg n "$NAME" '$n|@uri')
-          URL="https://registry.modelcontextprotocol.io/v0/servers/$ENC/versions"
+          URL="https://registry.modelcontextprotocol.io/v0/servers/$ENC/versio\
+          ns"
 
           if ! BODY=$(curl -fsS --max-time 30 "$URL"); then
             echo "Registry lookup failed — proceeding with publish (fail-open)."
@@ -107,13 +147,17 @@ jobs:
             exit 0
           fi
 
-          # NOTE: plain `jq -r`, not `jq -e` — `-e` exits 1 when the result is `false`, which is
-          # indistinguishable from a real jq failure and made an absent version look unparseable.
-          FOUND=$(printf '%s' "$BODY" | jq -r --arg v "$V" 'any(.servers[]?.server.version; . == $v)' 2>/dev/null) || FOUND=""
+          # NOTE: plain `jq -r`, not `jq -e` — `-e` exits 1 when the result is
+          # `false`, which is
+          # indistinguishable from a real jq failure and made an absent version
+          # look unparseable.
+          FOUND=$(printf '%s' "$BODY" | jq -r --arg v "$V" \
+          'any(.servers[]?.server.version; . == $v)' 2>/dev/null) || FOUND=""
 
           case "$FOUND" in
             true)
-              echo "::notice::$NAME@$V is already in the MCP Registry — skipping (idempotent re-run)."
+              echo "::notice::$NAME@$V is already in the MCP Registry — \
+          skipping (idempotent re-run)."
               echo "found=true" >> "$GITHUB_OUTPUT"
               ;;
             false)
@@ -121,24 +165,37 @@ jobs:
               echo "found=false" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "Unexpected registry response (jq returned '$FOUND') — proceeding with publish (fail-open)."
+              echo "Unexpected registry response (jq returned '$FOUND') — \
+          proceeding with publish (fail-open)."
               echo "found=false" >> "$GITHUB_OUTPUT"
               ;;
           esac
       - name: Install mcp-publisher
-        if: steps.ver.outputs.version != '' && steps.exists.outputs.found != 'true'
+        if:
+          "steps.ver.outputs.version != '' && steps.exists.outputs.found != 't\
+          rue'"
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/l\
+          atest/download/mcp-publisher_$(uname -s | tr '[:upper:]' \
+          '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').ta\
+          r.gz" | tar xz mcp-publisher
       - name: Pin server.json version to the release tag
-        if: steps.ver.outputs.version != '' && steps.exists.outputs.found != 'true'
+        if:
+          "steps.ver.outputs.version != '' && steps.exists.outputs.found != 't\
+          rue'"
         run: |
           V="${{ steps.ver.outputs.version }}"
-          jq --arg v "$V" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
+          jq --arg v "$V" '.version = $v | .packages[0].version = $v' \
+          server.json > server.tmp && mv server.tmp server.json
       - name: Authenticate to MCP Registry (GitHub OIDC)
-        if: steps.ver.outputs.version != '' && steps.exists.outputs.found != 'true'
+        if:
+          "steps.ver.outputs.version != '' && steps.exists.outputs.found != 't\
+          rue'"
         run: ./mcp-publisher login github-oidc
       - name: Publish to MCP Registry
-        if: steps.ver.outputs.version != '' && steps.exists.outputs.found != 'true'
+        if:
+          "steps.ver.outputs.version != '' && steps.exists.outputs.found != 't\
+          rue'"
         run: ./mcp-publisher publish
 
   publish-docker:
@@ -147,32 +204,43 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        # v4.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract version
         id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+        run:
+          "echo \"version=$(node -p \"require('./package.json').version\")\" >\
+          > \"$GITHUB_OUTPUT\""
       - name: Build and push Docker image
-        uses: docker/build-push-action@v7
+        # v7.4.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+          tags: >-
+            ghcr.io/${{ github.repository }}:latest,
+            ghcr.io/${{ github.repository }}:${{
+            steps.version.outputs.version }}
 
   publish-binaries:
-    # Runs for both `release: published` and a manual `workflow_dispatch` on a tag.
-    # release-please creates the GitHub Release with the default GITHUB_TOKEN, which
-    # does NOT trigger the `release` event (loop-protection) — so real releases are
-    # published via `workflow_dispatch --ref vX.Y.Z`. Gating on `event_name == 'release'`
-    # silently skipped binaries for every release-please tag (v1.37.1, v1.38.0 shipped
-    # with 0 assets). Skip only if no tag can be resolved (e.g. dispatch on a branch).
+    # Runs for both `release: published` and a manual `workflow_dispatch` on a
+    # tag.
+    # release-please creates the GitHub Release with the default GITHUB_TOKEN,
+    # which
+    # does NOT trigger the `release` event (loop-protection) — so real releases
+    # are
+    # published via `workflow_dispatch --ref vX.Y.Z`. Gating on `event_name ==
+    # 'release'`
+    # silently skipped binaries for every release-please tag (v1.37.1, v1.38.0
+    # shipped
+    # with 0 assets). Skip only if no tag can be resolved (e.g. dispatch on a
+    # branch).
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -196,8 +264,9 @@ jobs:
             login: mcp-telegram-login-windows-x64.exe
     steps:
       # When re-publishing a past tag via the `tag` input, check out that tag's
-      # source so the compiled binaries match the released code (not main's HEAD).
-      - uses: actions/checkout@v6
+      # source so the compiled binaries match the released code (not main's
+      # HEAD).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -206,22 +275,35 @@ jobs:
       # Skip the upload if none yields a vX.Y.Z tag (e.g. dispatch on `main`).
       - name: Resolve release tag
         id: tag
+        env:
+          RELEASE_TAG_INPUT: ${{ inputs.tag }}
+          RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ -n "${{ inputs.tag }}" ]; then
-            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-            echo "name=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          if [ -n "$RELEASE_TAG_INPUT" ]; then
+            TAG="$RELEASE_TAG_INPUT"
+          elif [ -n "$RELEASE_EVENT_TAG" ]; then
+            TAG="$RELEASE_EVENT_TAG"
+          elif [ "$RELEASE_REF_TYPE" = "tag" ]; then
+            TAG="$RELEASE_REF_NAME"
           else
-            echo "No release tag resolved (no tag input, not a release event, not a tag ref) — skipping binary upload."
+            echo "No release tag resolved — skipping binary upload."
             echo "name=" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+[0-9A-Za-z.+-]*$ ]]; then
+            echo "Invalid release tag" >&2
+            exit 1
+          fi
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
 
-      - uses: oven-sh/setup-bun@v2
+      # v2.2.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         if: steps.tag.outputs.name != ''
         with:
-          bun-version: "1.4.0"
+          bun-version: "1.4.2"
+          no-cache: true
 
       # Compile-only job — no registry publish. Tolerate lockfile drift so a
       # patch bump to package.json doesn't block standalone binary publishing
@@ -232,16 +314,22 @@ jobs:
 
       - name: Compile MCP server binary
         if: steps.tag.outputs.name != ''
-        run: bun build src/index.ts --compile --target ${{ matrix.target }} --outfile ${{ matrix.server }}
+        run:
+          "bun build src/index.ts --compile --target ${{ matrix.target }} --ou\
+          tfile ${{ matrix.server }}"
 
       - name: Compile login CLI binary
         if: steps.tag.outputs.name != ''
-        run: bun build src/qr-login-cli.ts --compile --target ${{ matrix.target }} --outfile ${{ matrix.login }}
+        run:
+          "bun build src/qr-login-cli.ts --compile --target ${{ matrix.target \
+          }} --outfile ${{ matrix.login }}"
 
       - name: Upload binaries to release
         if: steps.tag.outputs.name != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ steps.tag.outputs.name }} ${{ matrix.server }} --clobber
-          gh release upload ${{ steps.tag.outputs.name }} ${{ matrix.login }} --clobber
+          gh release upload ${{ steps.tag.outputs.name }} \
+          ${{ matrix.server }} --clobber
+          gh release upload ${{ steps.tag.outputs.name }} ${{ matrix.login }} \
+          --clobber

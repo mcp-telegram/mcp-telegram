@@ -66,7 +66,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.0",
     "big-integer": "^1.6.52",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.5",
     "qrcode": "^1.5.4",
     "telegram": "^2.26.22",
     "zod": "^4.6.5"

@@ -349,6 +349,31 @@ function ensureSessionDir(filePath: string): void {
 
 export type ChatEntity = Api.User | Api.Chat | Api.Channel | Api.TypeUser | Api.TypeChat;
 
+const NUMERIC_ID_RE = /^-?\d+$/;
+
+/**
+ * Find the dialog entity for a numeric chat ID. IDs reach us in two shapes:
+ *   • bare positive  (e.g. 1004294063929 for a channel, 8959122940 for a
+ *     user) — what get-chat-info/search emit and what GramJS can't
+ *     disambiguate; match it against any entity's bare id.
+ *   • marked         (-100<id> for channels, -<id> for basic groups) — the
+ *     sign/-100 prefix carries the type, so require the entity to match that
+ *     exact marked form, otherwise a group "-123" could wrongly match a user
+ *     with bare id 123.
+ */
+function findDialogEntityById(dialogs: { entity?: ChatEntity }[], chatId: string): ChatEntity | undefined {
+  const isMarked = chatId.startsWith("-");
+  return dialogs.find((d) => {
+    const entity = d.entity;
+    if (!entity?.id) return false;
+    const bare = entity.id.toString();
+    if (!isMarked) return chatId === bare;
+    if (entity instanceof Api.Channel) return chatId === `-100${bare}`;
+    if (entity instanceof Api.Chat) return chatId === `-${bare}`;
+    return false;
+  })?.entity;
+}
+
 export class TelegramService {
   private client: TelegramClient | null = null;
   private apiId: number;
@@ -1791,8 +1816,20 @@ export class TelegramService {
       // Fall through to dialog search
     }
 
-    // Search dialogs by display name
     const dialogs = await this.client.getDialogs({ limit: 100 });
+
+    // Numeric IDs: GramJS only resolves them from its in-memory cache, which is
+    // empty after a reconnect — match against dialog entities instead (same
+    // rules as resolveNumericPeer).
+    if (NUMERIC_ID_RE.test(chatId)) {
+      const byId = findDialogEntityById(dialogs, chatId);
+      if (byId) {
+        this.entityCache.set(chatId, byId);
+        return byId;
+      }
+    }
+
+    // Search dialogs by display name
     const query = chatId.toLowerCase();
 
     // Exact match first
@@ -1834,7 +1871,7 @@ export class TelegramService {
     // ambiguous (GramJS assumes PeerUser, so channel IDs fail outright).
     // Recover by looking the ID up among dialogs, which yields a full entity
     // (with access_hash) for both users and channels.
-    if (/^-?\d+$/.test(chatId)) return this.resolveNumericPeer(chatId);
+    if (NUMERIC_ID_RE.test(chatId)) return this.resolveNumericPeer(chatId);
     // Everything else — resolve display name via dialogs
     return this.resolveChat(chatId);
   }
@@ -1860,30 +1897,13 @@ export class TelegramService {
       // Fall through to dialog scan.
     }
 
-    // Scan dialogs for a matching entity. IDs reach us in two shapes:
-    //   • bare positive  (e.g. 1004294063929 for a channel, 8959122940 for a
-    //     user) — this is what list-chats/search emit and what GramJS can't
-    //     disambiguate; match it against any entity's bare id.
-    //   • marked         (-100<id> for channels, -<id> for basic groups) — the
-    //     sign/-100 prefix carries the type, so require the entity to match that
-    //     exact marked form, otherwise a group "-123" could wrongly match a user
-    //     with bare id 123.
-    const isMarked = chatId.startsWith("-");
+    // Scan dialogs for a matching entity (see findDialogEntityById).
     try {
       const dialogs = await this.client.getDialogs({ limit: 100 });
-      const match = dialogs.find((d) => {
-        const entity = d.entity;
-        if (!entity?.id) return false;
-        const bare = entity.id.toString();
-        if (!isMarked) return chatId === bare;
-        // Marked input must match the entity's marked form.
-        if (entity instanceof Api.Channel) return chatId === `-100${bare}`;
-        if (entity instanceof Api.Chat) return chatId === `-${bare}`;
-        return false;
-      });
-      if (match?.entity) {
-        this.entityCache.set(chatId, match.entity);
-        return match.entity;
+      const match = findDialogEntityById(dialogs, chatId);
+      if (match) {
+        this.entityCache.set(chatId, match);
+        return match;
       }
     } catch {
       // Dialog fetch failed — fall back to the raw ID below.

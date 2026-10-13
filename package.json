@@ -64,16 +64,16 @@
     "url": "https://github.com/mcp-telegram/mcp-telegram/issues"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "big-integer": "^1.6.52",
-    "dotenv": "^18.0.5",
+    "dotenv": "^18.0.7",
     "qrcode": "^1.5.4",
     "telegram": "^2.26.22",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "@types/qrcode": "^1.5.6",
     "c8": "^12.0.0",
     "tsx": "^4.23.15",

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.6](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.5...v1.43.6) (2026-10-13)
+
+
+### Fixed
+
+* **deps:** update MCP SDK, zod, dotenv, setup-node and Bun 1.4.3; patch vulnerable transitive proxy-addr and source-map-js ([d19c35f](https://github.com/mcp-telegram/mcp-telegram/commit/d19c35f316e0a2f0a89b2ec3d4b8ed7d051d4e83))
+
 ## [1.43.5](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.4...v1.43.5) (2026-10-13)
 
 

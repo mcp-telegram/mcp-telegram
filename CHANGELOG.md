@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.5](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.4...v1.43.5) (2026-10-13)
+
+
+### Fixed
+
+* **chats:** resolve bare numeric chat IDs via dialogs in resolveChat ([5de5756](https://github.com/mcp-telegram/mcp-telegram/commit/5de57565889e9b09dc4b5a7b9c2c6c61b0fbf8de))
+
 ## [1.43.4](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.3...v1.43.4) (2026-10-05)
 
 

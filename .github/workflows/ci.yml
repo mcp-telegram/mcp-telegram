@@ -47,7 +47,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         if: runner.os == 'Linux' && matrix.node-version == 22
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
       - run: bun install --frozen-lockfile --ignore-scripts --lockfile-only
         if: runner.os == 'Linux' && matrix.node-version == 22
       # Build the docs site so a dead link / broken VitePress fails the PR,

@@ -78,9 +78,9 @@ jobs:
       contents: read
       id-token: write
     steps:
-      # Check out the default ref (main on dispatch, the tag on a release event)
-      # — NOT
-      # the resolved tag. Unlike publish-binaries (which checks out the tag so
+      # Check out the dispatched ref (the release tag when release-please
+      # dispatches this workflow, main on a manual dispatch without --ref) —
+      # NOT the resolved tag. Unlike publish-binaries (which checks out the tag so
       # compiled
       # binaries match released code), we publish *metadata*: server.json lives
       # on main
@@ -196,7 +196,24 @@ jobs:
         if:
           "steps.ver.outputs.version != '' && steps.exists.outputs.found != 't\
           rue'"
-        run: ./mcp-publisher publish
+        # The registry checks npm right away, and a fresh npm release can take
+        # a minute or two to show up there. Retry only that specific miss.
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if OUT=$(./mcp-publisher publish 2>&1); then
+              printf '%s\n' "$OUT"
+              exit 0
+            fi
+            printf '%s\n' "$OUT"
+            case "$OUT" in
+              *"was not found"*)
+                echo "npm does not serve this version yet (attempt $attempt), retrying in 30s"
+                sleep 30
+                ;;
+              *) exit 1 ;;
+            esac
+          done
+          exit 1
 
   publish-docker:
     runs-on: ubuntu-latest

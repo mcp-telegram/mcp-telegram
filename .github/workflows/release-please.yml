@@ -52,3 +52,18 @@ jobs:
           # Dispatch on the tag itself: publish-npm and publish-docker check
           # out the dispatched ref, so --ref main could ship newer commits.
           gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f tag="$TAG"
+
+      # The Release PR is opened by github-actions[bot], so its pull_request CI
+      # run stays at "approval required" and the required checks never report.
+      # A dispatched run on the same branch reports them on the same commit.
+      - name: Run CI on the release branch
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+        run: |
+          if ! printf '%s' "$BRANCH" | grep -Eq '^release-please--[A-Za-z0-9._/-]+$'; then
+            echo "::error::unexpected release branch: $BRANCH"
+            exit 1
+          fi
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"

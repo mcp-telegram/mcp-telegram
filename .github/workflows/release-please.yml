@@ -2,8 +2,13 @@ name: Release Please
 
 # Maintains a rolling "Release PR" from Conventional Commits on main.
 # Merge that PR → release-please creates the git tag + GitHub Release,
-# which triggers publish.yml (on: release: published) to publish npm,
-# Docker, and standalone binaries. No manual version bump or changelog.
+# then dispatches publish.yml for that tag to publish npm, Docker and
+# standalone binaries. No manual version bump or changelog.
+#
+# The release is created with GITHUB_TOKEN, and events from GITHUB_TOKEN
+# never start other workflows, so publish.yml's `release: published`
+# trigger does not fire for these releases. workflow_dispatch is the
+# documented exception, hence the explicit dispatch step below.
 
 on:
   push:
@@ -13,6 +18,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # gh workflow run publish.yml
+  actions: write
 
 jobs:
   release-please:
@@ -23,10 +30,25 @@ jobs:
       # needed.
       # Config schema, inputs, and behavior are unchanged.
       # v5.0.0
-      - uses:
+      - id: release
+        uses:
           "googleapis/release-please-action\
           @45996ed1f6d02564a971a2fa1b5860e934307cf7"
 
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Dispatch publish for the new release
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::unexpected release tag: $TAG"
+            exit 1
+          fi
+          # Dispatch on the tag itself: publish-npm and publish-docker check
+          # out the dispatched ref, so --ref main could ship newer commits.
+          gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f tag="$TAG"

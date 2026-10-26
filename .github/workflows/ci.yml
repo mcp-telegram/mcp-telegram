@@ -9,6 +9,9 @@ on:
   # waits for manual approval, and required checks need a run on that commit.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ${{ matrix.os }}

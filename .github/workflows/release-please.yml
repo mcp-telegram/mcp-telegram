@@ -60,8 +60,11 @@ jobs:
         if: ${{ steps.release.outputs.prs_created == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          # Raw JSON, parsed in the shell: GitHub expands step env even when the
+          # step is skipped, and fromJSON('') breaks the whole step then.
+          PR_JSON: ${{ steps.release.outputs.pr }}
         run: |
+          BRANCH=$(printf '%s' "$PR_JSON" | jq -r '.headBranchName // empty')
           if ! printf '%s' "$BRANCH" | grep -Eq '^release-please--[A-Za-z0-9._/-]+$'; then
             echo "::error::unexpected release branch: $BRANCH"
             exit 1

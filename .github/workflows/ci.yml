@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # release-please dispatches this on its release branch: its pull_request run
+  # waits for manual approval, and required checks need a run on that commit.
+  workflow_dispatch:
 
 jobs:
   check:

@@ -78,9 +78,9 @@ jobs:
       contents: read
       id-token: write
     steps:
-      # Check out the dispatched ref (the release tag when release-please
-      # dispatches this workflow, main on a manual dispatch without --ref) —
-      # NOT the resolved tag. Unlike publish-binaries (which checks out the tag so
+      # Check out the triggering ref (the release tag on a release event or a
+      # dispatch on the tag, main on a manual dispatch without --ref) — NOT the
+      # resolved tag. Unlike publish-binaries (which checks out the tag so
       # compiled
       # binaries match released code), we publish *metadata*: server.json lives
       # on main

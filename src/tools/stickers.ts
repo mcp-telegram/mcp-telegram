@@ -8,12 +8,12 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
     "telegram-get-sticker-set",
     {
       description:
-        "Get all stickers from a sticker set by its short name. Returns each sticker with index and emoji. The index identifies the sticker in telegram-send-sticker.",
+        'Get all stickers from a sticker set by its short name. Returns each sticker with index, emoji and document ID. The index identifies the sticker in telegram-send-sticker. For a custom emoji set, send an emoji in a message with parseMode=html: <tg-emoji emoji-id="ID">E</tg-emoji>, where E is the emoji listed next to that ID; Telegram ignores the custom emoji if E differs (needs Telegram Premium).',
       inputSchema: {
         shortName: z
           .string()
           .describe(
-            "Short name of the sticker set (e.g. 'AnimatedEmojis', 'HotCherry'). Find names via telegram-search-sticker-sets or from t.me/addstickers/<shortName> links",
+            "Short name of the sticker set (e.g. 'AnimatedEmojis', 'HotCherry'). Find names via telegram-search-sticker-sets, telegram-get-installed-stickers or from t.me/addstickers/<shortName> and t.me/addemoji/<shortName> links",
           ),
       },
       annotations: READ_ONLY,
@@ -31,11 +31,15 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
 
         for (let i = 0; i < set.stickers.length; i++) {
           const s = set.stickers[i];
-          lines.push(`[${i}] ${s.emoji}`);
+          lines.push(`[${i}] ${s.emoji} id=${s.id}`);
         }
 
         lines.push("");
-        lines.push(`Send a sticker: telegram-send-sticker(chatId, stickerSet="${set.shortName}", index=N)`);
+        lines.push(
+          set.emojis
+            ? `Send a custom emoji: telegram-send-message(chatId, text='<tg-emoji emoji-id="ID">E</tg-emoji>', parseMode="html"), where E is the emoji listed next to that ID`
+            : `Send a sticker: telegram-send-sticker(chatId, stickerSet="${set.shortName}", index=N)`,
+        );
         return ok(lines.join("\n"));
       } catch (e) {
         return fail(e);
@@ -79,16 +83,19 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-get-installed-stickers",
     {
-      description: "List all sticker sets installed by the user. Returns pack titles and short names.",
-      inputSchema: {},
+      description:
+        "List all sticker sets installed by the user. Returns pack titles and short names. Set emoji=true to list installed custom emoji sets instead.",
+      inputSchema: {
+        emoji: z.boolean().optional().describe("List custom emoji sets instead of sticker sets"),
+      },
       annotations: READ_ONLY,
     },
-    async () => {
+    async ({ emoji }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
-        const sets = await telegram.getInstalledStickerSets();
+        const sets = await telegram.getInstalledStickerSets(emoji);
         if (sets.length === 0) {
           return ok("No sticker sets installed.");
         }

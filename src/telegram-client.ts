@@ -4712,6 +4712,7 @@ export class TelegramService {
     title: string;
     shortName: string;
     count: number;
+    emojis: boolean;
     stickers: Array<{
       id: string;
       accessHash: string;
@@ -4741,10 +4742,19 @@ export class TelegramService {
       title: set.title,
       shortName: set.shortName,
       count: set.count,
+      emojis: Boolean(set.emojis),
       stickers: result.documents.map((doc) => ({
         id: (doc as Api.Document).id.toString(),
         accessHash: (doc as Api.Document).accessHash.toString(),
-        emoji: emojiMap.get((doc as Api.Document).id.toString()) || "",
+        // A custom emoji entity must wrap exactly the document's own alt emoji,
+        // otherwise Telegram drops it; a document can sit in several packs, so
+        // the pack map is only the fallback.
+        emoji:
+          (doc as Api.Document).attributes?.find(
+            (a): a is Api.DocumentAttributeCustomEmoji => a instanceof Api.DocumentAttributeCustomEmoji,
+          )?.alt ||
+          emojiMap.get((doc as Api.Document).id.toString()) ||
+          "",
       })),
     };
   }
@@ -4776,7 +4786,7 @@ export class TelegramService {
     });
   }
 
-  async getInstalledStickerSets(): Promise<
+  async getInstalledStickerSets(emoji = false): Promise<
     Array<{
       title: string;
       shortName: string;
@@ -4784,7 +4794,10 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const result = await this.client.invoke(new Api.messages.GetAllStickers({ hash: bigInt(0) }));
+    const request = emoji
+      ? new Api.messages.GetEmojiStickers({ hash: bigInt(0) })
+      : new Api.messages.GetAllStickers({ hash: bigInt(0) });
+    const result = await this.client.invoke(request);
     if (result instanceof Api.messages.AllStickersNotModified) {
       return [];
     }

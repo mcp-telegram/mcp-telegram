@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.44.0...v1.44.1) (2026-10-26)
+
+
+### Fixed
+
+* **admin-log:** name admin log actions with a linear regex and give CI a read-only token ([#119](https://github.com/mcp-telegram/mcp-telegram/issues/119)) ([2b9dbea](https://github.com/mcp-telegram/mcp-telegram/commit/2b9dbeacbb3d745ee6d3e33dee79eca81cc33f7a))
+
 ## [1.44.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.7...v1.44.0) (2026-10-26)
 
 

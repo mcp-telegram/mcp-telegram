@@ -5,10 +5,15 @@ name: Release Please
 # then dispatches publish.yml for that tag to publish npm, Docker and
 # standalone binaries. No manual version bump or changelog.
 #
-# The release is created with GITHUB_TOKEN, and events from GITHUB_TOKEN
-# never start other workflows, so publish.yml's `release: published`
-# trigger does not fire for these releases. workflow_dispatch is the
-# documented exception, hence the explicit dispatch step below.
+# With the release GitHub App configured (variable RELEASE_APP_CLIENT_ID and
+# secret RELEASE_APP_PRIVATE_KEY), release-please acts as that App: the Release
+# PR gets its CI like any other PR, and the GitHub Release starts publish.yml
+# through its `release: published` trigger.
+#
+# Without the App it falls back to GITHUB_TOKEN. Events from GITHUB_TOKEN never
+# start other workflows and its Release PR CI waits for manual approval, so the
+# fallback dispatches publish.yml explicitly (workflow_dispatch is the
+# documented exception).
 
 on:
   push:
@@ -25,6 +30,18 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - id: app-token
+        if: ${{ vars.RELEASE_APP_CLIENT_ID != '' }}
+        # v3.3.0
+        uses:
+          "actions/create-github-app-token\
+          @64ab729a6294000f5aa4a4bc0b73d1f32bc45510"
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       # v5's only breaking change vs v4 is the bundled runtime (Node 20 → 24),
       # so the old FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 opt-in is no longer
       # needed.
@@ -36,11 +53,14 @@ jobs:
           @45996ed1f6d02564a971a2fa1b5860e934307cf7"
 
         with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      # Only on the GITHUB_TOKEN fallback: a release created by the App already
+      # starts publish.yml, and a second run would publish twice.
       - name: Dispatch publish for the new release
-        if: ${{ steps.release.outputs.release_created == 'true' }}
+        if: ${{ steps.release.outputs.release_created == 'true' && steps.app-token.outputs.token == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag_name }}
@@ -52,21 +72,3 @@ jobs:
           # Dispatch on the tag itself: publish-npm and publish-docker check
           # out the dispatched ref, so --ref main could ship newer commits.
           gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f tag="$TAG"
-
-      # The Release PR is opened by github-actions[bot], so its pull_request CI
-      # run stays at "approval required" and the required checks never report.
-      # A dispatched run on the same branch reports them on the same commit.
-      - name: Run CI on the release branch
-        if: ${{ steps.release.outputs.prs_created == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          # Raw JSON, parsed in the shell: GitHub expands step env even when the
-          # step is skipped, and fromJSON('') breaks the whole step then.
-          PR_JSON: ${{ steps.release.outputs.pr }}
-        run: |
-          BRANCH=$(printf '%s' "$PR_JSON" | jq -r '.headBranchName // empty')
-          if ! printf '%s' "$BRANCH" | grep -Eq '^release-please--[A-Za-z0-9._/-]+$'; then
-            echo "::error::unexpected release branch: $BRANCH"
-            exit 1
-          fi
-          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"

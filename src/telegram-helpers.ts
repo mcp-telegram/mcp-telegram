@@ -85,7 +85,7 @@ export function describeAdminLogAction(action: Api.TypeChannelAdminLogEventActio
   const prefix = "ChannelAdminLogEventAction";
   const raw = action.className.startsWith(prefix) ? action.className.slice(prefix.length) : action.className;
   return raw
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .replace(/([A-Z])(?=[A-Z][a-z])/g, "$1_")
     .replace(/([a-z])([A-Z])/g, "$1_$2")
     .toLowerCase();
 }

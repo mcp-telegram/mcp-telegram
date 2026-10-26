@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.7...v1.44.0) (2026-10-26)
+
+
+### Added
+
+* **stickers:** expose custom emoji ids and list installed emoji sets ([#107](https://github.com/mcp-telegram/mcp-telegram/issues/107)) ([ef18dc5](https://github.com/mcp-telegram/mcp-telegram/commit/ef18dc57fbb9904706ffc61e25cce0142c7b1dfc))
+
+
+### Fixed
+
+* **groups:** return the underlying cause when create-group has no chat ([#100](https://github.com/mcp-telegram/mcp-telegram/issues/100)) ([7eb9a24](https://github.com/mcp-telegram/mcp-telegram/commit/7eb9a241861fc8cf995ff9fc5246c64288aba40d)), closes [#95](https://github.com/mcp-telegram/mcp-telegram/issues/95)
+
 ## [1.43.7](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.6...v1.43.7) (2026-10-26)
 
 

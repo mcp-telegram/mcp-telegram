@@ -133,6 +133,43 @@ function send(socket: Socket, msg: IpcMessage): void {
   if (!socket.destroyed) socket.write(encodeMessage(msg));
 }
 
+/**
+ * Run one tool call on the owner's registry, the way every transport must: serialized with
+ * QR login through globalLock and bounded by the per-call timeout. Rejects with the tool's
+ * error, or with "Unknown tool" when the name is not registered.
+ */
+export async function executeTool(
+  mcpServer: McpServerInternal,
+  telegram: TelegramService,
+  name: string,
+  args: Record<string, unknown>,
+  timeoutMs: number = TOOL_CALL_TIMEOUT_MS,
+): Promise<unknown> {
+  const tool = mcpServer._registeredTools[name];
+  if (!tool) throw new Error(`Unknown tool: ${name}`);
+
+  // telegram-logout must cancel an in-progress QR login instead of queueing behind it
+  // for up to 5 minutes. Aborting releases the globalLock held by handleLoginStart.
+  if (name === "telegram-logout" && activeLogin) {
+    activeLogin.abort.abort();
+  }
+  const unlock = await globalLock.acquire();
+  try {
+    return await withTimeout(tool.handler(args, {}), timeoutMs, name);
+  } catch (err) {
+    // A call that burns the whole budget is the signature of a dead MTProto transport that
+    // our cached `connected` flag still reports as live. Flag it so the NEXT call
+    // revalidates and reconnects, instead of every subsequent call hanging the same way.
+    if (err instanceof Error && err.message.startsWith("Tool call timed out")) {
+      console.error(`[mcp-telegram] ${err.message} — marking Telegram connection unhealthy`);
+      telegram.markUnhealthy(`tool call timed out: ${name}`);
+    }
+    throw err;
+  } finally {
+    unlock();
+  }
+}
+
 async function handleToolRequest(
   socket: Socket,
   req: IpcToolRequest,
@@ -140,34 +177,12 @@ async function handleToolRequest(
   telegram: TelegramService,
   timeoutMs: number = TOOL_CALL_TIMEOUT_MS,
 ) {
-  const tool = mcpServer._registeredTools[req.tool];
   const response: IpcToolResponse = { type: "tool_response", id: req.id };
-
-  if (!tool) {
-    response.error = `Unknown tool: ${req.tool}`;
-  } else {
-    // telegram-logout must cancel an in-progress QR login instead of queueing behind it
-    // for up to 5 minutes. Aborting releases the globalLock held by handleLoginStart.
-    if (req.tool === "telegram-logout" && activeLogin) {
-      activeLogin.abort.abort();
-    }
-    const unlock = await globalLock.acquire();
-    try {
-      response.result = await withTimeout(tool.handler(req.args ?? {}, {}), timeoutMs, req.tool);
-    } catch (err) {
-      response.error = err instanceof Error ? err.message : String(err);
-      // A call that burns the whole budget is the signature of a dead MTProto transport that
-      // our cached `connected` flag still reports as live. Flag it so the NEXT call
-      // revalidates and reconnects, instead of every subsequent call hanging the same way.
-      if (err instanceof Error && err.message.startsWith("Tool call timed out")) {
-        console.error(`[mcp-telegram] ${err.message} — marking Telegram connection unhealthy`);
-        telegram.markUnhealthy(`tool call timed out: ${req.tool}`);
-      }
-    } finally {
-      unlock();
-    }
+  try {
+    response.result = await executeTool(mcpServer, telegram, req.tool, req.args ?? {}, timeoutMs);
+  } catch (err) {
+    response.error = err instanceof Error ? err.message : String(err);
   }
-
   send(socket, response);
 }
 

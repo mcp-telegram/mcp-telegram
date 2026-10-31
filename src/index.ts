@@ -37,8 +37,15 @@ async function main() {
   if (process.argv[2] === "serve" || process.env.MCP_TELEGRAM_DAEMON === "1") {
     requireCreds();
     console.error("[mcp-telegram] Starting in serve (daemon) mode");
-    const { runServe } = await import("./serve.js");
-    await runServe(API_ID, API_HASH as string, version);
+    const { parseHttpOptions, runServe } = await import("./serve.js");
+    let http: ReturnType<typeof parseHttpOptions>;
+    try {
+      http = parseHttpOptions(process.argv.slice(3), process.env);
+    } catch (err) {
+      console.error(`[mcp-telegram] ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+    await runServe(API_ID, API_HASH as string, version, http);
     return;
   }
 

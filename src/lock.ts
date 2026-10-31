@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 const DEFAULT_SESSION_DIR = join(homedir(), ".mcp-telegram");
 
-function resolveSessionDir(): string {
+export function resolveSessionDir(): string {
   const sessionPath = process.env.TELEGRAM_SESSION_PATH;
   if (sessionPath) return dirname(sessionPath);
   return DEFAULT_SESSION_DIR;

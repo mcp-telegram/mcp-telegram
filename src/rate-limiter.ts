@@ -7,6 +7,9 @@
  *   [rate-limiter] event {"event":"flood_wait","context":"X","seconds":N,...}
  */
 
+/** Start of the error thrown on FloodWait when `throwOnFloodWait` is set; callers match on it */
+export const FLOOD_WAIT_ERROR_PREFIX = "Rate limit: Telegram requires";
+
 export interface RateLimiterOptions {
   /** Maximum number of requests per second (default: 20) */
   maxRequestsPerSecond?: number;
@@ -62,7 +65,7 @@ export class RateLimiter {
       if (waitSeconds !== null) {
         if (options?.throwOnFloodWait) {
           throw new Error(
-            `Rate limit: Telegram requires a ${waitSeconds}s wait for ${context}. Try again in ${Math.ceil(waitSeconds / 60)} minute(s).`,
+            `${FLOOD_WAIT_ERROR_PREFIX} a ${waitSeconds}s wait for ${context}. Try again in ${Math.ceil(waitSeconds / 60)} minute(s).`,
           );
         }
         if (attempt >= this.maxRetries) {

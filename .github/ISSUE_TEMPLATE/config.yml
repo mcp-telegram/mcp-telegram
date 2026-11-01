@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/mcp-telegram/mcp-telegram/discussions
+    about: Ask how to do something or share an idea before it becomes a feature request.
+  - name: Security vulnerability
+    url: https://github.com/mcp-telegram/mcp-telegram/security/advisories/new
+    about: Report security problems privately. Please do not open a public issue.
+  - name: Problem with the hosted service (mcp-telegram.com)
+    url: https://github.com/mcp-telegram/mcp-telegram-cloud/issues/new/choose
+    about: OAuth, QR login, settings page or anything specific to the hosted version.

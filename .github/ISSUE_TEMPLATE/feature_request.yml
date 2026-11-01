@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a new tool or a change to an existing one
+labels: ["enhancement", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: You can write in any language. If you are not sure the idea fits, start a [discussion](https://github.com/mcp-telegram/mcp-telegram/discussions) first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task you want the assistant to handle in Telegram, and what stops you today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: A new tool, a new parameter, or a change in output. Mention the Telegram API method if you know it.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to open a pull request for this

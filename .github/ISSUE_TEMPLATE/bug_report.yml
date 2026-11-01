@@ -1,0 +1,62 @@
+name: Bug report
+description: A tool, the CLI or the serve daemon does not work as expected
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. You can write in any language.
+
+        Please remove phone numbers, session strings and private chat content from logs before posting. Security problems go through [private reporting](https://github.com/mcp-telegram/mcp-telegram/security/advisories/new), not here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start with `npx @overpod/mcp-telegram`
+        2. Ask the assistant to ...
+        3. Tool `telegram-...` returns ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: mcp-telegram version
+      placeholder: "1.43.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - npx / npm
+        - Docker
+        - Prebuilt binary
+        - serve daemon
+        - From source
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      placeholder: Claude Desktop, Claude Code, Cursor, Codex, ...
+  - type: input
+    id: os
+    attributes:
+      label: OS and Node.js version
+      placeholder: macOS 15, Node 22
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error output
+      render: text

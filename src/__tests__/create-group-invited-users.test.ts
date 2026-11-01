@@ -108,6 +108,20 @@ describe("createGroup unwraps messages.InvitedUsers", () => {
 
     await assert.rejects(() => service.createGroup({ title: "Doomed", users: ["@someone"] }), /Failed to create group/);
   });
+
+  it("names the declined invitees when no chat came back", async () => {
+    const service = makeService(async () => {
+      return new Api.messages.InvitedUsers({
+        updates: new Api.Updates({ updates: [], users: [], chats: [], date: 0, seq: 0 }),
+        missingInvitees: [new Api.MissingInvitee({ userId: bigInt(999) })],
+      });
+    });
+
+    await assert.rejects(
+      () => service.createGroup({ title: "Doomed", users: ["@someone"] }),
+      /1 invitee\(s\) declined/,
+    );
+  });
 });
 
 describe("inviteToGroup honours missingInvitees", () => {

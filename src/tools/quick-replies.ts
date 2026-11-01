@@ -14,7 +14,7 @@ export function registerQuickRepliesTools(server: McpServer, telegram: TelegramS
     "telegram-get-quick-replies",
     {
       description:
-        "Fetch the list of quick-reply shortcuts configured for the user account (messages.GetQuickReplies). Each entry has {shortcutId, shortcut, topMessage, count} — use the shortcutId with telegram-get-quick-reply-messages to inspect the stored messages. Optional `hash` implements Telegram's hash-based diff: pass the last-known aggregate hash as a decimal string and the server may respond with {notModified:true} if nothing changed. Opt-in: register only when MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1. Read-only.",
+        "Fetch the list of quick-reply shortcuts configured for the user account (messages.GetQuickReplies). Each entry has {shortcutId, shortcut, topMessage, count} ; telegram-get-quick-reply-messages takes the shortcutId and shows the stored messages. Optional `hash` implements Telegram's hash-based diff: pass the last-known aggregate hash as a decimal string and the server may respond with {notModified:true} if nothing changed. Opt-in: register only when MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1. Read-only.",
       inputSchema: {
         hash: z
           .string()
@@ -40,7 +40,7 @@ export function registerQuickRepliesTools(server: McpServer, telegram: TelegramS
     "telegram-get-quick-reply-messages",
     {
       description:
-        "Fetch messages stored under a quick-reply shortcut (messages.GetQuickReplyMessages). Use `shortcutId` from telegram-get-quick-replies. Optional `ids` narrows to specific message ids within the shortcut. Optional `hash` implements Telegram's hash-based diff: pass the last-known aggregate hash as a decimal string — the server may respond with {notModified:true, count} if nothing changed. Returns compact {count, messages[{id, date, text, isService, fromId?, replyToMsgId?}]}. Opt-in: register only when MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1. Read-only.",
+        "Fetch messages stored under a quick-reply shortcut (messages.GetQuickReplyMessages). `shortcutId` comes from telegram-get-quick-replies. Optional `ids` narrows to specific message ids within the shortcut. Optional `hash` implements Telegram's hash-based diff: pass the last-known aggregate hash as a decimal string — the server may respond with {notModified:true, count} if nothing changed. Returns compact {count, messages[{id, date, text, isService, fromId?, replyToMsgId?}]}. Opt-in: register only when MCP_TELEGRAM_ENABLE_QUICK_REPLIES=1. Read-only.",
       inputSchema: {
         shortcutId: z.number().int().nonnegative().describe("Shortcut id from telegram-get-quick-replies"),
         ids: z

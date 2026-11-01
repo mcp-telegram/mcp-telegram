@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { chmod, readFile, unlink, writeFile } from "node:fs/promises";
+import { chmod, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { computeCheck } from "telegram/Password.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
+import { getInputUser } from "telegram/Utils.js";
 import { RateLimiter } from "./rate-limiter.js";
 import type {
   AllStoriesSummary,
@@ -36,6 +37,7 @@ import type {
   ReadParticipantsSummary,
   ReportResultSummary,
   ResolvedBusinessChatLinkSummary,
+  SavedMusicSummary,
   StarsStatusSummary,
   StoriesByIdSummary,
   StoryPrivacy,
@@ -78,11 +80,15 @@ import {
   summarizeQuickReplyMessages,
   summarizeReadParticipants,
   summarizeReportResult,
+  summarizeSavedMusic,
   summarizeStarsStatus,
   summarizeStoriesById,
   summarizeStoryViewsList,
   summarizeUpdatesDifference,
+  topicReplyOptions,
 } from "./telegram-helpers.js";
+import type { SavedMusicResponse } from "./tl/saved-music.js";
+import { GetSavedMusicRequest } from "./tl/saved-music.js";
 
 export type {
   AllStoriesSummary,
@@ -118,6 +124,8 @@ export type {
   ReadParticipantsSummary,
   ReportResultSummary,
   ResolvedBusinessChatLinkSummary,
+  SavedMusicSummary,
+  SavedMusicTrack,
   StarsAmountSummary,
   StarsStatusSummary,
   StarsSubscriptionPricingSummary,
@@ -173,6 +181,7 @@ export {
   summarizeQuickReplyMessages,
   summarizeReadParticipants,
   summarizeReportResult,
+  summarizeSavedMusic,
   summarizeStarsAmount,
   summarizeStarsStatus,
   summarizeStarsSubscription,
@@ -339,6 +348,31 @@ function ensureSessionDir(filePath: string): void {
 }
 
 export type ChatEntity = Api.User | Api.Chat | Api.Channel | Api.TypeUser | Api.TypeChat;
+
+const NUMERIC_ID_RE = /^-?\d+$/;
+
+/**
+ * Find the dialog entity for a numeric chat ID. IDs reach us in two shapes:
+ *   • bare positive  (e.g. 1004294063929 for a channel, 8959122940 for a
+ *     user) — what get-chat-info/search emit and what GramJS can't
+ *     disambiguate; match it against any entity's bare id.
+ *   • marked         (-100<id> for channels, -<id> for basic groups) — the
+ *     sign/-100 prefix carries the type, so require the entity to match that
+ *     exact marked form, otherwise a group "-123" could wrongly match a user
+ *     with bare id 123.
+ */
+function findDialogEntityById(dialogs: { entity?: ChatEntity }[], chatId: string): ChatEntity | undefined {
+  const isMarked = chatId.startsWith("-");
+  return dialogs.find((d) => {
+    const entity = d.entity;
+    if (!entity?.id) return false;
+    const bare = entity.id.toString();
+    if (!isMarked) return chatId === bare;
+    if (entity instanceof Api.Channel) return chatId === `-100${bare}`;
+    if (entity instanceof Api.Chat) return chatId === `-${bare}`;
+    return false;
+  })?.entity;
+}
 
 export class TelegramService {
   private client: TelegramClient | null = null;
@@ -533,22 +567,24 @@ export class TelegramService {
         this.lastError = `Connection error: ${msg}`;
       }
 
-      try {
-        await this.client.disconnect();
-      } catch {
-        // Already on the connection-error path: a failing disconnect must not mask
-        // the original error recorded in this.lastError above.
-      }
-      this.client = null;
+      // destroy(), not disconnect(): GramJS only stops the client's update loop when
+      // `_destroyed` is set, and a merely disconnected client keeps pinging, failing and
+      // calling `_handleReconnect` -> getMe() forever. Before this fix the auth-error branch
+      // above had already nulled `this.client` (via clearSession), so the old
+      // `this.client.disconnect()` threw a swallowed TypeError and the client was never torn
+      // down at all: every revoked session left a zombie retrying AUTH_KEY_UNREGISTERED
+      // (users.GetUsers) against Telegram until the process restarted. dropDeadClient()
+      // swallows destroy() failures, so the lastError recorded above is never masked.
+      await this.dropDeadClient();
       return false;
     }
   }
 
   async clearSession(): Promise<void> {
-    this.connected = false;
+    // Destroy, never just drop the reference: an orphaned GramJS client keeps its update
+    // loop and auto-reconnect running with nobody left to stop it.
+    await this.dropDeadClient();
     this.sessionString = "";
-    this.client = null;
-    this.entityCache.clear();
     if (existsSync(this.sessionPath)) {
       await unlink(this.sessionPath);
     }
@@ -565,12 +601,10 @@ export class TelegramService {
   }
 
   async disconnect(): Promise<void> {
-    if (this.client && this.connected) {
-      await this.client.destroy();
-      this.connected = false;
-      this.client = null;
-      this.entityCache.clear();
-    }
+    // Tear the client down whatever the flag says. It used to require `this.connected`,
+    // but markUnhealthy() and a stale transport both clear the flag while leaving the
+    // client (and its update loop) alive, so disconnecting such a service leaked it.
+    await this.dropDeadClient();
   }
 
   /**
@@ -607,6 +641,8 @@ export class TelegramService {
     } catch (err) {
       console.error("[telegram] client.destroy failed during logOut:", err);
     }
+    // Already destroyed above — detach it so clearSession() does not destroy it twice.
+    this.client = null;
     await wipeLocalOrThrow();
     return revoked;
   }
@@ -838,27 +874,46 @@ export class TelegramService {
         // Return a minimal UpdateShortSentMessage — it only carries `id`, avoiding fake peerId/date.
         return new Api.UpdateShortSentMessage({ id, pts: 0, ptsCount: 0, date: Math.floor(Date.now() / 1000) });
       }
-      if (topicId) {
-        return await client.sendMessage(resolved, {
-          message: text,
-          topMsgId: topicId,
-          ...(replyTo ? { replyTo } : {}),
-          ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
-        });
-      }
       return await client.sendMessage(resolved, {
         message: text,
-        ...(replyTo ? { replyTo } : {}),
+        ...topicReplyOptions(replyTo, topicId),
         ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
       });
     }, `sendMessage to ${chatId}`);
   }
 
-  async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
+  /**
+   * Send a file as a document.
+   *
+   * `opts.fileName` overrides the name the recipient sees. Without it GramJS
+   * derives BOTH the document name and the MIME type from `basename(filePath)`
+   * (see `utils.getAttributes`), which is wrong for any caller that materializes
+   * bytes into an opaque temp file — the hosted server stores uploads as
+   * `upl_<uuid>` with no extension, so recipients used to get a nameless
+   * `application/octet-stream` blob.
+   *
+   * With a name we hand GramJS a `CustomFile` instead of the bare path, so the
+   * filename attribute AND the MIME type are derived from the real name; the
+   * bytes are still streamed from disk, no copy is made. `forceDocument` is
+   * pinned on that path so supplying a name can never silently turn an
+   * attachment into a re-compressed photo — extension-less paths already went
+   * out as documents, and this keeps that contract.
+   */
+  async sendFile(chatId: string, filePath: string, caption?: string, opts: { fileName?: string } = {}): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const fileName = opts.fileName;
     // pi-lens-ignore: sql-injection
     await this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
+      if (fileName) {
+        const { size } = await stat(filePath);
+        await this.client?.sendFile(resolved, {
+          file: new CustomFile(fileName, size, filePath),
+          caption,
+          forceDocument: true,
+        });
+        return;
+      }
       await this.client?.sendFile(resolved, { file: filePath, caption });
     }, `sendFile to ${chatId}`);
   }
@@ -871,6 +926,10 @@ export class TelegramService {
       replyTo?: number;
       topicId?: number;
       parseMode?: "md" | "html";
+      /** Original name of the audio. GramJS sniffs the codec from the name, so an
+       * extension-less temp path yields `application/octet-stream` and no
+       * DocumentAttributeAudio. See sendFile for the full rationale. */
+      fileName?: string;
     } = {},
   ): Promise<{ id: number }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -878,15 +937,15 @@ export class TelegramService {
     // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
+      const file = opts.fileName ? new CustomFile(opts.fileName, (await stat(filePath)).size, filePath) : filePath;
       // Duration is intentionally auto-detected by GramJS from the audio file —
       // letting the AI override it would mis-report playback length in the Telegram UI.
       const message = await client.sendFile(resolved, {
-        file: filePath,
+        file,
         voiceNote: true,
         caption: opts.caption,
         parseMode: opts.parseMode,
-        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+        ...topicReplyOptions(opts.replyTo, opts.topicId),
       });
       return { id: message.id };
     }, `sendVoice to ${chatId}`);
@@ -921,8 +980,7 @@ export class TelegramService {
       const message = await client.sendFile(resolved, {
         file: filePath,
         videoNote: true,
-        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+        ...topicReplyOptions(opts.replyTo, opts.topicId),
         ...(attributes ? { attributes } : {}),
       });
       return { id: message.id };
@@ -1085,7 +1143,7 @@ export class TelegramService {
 
   async sendAlbum(
     chatId: string,
-    items: Array<{ filePath: string; caption?: string }>,
+    items: Array<{ filePath: string; caption?: string; fileName?: string }>,
     opts: {
       caption?: string;
       parseMode?: "md" | "html";
@@ -1103,14 +1161,25 @@ export class TelegramService {
       const resolved = await this.resolvePeer(chatId);
       // Album-level caption lands on the first item; per-item captions stay as provided.
       const captions = items.map((it, i) => (i === 0 ? (opts.caption ?? it.caption ?? "") : (it.caption ?? "")));
+      // Named items travel as CustomFile so Telegram gets the real name + MIME
+      // instead of `basename(tempPath)`. forceDocument is pinned for the whole
+      // album in that case: album members must be homogeneous, and extension-less
+      // temp paths already went out as documents — naming them must not silently
+      // promote images to compressed photos and break the grouping.
+      const named = items.some((it) => it.fileName);
+      const files = await Promise.all(
+        items.map(async (it) =>
+          it.fileName ? new CustomFile(it.fileName, (await stat(it.filePath)).size, it.filePath) : it.filePath,
+        ),
+      );
       // GramJS sendFile auto-detects `file: string[]` and takes the _sendAlbum path,
       // which invokes messages.UploadMedia per item + messages.SendMultiMedia.
       const result = (await client.sendFile(resolved, {
-        file: items.map((it) => it.filePath),
+        file: files,
         caption: captions,
+        ...(named ? { forceDocument: true } : {}),
         parseMode: opts.parseMode,
-        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-        ...(opts.topicId ? { topMsgId: opts.topicId } : {}),
+        ...topicReplyOptions(opts.replyTo, opts.topicId),
       })) as unknown as Api.Message | Api.Message[] | undefined;
       const ids = Array.isArray(result)
         ? result.filter((m): m is Api.Message => m instanceof Api.Message).map((m) => m.id)
@@ -1156,27 +1225,67 @@ export class TelegramService {
   async downloadMediaAsBuffer(
     chatId: string,
     messageId: number,
-    options?: { thumb?: number },
-  ): Promise<{ buffer: Buffer; mimeType: string; isThumb: boolean }> {
+    options?: { thumb?: number; maxBytes?: number; signal?: AbortSignal },
+  ): Promise<{ buffer: Buffer; mimeType: string; isThumb: boolean; fileName?: string }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const maxBytes = options?.maxBytes;
+    if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes <= 0)) {
+      throw new Error("maxBytes must be a positive safe integer");
+    }
+    const guard = (downloaded = 0): void => {
+      options?.signal?.throwIfAborted();
+      if (maxBytes !== undefined && downloaded > maxBytes) throw new Error(`Media exceeds ${maxBytes} byte limit`);
+    };
+    guard();
     const resolved = await this.resolvePeer(chatId);
     const messages = await this.client.getMessages(resolved, { ids: [messageId] });
+    guard();
     const message = messages[0];
     if (!message) throw new Error(`Message ${messageId} not found`);
     if (!message.media) throw new Error(`Message ${messageId} has no media`);
-
+    // SAFETY: GramJS media variants expose document metadata only on documents;
+    // every field here is optional, and actual downloaded bytes are separately
+    // bounded even when metadata is absent or understates the size.
+    const document = (
+      message.media as unknown as { document?: { size?: { toString(): string }; attributes?: { fileName?: string }[] } }
+    ).document;
+    const checkFullSize = (): void => {
+      if (document?.size !== undefined) guard(Number(document.size.toString()));
+    };
+    // GramJS invokes this after each chunk (at most 512 KiB). A thrown error
+    // closes its iterator; the final guard also covers cached photo sizes,
+    // which don't invoke progressCallback. Metadata denies large documents
+    // BEFORE GramJS allocates the full file. signal is cooperative, not a way
+    // to cancel a currently blocked MTProto request.
+    const progressCallback = (downloaded: { toString(): string }): void => guard(Number(downloaded.toString()));
+    const guarded = maxBytes !== undefined || options?.signal ? { progressCallback } : {};
     let isThumb = false;
     let buffer: Buffer | undefined;
     if (options?.thumb !== undefined) {
-      buffer = (await this.client.downloadMedia(message, { thumb: options.thumb })) as Buffer | undefined;
+      buffer = (await this.client.downloadMedia(message, { thumb: options.thumb, ...guarded })) as Buffer | undefined;
       isThumb = !!buffer?.length;
     }
     // No thumb requested, or this media has no thumbnail at that size → full file.
-    if (!buffer?.length) buffer = (await this.client.downloadMedia(message)) as Buffer;
+    if (!buffer?.length) {
+      checkFullSize();
+      buffer = (await this.client.downloadMedia(message, guarded)) as Buffer;
+    }
     if (!buffer?.length) throw new Error("Failed to download media");
+    guard(buffer.length);
 
     const mimeType = this.detectMimeType(buffer, message.media);
-    return { buffer, mimeType, isThumb };
+    const fileName = document?.attributes?.find((a) => typeof a.fileName === "string")?.fileName;
+    return { buffer, mimeType, isThumb, ...(fileName !== undefined && { fileName }) };
+  }
+
+  /** Explicit capability for cloud callers: old core versions fail closed
+   * instead of silently ignoring a size cap passed as an unknown option. */
+  async downloadMediaBounded(
+    chatId: string,
+    messageId: number,
+    options: { maxBytes: number; thumb?: number; signal?: AbortSignal },
+  ): Promise<{ buffer: Buffer; mimeType: string; isThumb: boolean; fileName?: string }> {
+    return this.downloadMediaAsBuffer(chatId, messageId, options);
   }
 
   /** Detect MIME type from buffer magic bytes, falling back to media metadata */
@@ -1707,8 +1816,20 @@ export class TelegramService {
       // Fall through to dialog search
     }
 
-    // Search dialogs by display name
     const dialogs = await this.client.getDialogs({ limit: 100 });
+
+    // Numeric IDs: GramJS only resolves them from its in-memory cache, which is
+    // empty after a reconnect — match against dialog entities instead (same
+    // rules as resolveNumericPeer).
+    if (NUMERIC_ID_RE.test(chatId)) {
+      const byId = findDialogEntityById(dialogs, chatId);
+      if (byId) {
+        this.entityCache.set(chatId, byId);
+        return byId;
+      }
+    }
+
+    // Search dialogs by display name
     const query = chatId.toLowerCase();
 
     // Exact match first
@@ -1750,7 +1871,7 @@ export class TelegramService {
     // ambiguous (GramJS assumes PeerUser, so channel IDs fail outright).
     // Recover by looking the ID up among dialogs, which yields a full entity
     // (with access_hash) for both users and channels.
-    if (/^-?\d+$/.test(chatId)) return this.resolveNumericPeer(chatId);
+    if (NUMERIC_ID_RE.test(chatId)) return this.resolveNumericPeer(chatId);
     // Everything else — resolve display name via dialogs
     return this.resolveChat(chatId);
   }
@@ -1776,30 +1897,13 @@ export class TelegramService {
       // Fall through to dialog scan.
     }
 
-    // Scan dialogs for a matching entity. IDs reach us in two shapes:
-    //   • bare positive  (e.g. 1004294063929 for a channel, 8959122940 for a
-    //     user) — this is what list-chats/search emit and what GramJS can't
-    //     disambiguate; match it against any entity's bare id.
-    //   • marked         (-100<id> for channels, -<id> for basic groups) — the
-    //     sign/-100 prefix carries the type, so require the entity to match that
-    //     exact marked form, otherwise a group "-123" could wrongly match a user
-    //     with bare id 123.
-    const isMarked = chatId.startsWith("-");
+    // Scan dialogs for a matching entity (see findDialogEntityById).
     try {
       const dialogs = await this.client.getDialogs({ limit: 100 });
-      const match = dialogs.find((d) => {
-        const entity = d.entity;
-        if (!entity?.id) return false;
-        const bare = entity.id.toString();
-        if (!isMarked) return chatId === bare;
-        // Marked input must match the entity's marked form.
-        if (entity instanceof Api.Channel) return chatId === `-100${bare}`;
-        if (entity instanceof Api.Chat) return chatId === `-${bare}`;
-        return false;
-      });
-      if (match?.entity) {
-        this.entityCache.set(chatId, match.entity);
-        return match.entity;
+      const match = findDialogEntityById(dialogs, chatId);
+      if (match) {
+        this.entityCache.set(chatId, match);
+        return match;
       }
     } catch {
       // Dialog fetch failed — fall back to the raw ID below.
@@ -2509,6 +2613,38 @@ export class TelegramService {
       businessWorkHours,
       businessLocation,
     };
+  }
+
+  /**
+   * List the songs pinned to a user's profile (`users.getSavedMusic`).
+   *
+   * The request class is hand-rolled (`./tl/saved-music.ts`) because GramJS is pinned at TL
+   * layer 198, which predates this method.
+   */
+  async getSavedMusic(userId?: string, opts: { offset?: number; limit?: number } = {}): Promise<SavedMusicSummary> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const offset = opts.offset ?? 0;
+    const limit = opts.limit ?? 50;
+    // resolvePeer first: getInputEntity alone throws "Could not find the input entity" for
+    // display-name fragments and uncached bare numeric ids. "me" is the self default.
+    const resolved = await this.resolvePeer(userId ?? "me");
+    // The InputPeer → InputUser conversion is mandatory. getBytes() delegates field 2 to the
+    // object's own constructor id, and unlike generated requests this class has no AUTO_CASTS
+    // resolve() to repair an InputPeer. getInputUser also rejects channels/groups loudly.
+    const id = getInputUser(await this.client.getInputEntity(resolved));
+    return this.rateLimiter.execute(
+      async () => {
+        const request = new GetSavedMusicRequest(id, offset, limit);
+        // invoke() is typed over a closed union of generated classes, which a hand-rolled
+        // request cannot join; the outbound cast collapses the return type, so restore it.
+        const response = (await this.client?.invoke(request as unknown as Api.AnyRequest)) as
+          | SavedMusicResponse
+          | undefined;
+        if (!response) throw new Error("users.getSavedMusic returned nothing");
+        return summarizeSavedMusic(response, offset);
+      },
+      `getSavedMusic ${userId ?? "me"}`,
+    );
   }
 
   // ─── Profiles & Media ──────────────────────────────────────────────────────
@@ -3354,7 +3490,20 @@ export class TelegramService {
     // created. See unwrapInvitedUsers().
     const updates = unwrapInvitedUsers(result);
     const chat = updates.chats?.[0];
-    if (!chat) throw new Error("Failed to create group");
+    if (!chat) {
+      // invoke() already resolved without throwing, so this is not a transport or
+      // RPC error (those surface on their own via invoke()); it's Telegram
+      // acknowledging the request without handing back the chat we expected. The
+      // clearest signal available at this point is what did come back, so report
+      // that shape instead of a dead-end message: how many invitees Telegram
+      // declined (a full house can accompany a chat-less response) and the raw
+      // update/chat counts, so this is at least attributable in telemetry.
+      const missing = missingInviteeIds(result);
+      const declinedNote = missing.length > 0 ? `; ${missing.length} invitee(s) declined` : "";
+      throw new Error(
+        `Failed to create group: Telegram's response had no chat (updates: ${updates.updates?.length ?? 0}, chats: ${updates.chats?.length ?? 0}${declinedNote})`,
+      );
+    }
 
     const missingInvitees = missingInviteeIds(result);
     return {
@@ -4700,6 +4849,7 @@ export class TelegramService {
     title: string;
     shortName: string;
     count: number;
+    emojis: boolean;
     stickers: Array<{
       id: string;
       accessHash: string;
@@ -4729,10 +4879,19 @@ export class TelegramService {
       title: set.title,
       shortName: set.shortName,
       count: set.count,
+      emojis: Boolean(set.emojis),
       stickers: result.documents.map((doc) => ({
         id: (doc as Api.Document).id.toString(),
         accessHash: (doc as Api.Document).accessHash.toString(),
-        emoji: emojiMap.get((doc as Api.Document).id.toString()) || "",
+        // A custom emoji entity must wrap exactly the document's own alt emoji,
+        // otherwise Telegram drops it; a document can sit in several packs, so
+        // the pack map is only the fallback.
+        emoji:
+          (doc as Api.Document).attributes?.find(
+            (a): a is Api.DocumentAttributeCustomEmoji => a instanceof Api.DocumentAttributeCustomEmoji,
+          )?.alt ||
+          emojiMap.get((doc as Api.Document).id.toString()) ||
+          "",
       })),
     };
   }
@@ -4764,7 +4923,7 @@ export class TelegramService {
     });
   }
 
-  async getInstalledStickerSets(): Promise<
+  async getInstalledStickerSets(emoji = false): Promise<
     Array<{
       title: string;
       shortName: string;
@@ -4772,7 +4931,10 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const result = await this.client.invoke(new Api.messages.GetAllStickers({ hash: bigInt(0) }));
+    const request = emoji
+      ? new Api.messages.GetEmojiStickers({ hash: bigInt(0) })
+      : new Api.messages.GetAllStickers({ hash: bigInt(0) });
+    const result = await this.client.invoke(request);
     if (result instanceof Api.messages.AllStickersNotModified) {
       return [];
     }

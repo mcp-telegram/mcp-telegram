@@ -189,7 +189,7 @@ export function registerFolderTools(server: McpServer, telegram: TelegramService
     "telegram-get-suggested-folders",
     {
       description:
-        "Get Telegram's suggested chat folders based on your chat list (e.g. 'Unread', 'Personal', 'Work'). Returns folder templates you can create with telegram-create-folder.",
+        "Get Telegram's suggested chat folders based on your chat list (e.g. 'Unread', 'Personal', 'Work'). Returns folder templates only; nothing is created.",
       inputSchema: {},
       annotations: READ_ONLY,
     },

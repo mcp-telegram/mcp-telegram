@@ -12,6 +12,7 @@ import { registerFolderTools } from "./folders.js";
 import { registerGroupCallTools } from "./group-calls.js";
 import { registerMediaTools } from "./media.js";
 import { registerMessageTools } from "./messages.js";
+import { registerMusicTools } from "./music.js";
 import { registerQuickRepliesTools } from "./quick-replies.js";
 import { registerReactionTools } from "./reactions.js";
 import { registerSendMediaTools } from "./send-media.js";
@@ -40,4 +41,5 @@ export function registerTools(server: McpServer, telegram: TelegramService) {
   registerGroupCallTools(server, telegram);
   registerStarsTools(server, telegram);
   registerQuickRepliesTools(server, telegram);
+  registerMusicTools(server, telegram);
 }

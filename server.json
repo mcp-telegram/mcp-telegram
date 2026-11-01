@@ -1,13 +1,27 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.mcp-telegram/mcp-telegram",
-  "description": "MCP server for Telegram userbot — messages, media, reactions, polls & more. Built on GramJS/MTProto.",
-  "title": "Telegram (mcp-telegram)",
+  "description": "Unofficial Telegram MCP server — read, search, reply and react in your own Telegram account.",
+  "title": "Chatroost — unofficial Telegram MCP server",
+  "websiteUrl": "https://mcp-telegram.com",
+  "icons": [
+    {
+      "src": "https://mcp-telegram.com/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"]
+    }
+  ],
   "repository": {
     "url": "https://github.com/mcp-telegram/mcp-telegram",
     "source": "github"
   },
   "version": "1.40.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.mcp-telegram.com/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",

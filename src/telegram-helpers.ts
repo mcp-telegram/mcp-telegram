@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import bigInt from "big-integer";
 import { Api } from "telegram/tl/index.js";
+import type { SavedMusicResponse } from "./tl/saved-music.js";
 
 /**
  * Build an InputReplyToMessage from optional replyTo / topicId, matching the shape used by
@@ -14,6 +15,19 @@ export function buildReplyTo(replyTo?: number, topicId?: number): Api.InputReply
     replyToMsgId: (replyTo ?? topicId) as number,
     topMsgId: topicId,
   });
+}
+
+/**
+ * Reply options for GramJS's high-level `sendMessage` / `sendFile`.
+ *
+ * GramJS only reads `topMsgId` when `replyTo` is also set (it builds InputReplyToMessage
+ * inside `if (replyTo != undefined)`), so `{ topMsgId }` alone was silently dropped and a
+ * message "sent to topic N" landed in General. Posting into a topic means replying to its
+ * root message, the same rule as {@link buildReplyTo}.
+ */
+export function topicReplyOptions(replyTo?: number, topicId?: number): { replyTo?: number; topMsgId?: number } {
+  if (topicId) return { replyTo: replyTo ?? topicId, topMsgId: topicId };
+  return replyTo ? { replyTo } : {};
 }
 
 /** Cryptographically random 64-bit bigInt for TL randomId (SendMedia/SendMultiMedia require it). */
@@ -71,7 +85,7 @@ export function describeAdminLogAction(action: Api.TypeChannelAdminLogEventActio
   const prefix = "ChannelAdminLogEventAction";
   const raw = action.className.startsWith(prefix) ? action.className.slice(prefix.length) : action.className;
   return raw
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .replace(/([A-Z])(?=[A-Z][a-z])/g, "$1_")
     .replace(/([a-z])([A-Z])/g, "$1_$2")
     .toLowerCase();
 }
@@ -842,6 +856,60 @@ export function summarizeBoostsList(result: Api.premium.TypeBoostsList): BoostsL
     boosts: (r.boosts ?? []).map(summarizeBoost),
     nextOffset: r.nextOffset,
   };
+}
+
+export type SavedMusicTrack = {
+  id: string;
+  title?: string;
+  performer?: string;
+  duration?: number;
+  fileName?: string;
+  mimeType?: string;
+  size?: string;
+};
+
+export type SavedMusicSummary = {
+  count: number;
+  notModified?: true;
+  tracks: SavedMusicTrack[];
+  nextOffset?: number;
+};
+
+/**
+ * Map a `users.SavedMusic` response to the tool payload. Pure — no client access.
+ *
+ * `id` and `size` are big-integer instances and must be stringified: JSON.stringify emits
+ * `{}` for them otherwise.
+ */
+export function summarizeSavedMusic(response: SavedMusicResponse, offset: number): SavedMusicSummary {
+  const tracks: SavedMusicTrack[] = response.documents.map((doc) => {
+    const track: SavedMusicTrack = { id: doc.id.toString() };
+    if (doc.mimeType) track.mimeType = doc.mimeType;
+    if (doc.size !== undefined) track.size = doc.size.toString();
+
+    const audio = doc.attributes?.find((a): a is Api.DocumentAttributeAudio => a instanceof Api.DocumentAttributeAudio);
+    if (audio) {
+      if (audio.title) track.title = audio.title;
+      if (audio.performer) track.performer = audio.performer;
+      if (audio.duration !== undefined) track.duration = audio.duration;
+    }
+
+    // Fallback label when the audio attribute carries no title/performer.
+    const named = doc.attributes?.find(
+      (a): a is Api.DocumentAttributeFilename => a instanceof Api.DocumentAttributeFilename,
+    );
+    if (named?.fileName) track.fileName = named.fileName;
+
+    return track;
+  });
+
+  const out: SavedMusicSummary = { count: response.count, tracks };
+  if (response.notModified) out.notModified = true;
+  // Derive the page boundary from `count`, not `tracks.length < limit` — the two disagree
+  // when the server short-pages a non-final page.
+  const consumed = offset + tracks.length;
+  if (consumed < response.count) out.nextOffset = consumed;
+  return out;
 }
 
 export type BusinessChatLinkSummary = {

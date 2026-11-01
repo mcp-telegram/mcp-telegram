@@ -33,6 +33,7 @@ interface ServiceInternals {
   connected: boolean;
   entityCache: Map<string, unknown>;
   resolveNumericPeer(chatId: string): Promise<unknown>;
+  resolveChat(chatId: string): Promise<unknown>;
 }
 
 function makeService(client: MockClient): ServiceInternals {
@@ -182,5 +183,78 @@ describe("resolveNumericPeer", () => {
 
     const out = await s.resolveNumericPeer("333");
     assert.strictEqual(out, "333");
+  });
+});
+
+describe("resolveChat numeric IDs", () => {
+  // list-topics/get-chat-info go through resolveChat, which used to match
+  // dialogs only by title — a bare channel id failed with "Cannot find chat"
+  // whenever GramJS's in-memory cache was cold (after a reconnect).
+  it("recovers a bare CHANNEL id via dialog scan when direct resolve fails", async () => {
+    const channelEntity = makeChannel(3011436425);
+    const s = makeService({
+      getEntity: DIRECT_RESOLVE_FAILS,
+      getDialogs: async () => [{ entity: makeUser(1) }, { entity: channelEntity }],
+    });
+
+    const out = await s.resolveChat("3011436425");
+    assert.strictEqual(out, channelEntity);
+    assert.strictEqual(s.entityCache.get("3011436425"), channelEntity, "result is cached");
+  });
+
+  it("recovers a -100… marked CHANNEL id via dialog scan", async () => {
+    const channelEntity = makeChannel(3011436425);
+    const s = makeService({
+      getEntity: DIRECT_RESOLVE_FAILS,
+      getDialogs: async () => [{ entity: channelEntity }],
+    });
+
+    const out = await s.resolveChat("-1003011436425");
+    assert.strictEqual(out, channelEntity);
+  });
+
+  it("does NOT cross-match a group id -123 against a user with bare id 123", async () => {
+    const s = makeService({
+      getEntity: DIRECT_RESOLVE_FAILS,
+      getDialogs: async () => [{ entity: makeUser(123) }],
+    });
+
+    await assert.rejects(s.resolveChat("-123"), /Cannot find chat "-123"/);
+  });
+
+  it("still matches dialogs by title for non-numeric input", async () => {
+    const chatEntity = makeChat(77);
+    const s = makeService({
+      getEntity: DIRECT_RESOLVE_FAILS,
+      getDialogs: async () => [{ entity: chatEntity, title: "Team Chat" }],
+    });
+
+    const out = await s.resolveChat("team chat");
+    assert.strictEqual(out, chatEntity);
+  });
+
+  it("falls back to a numeric title match when no entity id matches", async () => {
+    const chatEntity = makeChat(77);
+    const s = makeService({
+      getEntity: DIRECT_RESOLVE_FAILS,
+      getDialogs: async () => [{ entity: chatEntity, title: "2024" }],
+    });
+
+    const out = await s.resolveChat("2024");
+    assert.strictEqual(out, chatEntity);
+  });
+
+  it("fetches dialogs only once per lookup", async () => {
+    let calls = 0;
+    const s = makeService({
+      getEntity: DIRECT_RESOLVE_FAILS,
+      getDialogs: async () => {
+        calls++;
+        return [{ entity: makeUser(1) }];
+      },
+    });
+
+    await assert.rejects(s.resolveChat("999"), /Cannot find chat "999"/);
+    assert.strictEqual(calls, 1);
   });
 });

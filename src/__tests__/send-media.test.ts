@@ -1,12 +1,20 @@
 import assert from "node:assert";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import bigInt from "big-integer";
+import { CustomFile } from "telegram/client/uploads.js";
 import { Api } from "telegram/tl/index.js";
+import { getAttributes } from "telegram/Utils.js";
 import { TelegramService } from "../telegram-client.js";
-import { buildReplyTo, extractDiceResult, extractMessageId, generateRandomBigInt } from "../telegram-helpers.js";
+import {
+  buildReplyTo,
+  extractDiceResult,
+  extractMessageId,
+  generateRandomBigInt,
+  topicReplyOptions,
+} from "../telegram-helpers.js";
 import { isSafeAbsolutePath } from "../tools/shared.js";
 
 const TMP_DIR = join(tmpdir(), `mcp-telegram-sendmedia-test-${process.pid}`);
@@ -15,7 +23,10 @@ const SESSION_PATH = join(TMP_DIR, "session");
 before(() => mkdirSync(TMP_DIR, { recursive: true }));
 after(() => rmSync(TMP_DIR, { recursive: true, force: true }));
 
-type AnyFn = (...args: unknown[]) => unknown;
+// `never[]` params, not `unknown[]`: the test doubles below declare their own
+// concrete argument types (`opts: Record<string, unknown>`), which strictFunctionTypes
+// rejects against `unknown[]`. Contravariance makes every shape assignable here.
+type AnyFn = (...args: never[]) => unknown;
 type MockClient = {
   invoke: AnyFn;
   sendFile: AnyFn;
@@ -128,6 +139,20 @@ describe("buildReplyTo", () => {
     const r = buildReplyTo(99, 17);
     assert.strictEqual(r?.replyToMsgId, 99);
     assert.strictEqual(r?.topMsgId, 17);
+  });
+});
+
+describe("topicReplyOptions (GramJS high-level sendMessage/sendFile)", () => {
+  // GramJS reads topMsgId only when replyTo is set; a bare topMsgId posted into General.
+  it("posts into a topic by replying to its root when only topicId is given", () => {
+    assert.deepStrictEqual(topicReplyOptions(undefined, 17), { replyTo: 17, topMsgId: 17 });
+  });
+  it("keeps an explicit reply inside the topic", () => {
+    assert.deepStrictEqual(topicReplyOptions(99, 17), { replyTo: 99, topMsgId: 17 });
+  });
+  it("passes a plain reply through and omits everything when neither is set", () => {
+    assert.deepStrictEqual(topicReplyOptions(5), { replyTo: 5 });
+    assert.deepStrictEqual(topicReplyOptions(), {});
   });
 });
 
@@ -359,6 +384,73 @@ describe("TelegramService.sendMessage (quoteText/effect raw path)", () => {
   });
 });
 
+describe("TelegramService.sendFile (filename preservation)", () => {
+  // Real bytes on disk: the named path stat()s the file to size the upload.
+  const NAMED_PATH = join(TMP_DIR, "upl_9b071789c52b45b4a2cf034b1d9a81a1");
+  const BYTES = "# hello\n";
+  before(() => writeFileSync(NAMED_PATH, BYTES));
+
+  function captureClient(captured: Record<string, unknown>): MockClient {
+    return {
+      invoke: async () => undefined,
+      getInputEntity: async () => ({}),
+      sendFile: async (...args: unknown[]) => {
+        captured.opts = args[1];
+        return { id: 1 } as unknown as Api.Message;
+      },
+    };
+  }
+
+  it("passes the bare path through when no fileName is given (local stdio behaviour unchanged)", async () => {
+    const service = makeService();
+    const captured: Record<string, unknown> = {};
+    primeConnected(service, captureClient(captured));
+
+    await service.sendFile("chat", NAMED_PATH, "cap");
+
+    const opts = captured.opts as Record<string, unknown>;
+    assert.strictEqual(opts.file, NAMED_PATH);
+    assert.strictEqual(opts.caption, "cap");
+    // Must NOT force a document: a local .jpg path still goes out as a photo.
+    assert.ok(!("forceDocument" in opts), "unnamed sends must not change the photo/document decision");
+  });
+
+  it("wraps the file so Telegram receives the original name, not basename(tempPath)", async () => {
+    const service = makeService();
+    const captured: Record<string, unknown> = {};
+    primeConnected(service, captureClient(captured));
+
+    await service.sendFile("chat", NAMED_PATH, "cap", { fileName: "review_git-delivery.md" });
+
+    const opts = captured.opts as Record<string, unknown>;
+    const file = opts.file as CustomFile;
+    assert.ok(file instanceof CustomFile, "named sends must hand GramJS a CustomFile");
+    assert.strictEqual(file.name, "review_git-delivery.md");
+    assert.strictEqual(file.path, NAMED_PATH, "bytes must stream from the original path \u2014 no copy");
+    assert.strictEqual(file.size, Buffer.byteLength(BYTES));
+    assert.strictEqual(opts.caption, "cap");
+    assert.strictEqual(opts.forceDocument, true);
+  });
+
+  it("makes GramJS derive the real filename attribute and MIME from that wrapper", async () => {
+    // Locks the integration assumption this fix rests on: getAttributes reads the
+    // name off CustomFile. A bare path yields the nameless octet-stream we shipped.
+    const named = getAttributes(new CustomFile("report.md", 8, NAMED_PATH), { forceDocument: true });
+    const nameAttr = named.attrs.find(
+      (a): a is Api.DocumentAttributeFilename => a instanceof Api.DocumentAttributeFilename,
+    );
+    assert.strictEqual(nameAttr?.fileName, "report.md");
+    assert.strictEqual(named.mimeType, "text/markdown");
+
+    const bare = getAttributes(NAMED_PATH, { forceDocument: true });
+    const bareName = bare.attrs.find(
+      (a): a is Api.DocumentAttributeFilename => a instanceof Api.DocumentAttributeFilename,
+    );
+    assert.strictEqual(bareName?.fileName, "upl_9b071789c52b45b4a2cf034b1d9a81a1");
+    assert.strictEqual(bare.mimeType, "application/octet-stream");
+  });
+});
+
 describe("TelegramService.sendVoice", () => {
   it("calls client.sendFile with voiceNote:true and returns message id", async () => {
     const service = makeService();
@@ -390,6 +482,50 @@ describe("TelegramService.sendVoice", () => {
     assert.strictEqual(opts.parseMode, "md");
     // Duration is auto-detected by GramJS — we must not override it client-side
     assert.strictEqual(opts.attributes, undefined);
+  });
+
+  it("posts into a topic without replyTo by replying to the topic root (GramJS drops a bare topMsgId)", async () => {
+    const service = makeService();
+    const captured: Record<string, unknown> = {};
+    const client: MockClient = {
+      invoke: async () => undefined,
+      getInputEntity: async () => ({}),
+      sendFile: async (_peer: unknown, opts: Record<string, unknown>) => {
+        captured.opts = opts;
+        return { id: 1 } as unknown as Api.Message;
+      },
+    };
+    primeConnected(service, client);
+
+    await service.sendVoice("chat", "/tmp/x.ogg", { topicId: 42 });
+
+    const opts = captured.opts as Record<string, unknown>;
+    assert.strictEqual(opts.replyTo, 42);
+    assert.strictEqual(opts.topMsgId, 42);
+  });
+
+  it("wraps the audio as CustomFile when a fileName is given so the codec is detectable", async () => {
+    const service = makeService();
+    const captured: Record<string, unknown> = {};
+    const voicePath = join(TMP_DIR, "upl_voice");
+    writeFileSync(voicePath, "oggbytes");
+    const client: MockClient = {
+      invoke: async () => undefined,
+      getInputEntity: async () => ({}),
+      sendFile: async (...args: unknown[]) => {
+        captured.opts = args[1];
+        return { id: 1 } as unknown as Api.Message;
+      },
+    };
+    primeConnected(service, client);
+
+    await service.sendVoice("chat", voicePath, { fileName: "note.ogg" });
+
+    const opts = captured.opts as Record<string, unknown>;
+    const file = opts.file as CustomFile;
+    assert.ok(file instanceof CustomFile);
+    assert.strictEqual(file.name, "note.ogg");
+    assert.strictEqual(opts.voiceNote, true);
   });
 
   it("omits replyTo/topMsgId when not provided", async () => {
@@ -823,6 +959,61 @@ describe("TelegramService.sendAlbum", () => {
     const opts = captured.opts as Record<string, unknown>;
     assert.strictEqual(opts.replyTo, 7);
     assert.strictEqual(opts.topMsgId, 42);
+  });
+
+  it("wraps named items as CustomFile and pins forceDocument for the whole album", async () => {
+    const service = makeService();
+    const captured: Record<string, unknown> = {};
+    const path1 = join(TMP_DIR, "upl_album_1");
+    const path2 = join(TMP_DIR, "upl_album_2");
+    writeFileSync(path1, "one");
+    writeFileSync(path2, "two");
+    const client: MockClient = {
+      invoke: async () => undefined,
+      getInputEntity: async () => ({}),
+      sendFile: async (...args: unknown[]) => {
+        captured.opts = args[1];
+        return [makeMessage(1), makeMessage(2)] as unknown as Api.Message;
+      },
+    };
+    primeConnected(service, client);
+
+    await service.sendAlbum("chat", [
+      { filePath: path1, fileName: "first.pdf" },
+      { filePath: path2, fileName: "second.pdf" },
+    ]);
+
+    const opts = captured.opts as Record<string, unknown>;
+    const files = opts.file as CustomFile[];
+    assert.deepStrictEqual(
+      files.map((f) => f.name),
+      ["first.pdf", "second.pdf"],
+    );
+    assert.deepStrictEqual(
+      files.map((f) => f.path),
+      [path1, path2],
+    );
+    assert.strictEqual(opts.forceDocument, true);
+  });
+
+  it("leaves unnamed albums on the bare-path code path (no forceDocument)", async () => {
+    const service = makeService();
+    const captured: Record<string, unknown> = {};
+    const client: MockClient = {
+      invoke: async () => undefined,
+      getInputEntity: async () => ({}),
+      sendFile: async (...args: unknown[]) => {
+        captured.opts = args[1];
+        return [makeMessage(1), makeMessage(2)] as unknown as Api.Message;
+      },
+    };
+    primeConnected(service, client);
+
+    await service.sendAlbum("chat", [{ filePath: "/tmp/1.jpg" }, { filePath: "/tmp/2.jpg" }]);
+
+    const opts = captured.opts as Record<string, unknown>;
+    assert.deepStrictEqual(opts.file, ["/tmp/1.jpg", "/tmp/2.jpg"]);
+    assert.ok(!("forceDocument" in opts), "unnamed albums must keep today's photo/document decision");
   });
 
   it("rejects fewer than 2 items", async () => {

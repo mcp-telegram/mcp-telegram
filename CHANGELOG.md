@@ -5,6 +5,114 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.44.0...v1.44.1) (2026-10-26)
+
+
+### Fixed
+
+* **admin-log:** name admin log actions with a linear regex and give CI a read-only token ([#119](https://github.com/mcp-telegram/mcp-telegram/issues/119)) ([2b9dbea](https://github.com/mcp-telegram/mcp-telegram/commit/2b9dbeacbb3d745ee6d3e33dee79eca81cc33f7a))
+
+## [1.44.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.7...v1.44.0) (2026-10-26)
+
+
+### Added
+
+* **stickers:** expose custom emoji ids and list installed emoji sets ([#107](https://github.com/mcp-telegram/mcp-telegram/issues/107)) ([ef18dc5](https://github.com/mcp-telegram/mcp-telegram/commit/ef18dc57fbb9904706ffc61e25cce0142c7b1dfc))
+
+
+### Fixed
+
+* **groups:** return the underlying cause when create-group has no chat ([#100](https://github.com/mcp-telegram/mcp-telegram/issues/100)) ([7eb9a24](https://github.com/mcp-telegram/mcp-telegram/commit/7eb9a241861fc8cf995ff9fc5246c64288aba40d)), closes [#95](https://github.com/mcp-telegram/mcp-telegram/issues/95)
+
+## [1.43.7](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.6...v1.43.7) (2026-10-26)
+
+
+### Fixed
+
+* **deps:** update MCP SDK, dotenv, vitepress and Bun 1.4.4; patch vulnerable transitive body-parser, fast-uri and ip-address ([#113](https://github.com/mcp-telegram/mcp-telegram/issues/113)) ([23307f5](https://github.com/mcp-telegram/mcp-telegram/commit/23307f5f01cfb4d7a0b6458b4229f8f142cb3746))
+
+## [1.43.6](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.5...v1.43.6) (2026-10-13)
+
+
+### Fixed
+
+* **deps:** update MCP SDK, zod, dotenv, setup-node and Bun 1.4.3; patch vulnerable transitive proxy-addr and source-map-js ([d19c35f](https://github.com/mcp-telegram/mcp-telegram/commit/d19c35f316e0a2f0a89b2ec3d4b8ed7d051d4e83))
+
+## [1.43.5](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.4...v1.43.5) (2026-10-13)
+
+
+### Fixed
+
+* **chats:** resolve bare numeric chat IDs via dialogs in resolveChat ([5de5756](https://github.com/mcp-telegram/mcp-telegram/commit/5de57565889e9b09dc4b5a7b9c2c6c61b0fbf8de))
+
+## [1.43.4](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.3...v1.43.4) (2026-10-05)
+
+
+### Fixed
+
+* **deps:** upgrade dotenv to 18 with synchronized lockfiles ([43acc3f](https://github.com/mcp-telegram/mcp-telegram/commit/43acc3fcddfe7aa392eeea91781c4d941d71d307))
+
+## [1.43.3](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.2...v1.43.3) (2026-10-05)
+
+
+### Fixed
+
+* **deps:** update MCP SDK and resolve vulnerable transitive dependencies ([2c239c6](https://github.com/mcp-telegram/mcp-telegram/commit/2c239c6e8f2656b75edda3ce02bb0f422574f79a))
+
+## [1.43.2](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.1...v1.43.2) (2026-10-03)
+
+
+### Fixed
+
+* **media:** bound private media downloads before buffering ([436aa3f](https://github.com/mcp-telegram/mcp-telegram/commit/436aa3f49366d81a63d8f3bee18bb458ca7c7a15))
+* **messages:** sending into a forum topic without replyTo lands in that topic, not in General ([9a23fba](https://github.com/mcp-telegram/mcp-telegram/commit/9a23fba572e02233f08a2393f329f0a648750936))
+* **tools:** describe set-admin rights accurately and state tool relationships as facts, not orders ([#101](https://github.com/mcp-telegram/mcp-telegram/issues/101)) ([fbac57e](https://github.com/mcp-telegram/mcp-telegram/commit/fbac57e103440d494cd7757053eb4bac4a1cf8d0))
+* **tools:** descriptions state which tool provides an ID as a fact instead of telling the model to call it ([b3d4aca](https://github.com/mcp-telegram/mcp-telegram/commit/b3d4aca44d1d2036a53430e40dfcccd28d184cd9))
+
+
+### Documentation
+
+* link the public roadmap board ([cd4cd92](https://github.com/mcp-telegram/mcp-telegram/commit/cd4cd926a1e535e0f969a7e6a2305c48ec517979))
+* **tools:** send-voice says only OGG/Opus arrives as a voice message ([2edac09](https://github.com/mcp-telegram/mcp-telegram/commit/2edac098ecdfd1e74cb4ef22346134e06d0a2108))
+
+## [1.43.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.43.0...v1.43.1) (2026-09-29)
+
+
+### Fixed
+
+* **client:** destroy GramJS clients instead of orphaning them on failed connect, disconnect and clearSession ([994229d](https://github.com/mcp-telegram/mcp-telegram/commit/994229d370ecbc8cb8f1dbe31b893f9f635dae57))
+
+## [1.43.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.42.0...v1.43.0) (2026-09-21)
+
+
+### Added
+
+* **media:** let callers name uploaded files so Telegram gets the real name and MIME ([eb1bd66](https://github.com/mcp-telegram/mcp-telegram/commit/eb1bd66a1b8994506d48909c5626fb8162736134))
+
+## [1.42.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.7...v1.42.0) (2026-09-16)
+
+
+### Added
+
+* **profiles:** Add telegram-get-saved-music ([#79](https://github.com/mcp-telegram/mcp-telegram/issues/79)) ([f9440dd](https://github.com/mcp-telegram/mcp-telegram/commit/f9440ddfe68f1da2e48351cb22682e3e8ddeb172))
+
+
+### Fixed
+
+* **docs:** restore ru/zh outline and last-updated labels dropped by the VitePress 2 rename ([65907ad](https://github.com/mcp-telegram/mcp-telegram/commit/65907adc88d7c6ac9c136f541e2985d3c2006025))
+
+
+### Documentation
+
+* cover telegram-get-saved-music in en/ru/zh and bump the tool count to 182 ([e58ac9d](https://github.com/mcp-telegram/mcp-telegram/commit/e58ac9d051f25134764c9e362537bada15264b69))
+
+## [1.41.7](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.6...v1.41.7) (2026-09-10)
+
+
+### Documentation
+
+* **registry:** brand the MCP Registry listing as Chatroost, mark it unofficial and advertise the hosted remote endpoint ([e27634a](https://github.com/mcp-telegram/mcp-telegram/commit/e27634ad343aba6e2f371b7e0198423e8f60e0ad))
+
 ## [1.41.6](https://github.com/mcp-telegram/mcp-telegram/compare/v1.41.5...v1.41.6) (2026-08-27)
 
 

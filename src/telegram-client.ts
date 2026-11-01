@@ -89,6 +89,7 @@ import {
 } from "./telegram-helpers.js";
 import type { SavedMusicResponse } from "./tl/saved-music.js";
 import { GetSavedMusicRequest } from "./tl/saved-music.js";
+import { type InstantViewSummary, summarizeInstantView } from "./webpage-preview.js";
 
 export type {
   AllStoriesSummary,
@@ -346,6 +347,9 @@ function ensureSessionDir(filePath: string): void {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 }
+
+/** Media descriptor in message lists; `title`/`text` are Instant View page content, not the author's text. */
+export type MessageMediaInfo = { type: string; fileName?: string; size?: number } & InstantViewSummary;
 
 export type ChatEntity = Api.User | Api.Chat | Api.Channel | Api.TypeUser | Api.TypeChat;
 
@@ -1491,7 +1495,7 @@ export class TelegramService {
     text: string;
     sender: string;
     date: string;
-    media?: { type: string; fileName?: string; size?: number };
+    media?: MessageMediaInfo;
     reactions?: { emoji: string; count: number; me: boolean }[];
   } | null> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -1538,7 +1542,7 @@ export class TelegramService {
       id: number;
       date: string;
       text: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -1581,7 +1585,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -1635,7 +1639,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -1692,7 +1696,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -1985,9 +1989,7 @@ export class TelegramService {
   }
 
   /** Extract media info from a message */
-  private extractMediaInfo(
-    media: Api.TypeMessageMedia | undefined,
-  ): { type: string; fileName?: string; size?: number } | undefined {
+  private extractMediaInfo(media: Api.TypeMessageMedia | undefined): MessageMediaInfo | undefined {
     if (!media) return undefined;
     if (media instanceof Api.MessageMediaPhoto) {
       return { type: "photo" };
@@ -2003,6 +2005,10 @@ export class TelegramService {
         else if (attr instanceof Api.DocumentAttributeFilename) fileName = attr.fileName;
       }
       return { type, fileName, size: doc.size?.toJSNumber?.() ?? Number(doc.size) };
+    }
+    if (media instanceof Api.MessageMediaWebPage) {
+      // Instant View text is third-party page content: it goes here, never into the message text
+      return { type: "webpage", ...summarizeInstantView(media) };
     }
     return undefined;
   }
@@ -2038,7 +2044,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -2157,7 +2163,7 @@ export class TelegramService {
       sender: string;
       date: string;
       chat: { id: string; name: string; type: string; username?: string };
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -2244,7 +2250,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -3161,7 +3167,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {

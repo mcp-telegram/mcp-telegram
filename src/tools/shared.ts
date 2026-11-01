@@ -21,6 +21,26 @@ export function fail(e: unknown) {
   return { content: [{ type: "text" as const, text: `Error: ${sanitize(msg)}` }], isError: true as const };
 }
 
+/**
+ * Page text from a third party: one line, and square brackets swapped for round ones
+ * so the page cannot close the media label and fake a message line of its own.
+ */
+function oneLineThirdParty(text: string): string {
+  return text.replace(/\s+/g, " ").replace(/\[/g, "(").replace(/\]/g, ")").trim();
+}
+
+/**
+ * Format a message media descriptor like: [photo], [document: a.pdf], [webpage: Title | Instant View: ...].
+ * Instant View text comes from a third-party page, so it is labelled and kept on one line.
+ */
+export function formatMedia(media?: { type: string; fileName?: string; title?: string; text?: string }): string {
+  if (!media) return "";
+  const parts = [media.fileName ?? (media.title && oneLineThirdParty(media.title))];
+  if (media.text) parts.push(`Instant View: ${oneLineThirdParty(media.text)}`);
+  const details = parts.filter(Boolean).join(" | ");
+  return ` [${media.type}${details ? `: ${details}` : ""}]`;
+}
+
 /** Format reactions array into compact text like: [👍×5 ❤️×3(me) 🔥×1] */
 export function formatReactions(reactions?: { emoji: string; count: number; me: boolean }[]): string {
   if (!reactions?.length) return "";

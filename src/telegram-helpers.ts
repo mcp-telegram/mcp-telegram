@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import bigInt from "big-integer";
 import { Api } from "telegram/tl/index.js";
 import type { SavedMusicResponse } from "./tl/saved-music.js";
+import { type InstantViewSummary, summarizeInstantView } from "./webpage-preview.js";
 
 /**
  * Build an InputReplyToMessage from optional replyTo / topicId, matching the shape used by
@@ -475,6 +476,8 @@ export type UpdatesMessageSummary = {
   date: number;
   text: string;
   isService: boolean;
+  /** Instant View page behind a link preview: third-party content, not the author's text */
+  webpage?: InstantViewSummary;
 };
 
 export type UpdatesDifferenceSummary = {
@@ -511,7 +514,16 @@ function summarizeMessageForUpdates(msg: Api.TypeMessage): UpdatesMessageSummary
   const fromId = peerToCompact((msg as Api.Message | Api.MessageService).fromId);
   const date = (msg as Api.Message | Api.MessageService).date ?? 0;
   if (msg instanceof Api.Message) {
-    return { id: msg.id, peer, fromId, date, text: msg.message ?? "", isService: false };
+    const webpage = summarizeInstantView(msg.media);
+    return {
+      id: msg.id,
+      peer,
+      fromId,
+      date,
+      text: msg.message ?? "",
+      isService: false,
+      ...(webpage ? { webpage } : {}),
+    };
   }
   if (msg instanceof Api.MessageService) {
     return {
@@ -1237,6 +1249,8 @@ export type QuickReplyMessageSummary = {
   isService: boolean;
   fromId?: CompactPeer;
   replyToMsgId?: number;
+  /** Instant View page behind a link preview: third-party content, not the author's text */
+  webpage?: InstantViewSummary;
 };
 
 export type QuickReplyMessagesSummary = {
@@ -1252,6 +1266,7 @@ export function summarizeQuickReplyMessage(msg: Api.TypeMessage): QuickReplyMess
   const replyHeader = (base as Api.Message).replyTo;
   const replyToMsgId = replyHeader instanceof Api.MessageReplyHeader ? replyHeader.replyToMsgId : undefined;
   if (msg instanceof Api.Message) {
+    const webpage = summarizeInstantView(msg.media);
     return {
       id: msg.id,
       date: msg.date,
@@ -1259,6 +1274,7 @@ export function summarizeQuickReplyMessage(msg: Api.TypeMessage): QuickReplyMess
       isService: false,
       fromId,
       replyToMsgId,
+      ...(webpage ? { webpage } : {}),
     };
   }
   if (msg instanceof Api.MessageService) {

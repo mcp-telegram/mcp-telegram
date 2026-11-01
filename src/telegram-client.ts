@@ -89,6 +89,7 @@ import {
 } from "./telegram-helpers.js";
 import type { SavedMusicResponse } from "./tl/saved-music.js";
 import { GetSavedMusicRequest } from "./tl/saved-music.js";
+import { type InstantViewSummary, summarizeInstantView } from "./webpage-preview.js";
 
 export type {
   AllStoriesSummary,
@@ -346,6 +347,9 @@ function ensureSessionDir(filePath: string): void {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 }
+
+/** Media descriptor in message lists; `title`/`text` are Instant View page content, not the author's text. */
+export type MessageMediaInfo = { type: string; fileName?: string; size?: number } & InstantViewSummary;
 
 export type ChatEntity = Api.User | Api.Chat | Api.Channel | Api.TypeUser | Api.TypeChat;
 
@@ -1491,7 +1495,7 @@ export class TelegramService {
     text: string;
     sender: string;
     date: string;
-    media?: { type: string; fileName?: string; size?: number };
+    media?: MessageMediaInfo;
     reactions?: { emoji: string; count: number; me: boolean }[];
   } | null> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -1501,7 +1505,7 @@ export class TelegramService {
     if (!m || m.id !== messageId) return null;
     return {
       id: m.id,
-      text: this.extractMessageText(m),
+      text: m.message ?? "",
       sender: await this.resolveSenderName(m.senderId),
       date: new Date((m.date ?? 0) * 1000).toISOString(),
       media: this.extractMediaInfo(m.media),
@@ -1538,7 +1542,7 @@ export class TelegramService {
       id: number;
       date: string;
       text: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
     }>
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
@@ -1555,7 +1559,7 @@ export class TelegramService {
         .map((m) => ({
           id: m.id,
           date: new Date((m.date ?? 0) * 1000).toISOString(),
-          text: this.extractMessageText(m),
+          text: m.message ?? "",
           media: this.extractMediaInfo(m.media),
         }));
     }, `getScheduledMessages in ${chatId}`);
@@ -1581,7 +1585,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -1601,7 +1605,7 @@ export class TelegramService {
           .filter((m): m is Api.Message => m instanceof Api.Message)
           .map(async (m) => ({
             id: m.id,
-            text: this.extractMessageText(m),
+            text: m.message ?? "",
             sender: await this.resolveSenderName(m.senderId),
             date: new Date((m.date ?? 0) * 1000).toISOString(),
             media: this.extractMediaInfo(m.media),
@@ -1635,7 +1639,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -1662,7 +1666,7 @@ export class TelegramService {
           .filter((m): m is Api.Message => m instanceof Api.Message)
           .map(async (m) => ({
             id: m.id,
-            text: this.extractMessageText(m),
+            text: m.message ?? "",
             sender: await this.resolveSenderName(m.senderId),
             date: new Date((m.date ?? 0) * 1000).toISOString(),
             media: this.extractMediaInfo(m.media),
@@ -1692,7 +1696,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -1719,7 +1723,7 @@ export class TelegramService {
           .filter((m): m is Api.Message => m instanceof Api.Message)
           .map(async (m) => ({
             id: m.id,
-            text: this.extractMessageText(m),
+            text: m.message ?? "",
             sender: await this.resolveSenderName(m.senderId),
             date: new Date((m.date ?? 0) * 1000).toISOString(),
             media: this.extractMediaInfo(m.media),
@@ -1984,144 +1988,8 @@ export class TelegramService {
     return { id: chatId, name: "Unknown", type: "unknown" };
   }
 
-  /** Flatten Telegram rich text while preserving the visible character order. */
-  private extractRichText(text: Api.TypeRichText): string {
-    if (text instanceof Api.TextPlain) return text.text;
-    if (text instanceof Api.TextConcat) {
-      return text.texts.map((part) => this.extractRichText(part)).join("");
-    }
-    if ("text" in text) return this.extractRichText(text.text);
-    return "";
-  }
-
-  private joinVisibleText(parts: Array<string | undefined>, separator = "\n\n"): string {
-    return parts
-      .map((part) => part?.trim())
-      .filter((part): part is string => Boolean(part))
-      .join(separator);
-  }
-
-  private extractPageCaption(caption: Api.TypePageCaption): string {
-    if (!(caption instanceof Api.PageCaption)) return "";
-    return this.joinVisibleText([this.extractRichText(caption.text), this.extractRichText(caption.credit)]);
-  }
-
-  /** Flatten the content Telegram renders in an Instant View page block. */
-  private extractPageBlock(block: Api.TypePageBlock): string {
-    if (block instanceof Api.PageBlockList) {
-      return block.items
-        .map((item) => {
-          const text =
-            item instanceof Api.PageListItemText
-              ? this.extractRichText(item.text)
-              : item instanceof Api.PageListItemBlocks
-                ? this.extractPageBlocks(item.blocks)
-                : "";
-          return text ? `• ${text}` : "";
-        })
-        .filter(Boolean)
-        .join("\n");
-    }
-
-    if (block instanceof Api.PageBlockOrderedList) {
-      return block.items
-        .map((item) => {
-          const text =
-            item instanceof Api.PageListOrderedItemText
-              ? this.extractRichText(item.text)
-              : item instanceof Api.PageListOrderedItemBlocks
-                ? this.extractPageBlocks(item.blocks)
-                : "";
-          return text ? `${item.num} ${text}`.trim() : "";
-        })
-        .filter(Boolean)
-        .join("\n");
-    }
-
-    if (block instanceof Api.PageBlockBlockquote || block instanceof Api.PageBlockPullquote) {
-      return this.joinVisibleText([this.extractRichText(block.text), this.extractRichText(block.caption)]);
-    }
-
-    if (block instanceof Api.PageBlockAuthorDate) return this.extractRichText(block.author);
-    if (block instanceof Api.PageBlockCover) return this.extractPageBlock(block.cover);
-
-    if (block instanceof Api.PageBlockEmbedPost) {
-      return this.joinVisibleText([
-        block.author,
-        this.extractPageBlocks(block.blocks),
-        this.extractPageCaption(block.caption),
-      ]);
-    }
-
-    if (block instanceof Api.PageBlockCollage || block instanceof Api.PageBlockSlideshow) {
-      return this.joinVisibleText([this.extractPageBlocks(block.items), this.extractPageCaption(block.caption)]);
-    }
-
-    if (block instanceof Api.PageBlockTable) {
-      const rows = block.rows
-        .map((row) =>
-          row.cells
-            .map((cell) => (cell.text ? this.extractRichText(cell.text) : ""))
-            .filter(Boolean)
-            .join("\t"),
-        )
-        .filter(Boolean)
-        .join("\n");
-      return this.joinVisibleText([this.extractRichText(block.title), rows]);
-    }
-
-    if (block instanceof Api.PageBlockDetails) {
-      return this.joinVisibleText([this.extractRichText(block.title), this.extractPageBlocks(block.blocks)]);
-    }
-
-    if (block instanceof Api.PageBlockRelatedArticles) {
-      const articles = block.articles
-        .map((article) => this.joinVisibleText([article.title, article.description, article.author], " — "))
-        .filter(Boolean)
-        .join("\n");
-      return this.joinVisibleText([this.extractRichText(block.title), articles]);
-    }
-
-    if (
-      block instanceof Api.PageBlockPhoto ||
-      block instanceof Api.PageBlockVideo ||
-      block instanceof Api.PageBlockEmbed ||
-      block instanceof Api.PageBlockAudio ||
-      block instanceof Api.PageBlockMap
-    ) {
-      return this.extractPageCaption(block.caption);
-    }
-
-    if ("text" in block) return this.extractRichText(block.text);
-    return "";
-  }
-
-  private extractPageBlocks(blocks: Api.TypePageBlock[]): string {
-    return this.joinVisibleText(blocks.map((block) => this.extractPageBlock(block)));
-  }
-
-  /** Return the text Telegram clients render for a message. */
-  private extractMessageText(message: Api.Message): string {
-    const text = message.message ?? "";
-    if (text.length > 0) return text;
-
-    const media = message.media;
-    if (media instanceof Api.MessageMediaWebPage && media.webpage instanceof Api.WebPage) {
-      const cachedPage = media.webpage.cachedPage;
-      if (cachedPage instanceof Api.Page) {
-        const cachedPageText = this.extractPageBlocks(cachedPage.blocks);
-        if (cachedPageText) return cachedPageText;
-      }
-      return this.joinVisibleText([media.webpage.title, media.webpage.description]);
-    }
-
-    return text;
-  }
-
   /** Extract media info from a message */
-  private extractMediaInfo(
-    media: Api.TypeMessageMedia | undefined,
-  ): { type: string; fileName?: string; size?: number } | undefined {
+  private extractMediaInfo(media: Api.TypeMessageMedia | undefined): MessageMediaInfo | undefined {
     if (!media) return undefined;
     if (media instanceof Api.MessageMediaPhoto) {
       return { type: "photo" };
@@ -2139,7 +2007,8 @@ export class TelegramService {
       return { type, fileName, size: doc.size?.toJSNumber?.() ?? Number(doc.size) };
     }
     if (media instanceof Api.MessageMediaWebPage) {
-      return { type: "webpage" };
+      // Instant View text is third-party page content: it goes here, never into the message text
+      return { type: "webpage", ...summarizeInstantView(media) };
     }
     return undefined;
   }
@@ -2175,7 +2044,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -2194,7 +2063,7 @@ export class TelegramService {
     const results = await Promise.all(
       filtered.map(async (m) => ({
         id: m.id,
-        text: this.extractMessageText(m),
+        text: m.message ?? "",
         sender: await this.resolveSenderName(m.senderId),
         date: new Date((m.date ?? 0) * 1000).toISOString(),
         media: this.extractMediaInfo(m.media),
@@ -2294,7 +2163,7 @@ export class TelegramService {
       sender: string;
       date: string;
       chat: { id: string; name: string; type: string; username?: string };
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -2357,7 +2226,7 @@ export class TelegramService {
 
         return {
           id: m.id,
-          text: this.extractMessageText(m),
+          text: m.message ?? "",
           sender: await this.resolveSenderName(m.senderId),
           date: new Date((m.date ?? 0) * 1000).toISOString(),
           chat: chatsMap.get(chatId) || { id: chatId, name: "Unknown", type: "unknown" },
@@ -2381,7 +2250,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -2399,7 +2268,7 @@ export class TelegramService {
     const results = await Promise.all(
       filtered.map(async (m) => ({
         id: m.id,
-        text: this.extractMessageText(m),
+        text: m.message ?? "",
         sender: await this.resolveSenderName(m.senderId),
         date: new Date((m.date ?? 0) * 1000).toISOString(),
         media: this.extractMediaInfo(m.media),
@@ -3298,7 +3167,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
-      media?: { type: string; fileName?: string; size?: number };
+      media?: MessageMediaInfo;
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
@@ -3324,7 +3193,7 @@ export class TelegramService {
         .filter((m): m is Api.Message => m instanceof Api.Message)
         .map(async (m) => ({
           id: m.id,
-          text: this.extractMessageText(m),
+          text: m.message ?? "",
           sender: await this.resolveSenderName(m.senderId),
           date: new Date((m.date ?? 0) * 1000).toISOString(),
           media: this.extractMediaInfo(m.media),

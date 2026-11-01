@@ -13,7 +13,7 @@ import { computeCheck } from "telegram/Password.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
 import { getInputUser } from "telegram/Utils.js";
-import { RateLimiter } from "./rate-limiter.js";
+import { FLOOD_WAIT_ERROR_PREFIX, RateLimiter } from "./rate-limiter.js";
 import type {
   AllStoriesSummary,
   BoostsListSummary,
@@ -351,6 +351,16 @@ function ensureSessionDir(filePath: string): void {
 /** Media descriptor in message lists; `title`/`text` are Instant View page content, not the author's text. */
 export type MessageMediaInfo = { type: string; fileName?: string; size?: number } & InstantViewSummary;
 
+/** Position in a forum topic list for channels.GetForumTopics */
+type ForumTopicsCursor = { offsetDate: number; offsetId: number; offsetTopic: number };
+/** Time for reading topics in one call; what is left is reported as remaining */
+const FORUM_READ_TIME_BUDGET_MS = 20_000;
+
+/** Forum mark-as-read looks at most at this many pages of 100 topics */
+const FORUM_READ_MAX_PAGES = 5;
+/** Topics marked per call: each one is a request, so the rest waits for the next call instead of risking FloodWait */
+const FORUM_READ_MAX_TOPICS = 100;
+
 export type ChatEntity = Api.User | Api.Chat | Api.Channel | Api.TypeUser | Api.TypeChat;
 
 const NUMERIC_ID_RE = /^-?\d+$/;
@@ -388,6 +398,8 @@ export class TelegramService {
   private rateLimiter = new RateLimiter();
   private lastTypingAt = new Map<string, number>();
   private entityCache = new Map<string, ChatEntity>();
+  /** Where an unfinished forum mark-as-read scan stopped, by channel id */
+  private forumReadCursors = new Map<string, ForumTopicsCursor>();
   lastError = "";
 
   get sessionDir(): string {
@@ -1381,7 +1393,12 @@ export class TelegramService {
   > {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const dialogs = await this.client.getDialogs({ limit: limit * 3 });
-    const unread = dialogs.filter((d) => d.unreadCount > 0).slice(0, limit);
+    // A forum keeps unread counters per topic, so the chat counter can be 0 while topics are unread;
+    // forums are checked topic by topic below and dropped there if nothing is unread, so the limit
+    // is applied after that check
+    const unread = dialogs.filter(
+      (d) => d.unreadCount > 0 || (d.entity instanceof Api.Channel && Boolean(d.entity.forum)),
+    );
     const results = await Promise.all(
       unread.map(async (d) => {
         const isUser = d.entity instanceof Api.User;
@@ -1410,13 +1427,14 @@ export class TelegramService {
               topics: unreadTopics.length > 0 ? unreadTopics : undefined,
             };
           } catch {
-            return { ...base, forum: true };
+            // Topics unknown: only the chat counter is left to go by
+            return d.unreadCount > 0 ? { ...base, forum: true } : null;
           }
         }
         return base;
       }),
     );
-    return results.filter((r) => r !== null);
+    return results.filter((r) => r !== null).slice(0, limit);
   }
 
   async getContactRequests(limit = 20): Promise<
@@ -1482,9 +1500,113 @@ export class TelegramService {
 
   // ─── Read state ────────────────────────────────────────────────────────────
 
-  async markAsRead(chatId: string): Promise<void> {
+  /**
+   * Mark a chat as read. In a forum the chat history and each topic keep their own read state,
+   * so every topic that still has unread messages is read separately, like the official apps do.
+   */
+  async markAsRead(chatId: string): Promise<{
+    topicsMarked?: number;
+    topicsFailed?: number;
+    topicError?: string;
+    topicsRemaining?: number;
+    topicsNotChecked?: boolean;
+  }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    await this.client.markAsRead(chatId);
+    const client = this.client;
+    const entity = await this.resolveChat(chatId);
+    await client.markAsRead(entity);
+    if (!(entity instanceof Api.Channel) || !entity.forum) return {};
+
+    // A scan stopped by the page cap resumes where it ended, so repeated calls reach every topic
+    const channelKey = entity.id.toString();
+    const scan = await this.listForumTopicsForRead(entity, this.forumReadCursors.get(channelKey));
+    const allUnread = scan.topics.filter((t) => t.unreadCount > 0);
+    let topicsMarked = 0;
+    let topicsFailed = 0;
+    let topicError: string | undefined;
+    // GramJS sleeps through FloodWaits up to 60 s on its own, so the loop also has a time budget
+    const deadline = Date.now() + FORUM_READ_TIME_BUDGET_MS;
+    for (const topic of allUnread.slice(0, FORUM_READ_MAX_TOPICS)) {
+      if (Date.now() > deadline) break;
+      try {
+        await this.rateLimiter.execute(
+          () =>
+            client.invoke(
+              new Api.messages.ReadDiscussion({ peer: entity, msgId: topic.id, readMaxId: topic.topMessage }),
+            ),
+          `markAsRead topic ${topic.id} in ${chatId}`,
+          // Waiting out a FloodWait per topic could hang the call for minutes and then keep sending
+          { throwOnFloodWait: true },
+        );
+        topicsMarked++;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        // Telegram asked to slow down: stop here, the rest is reported as remaining
+        if (message.startsWith(FLOOD_WAIT_ERROR_PREFIX)) {
+          topicError = message;
+          break;
+        }
+        // One broken topic must not leave the rest unread; report the count and the first cause
+        topicsFailed++;
+        topicError ??= message;
+      }
+    }
+    const topicsRemaining = allUnread.length - topicsMarked - topicsFailed;
+    // Move on to the next range only when this one is fully read; otherwise the next call rescans it
+    if (topicsRemaining === 0 && topicsFailed === 0) {
+      if (scan.next) this.forumReadCursors.set(channelKey, scan.next);
+      else this.forumReadCursors.delete(channelKey);
+    }
+    return {
+      topicsMarked,
+      ...(topicsFailed > 0 ? { topicsFailed } : {}),
+      ...(topicError ? { topicError } : {}),
+      ...(topicsRemaining > 0 ? { topicsRemaining } : {}),
+      // Topics past the scan cap were not looked at yet: say so instead of reporting the forum as done
+      ...(scan.next ? { topicsNotChecked: true } : {}),
+    };
+  }
+
+  /**
+   * Topics of a forum with their read state, from `from` (or the start) for at most FORUM_READ_MAX_PAGES pages.
+   * `next` is set when the list goes on past the cap.
+   */
+  private async listForumTopicsForRead(
+    channel: Api.Channel,
+    from?: ForumTopicsCursor,
+  ): Promise<{ topics: Array<{ id: number; topMessage: number; unreadCount: number }>; next?: ForumTopicsCursor }> {
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
+    const pageSize = 100;
+    const out: Array<{ id: number; topMessage: number; unreadCount: number }> = [];
+    let cursor: ForumTopicsCursor = from ?? { offsetDate: 0, offsetId: 0, offsetTopic: 0 };
+    for (let page = 0; page < FORUM_READ_MAX_PAGES; page++) {
+      const result = await this.client.invoke(
+        new Api.channels.GetForumTopics({
+          channel,
+          limit: pageSize,
+          offsetDate: cursor.offsetDate,
+          offsetId: cursor.offsetId,
+          offsetTopic: cursor.offsetTopic,
+        }),
+      );
+      const topics = result.topics.filter((t): t is Api.ForumTopic => t instanceof Api.ForumTopic);
+      for (const t of topics) out.push({ id: t.id, topMessage: t.topMessage, unreadCount: t.unreadCount });
+      const last = topics.at(-1);
+      // Only an empty page is the end: the server may return fewer topics than asked, and the total
+      // count changes as topics are deleted. A cursor that does not move would loop, so it ends the scan too.
+      if (!last || last.id === cursor.offsetTopic) return { topics: out };
+      // The cursor follows the order the server used: by creation date, or by the last message
+      const lastMessage = result.messages.find((m) => m.id === last.topMessage);
+      cursor = {
+        offsetDate:
+          !result.orderByCreateDate && (lastMessage instanceof Api.Message || lastMessage instanceof Api.MessageService)
+            ? lastMessage.date
+            : last.date,
+        offsetId: last.topMessage,
+        offsetTopic: last.id,
+      };
+    }
+    return { topics: out, next: cursor };
   }
 
   async getMessageById(

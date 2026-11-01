@@ -522,7 +522,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-mark-as-read",
     {
-      description: "Mark a Telegram chat as read",
+      description: "Mark a Telegram chat as read. In a forum, every topic with unread messages is marked read too",
       inputSchema: { chatId: z.string().describe("Chat ID or username") },
       annotations: WRITE,
     },
@@ -531,8 +531,21 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       if (err) return fail(new Error(err));
 
       try {
-        await telegram.markAsRead(chatId);
-        return ok(`Marked ${chatId} as read`);
+        const result = await telegram.markAsRead(chatId);
+        let text = `Marked ${chatId} as read`;
+        if (result.topicsMarked !== undefined) text += ` (${result.topicsMarked} unread topics marked)`;
+        if (result.topicsFailed) {
+          text += `. ${result.topicsFailed} topics could not be marked: ${result.topicError}`;
+        } else if (result.topicError) {
+          text += `. Stopped early: ${result.topicError}`;
+        }
+        if (result.topicsRemaining) {
+          text += `. ${result.topicsRemaining} more unread topics left, call again to mark them`;
+        }
+        if (result.topicsNotChecked) {
+          text += ". The forum has more topics than one call checks; call again to continue with the rest";
+        }
+        return ok(text);
       } catch (e) {
         return fail(e);
       }

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.2](https://github.com/mcp-telegram/mcp-telegram/compare/v1.44.1...v1.44.2) (2026-11-01)
+
+
+### Fixed
+
+* **messages:** mark every unread forum topic read and list forums with unread topics ([#124](https://github.com/mcp-telegram/mcp-telegram/issues/124)) ([b473b84](https://github.com/mcp-telegram/mcp-telegram/commit/b473b84bd59c3c2922d0bdc1734ee71f1acd5e63))
+* **messages:** return Instant View text as labelled webpage media ([#77](https://github.com/mcp-telegram/mcp-telegram/issues/77)) ([7edebde](https://github.com/mcp-telegram/mcp-telegram/commit/7edebde3599d255ac8e878922fd71dc1c7679668))
+
 ## [1.44.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.44.0...v1.44.1) (2026-10-26)
 
 

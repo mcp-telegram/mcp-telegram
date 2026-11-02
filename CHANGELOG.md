@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.45.0...v1.45.1) (2026-11-02)
+
+
+### Fixed
+
+* **security:** tighten the session folder on start, run the daemon unit with systemd hardening, ship binaries with checksums and provenance ([#129](https://github.com/mcp-telegram/mcp-telegram/issues/129)) ([fa3c61b](https://github.com/mcp-telegram/mcp-telegram/commit/fa3c61b21d320ee2f04f294711d1944b920dd267))
+
 ## [1.45.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.44.2...v1.45.0) (2026-11-02)
 
 

@@ -280,6 +280,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Build provenance for the compiled binaries (see the attest step).
+      id-token: write
+      attestations: write
     strategy:
       matrix:
         include:
@@ -341,12 +344,11 @@ jobs:
           bun-version: "1.4.4"
           no-cache: true
 
-      # Compile-only job — no registry publish. Tolerate lockfile drift so a
-      # patch bump to package.json doesn't block standalone binary publishing
-      # while bun.lock catches up. Dependency tree is already validated by
-      # publish-npm above (npm ci + package-lock.json).
+      # Frozen: the binaries embed every dependency, so they must be built from
+      # the reviewed bun.lock, not from whatever the semver ranges resolve to
+      # today (audit 2026-11-02). CI already checks that bun.lock is in sync.
       - if: steps.tag.outputs.name != ''
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Compile MCP server binary
         if: steps.tag.outputs.name != ''
@@ -360,12 +362,29 @@ jobs:
           "bun build src/qr-login-cli.ts --compile --target ${{ matrix.target \
           }} --outfile ${{ matrix.login }}"
 
+      # Users can check what they downloaded: a SHA-256 file next to each
+      # binary, and a signed build-provenance attestation
+      # (`gh attestation verify <file> --repo mcp-telegram/mcp-telegram`).
+      - name: Checksums
+        if: steps.tag.outputs.name != ''
+        run: |
+          sha256sum ${{ matrix.server }} > ${{ matrix.server }}.sha256
+          sha256sum ${{ matrix.login }} > ${{ matrix.login }}.sha256
+
+      # v4.2.2
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+        if: steps.tag.outputs.name != ''
+        with:
+          subject-path: |
+            ${{ matrix.server }}
+            ${{ matrix.login }}
+
       - name: Upload binaries to release
         if: steps.tag.outputs.name != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ steps.tag.outputs.name }} \
-          ${{ matrix.server }} --clobber
+          ${{ matrix.server }} ${{ matrix.server }}.sha256 --clobber
           gh release upload ${{ steps.tag.outputs.name }} ${{ matrix.login }} \
-          --clobber
+          ${{ matrix.login }}.sha256 --clobber

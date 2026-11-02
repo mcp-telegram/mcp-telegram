@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { chmod, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -13,6 +13,7 @@ import { computeCheck } from "telegram/Password.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
 import { getInputUser } from "telegram/Utils.js";
+import { secureSessionDir } from "./lock.js";
 import { FLOOD_WAIT_ERROR_PREFIX, RateLimiter } from "./rate-limiter.js";
 import type {
   AllStoriesSummary,
@@ -342,10 +343,7 @@ function resolveBaseLogger(): Logger {
 }
 
 function ensureSessionDir(filePath: string): void {
-  const dir = dirname(filePath);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-  }
+  secureSessionDir(dirname(filePath));
 }
 
 /** Media descriptor in message lists; `title`/`text` are Instant View page content, not the author's text. */

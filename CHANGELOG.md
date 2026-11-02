@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.44.2...v1.45.0) (2026-11-02)
+
+
+### Added
+
+* **security:** restrict file tools to safe folders and keep chat text from forging output lines ([#126](https://github.com/mcp-telegram/mcp-telegram/issues/126)) ([cec1489](https://github.com/mcp-telegram/mcp-telegram/commit/cec1489096ca8e11e330a3f0e1138409094e27c4))
+
 ## [1.44.2](https://github.com/mcp-telegram/mcp-telegram/compare/v1.44.1...v1.44.2) (2026-11-01)
 
 

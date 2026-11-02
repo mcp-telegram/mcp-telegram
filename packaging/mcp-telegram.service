@@ -24,6 +24,22 @@ EnvironmentFile=/etc/mcp-telegram.env
 ExecStart=/usr/bin/node /opt/mcp-telegram/dist/cli.js serve
 Restart=always
 RestartSec=2
+# Hardening that keeps the user and file locations as they are. For more, run the
+# daemon as a dedicated account (User=mcp-telegram, its own TELEGRAM_SESSION_PATH)
+# and add ProtectHome=read-only plus ReadWritePaths= for the session and download
+# folders.
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictRealtime=yes
 
 [Install]
 WantedBy=multi-user.target

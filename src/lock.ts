@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -9,6 +9,37 @@ function resolveSessionDir(): string {
   const sessionPath = process.env.TELEGRAM_SESSION_PATH;
   if (sessionPath) return dirname(sessionPath);
   return DEFAULT_SESSION_DIR;
+}
+
+/**
+ * Create the session folder as 0700, or tighten an existing one. The dedicated default
+ * folder (~/.mcp-telegram) is made 0700; it used to keep whatever mode it was created
+ * with (seen as 0775), so another account in the group could swap daemon.sock or
+ * daemon.lock. A custom folder (TELEGRAM_SESSION_PATH in, say, ~/Documents) is shared
+ * with other files, so it only loses group/other write. No-op on Windows.
+ */
+export function secureSessionDir(dir: string, dedicatedDir = DEFAULT_SESSION_DIR): void {
+  // Create-or-keep in one call, then always check: no window between "missing" and
+  // "created" in which another process could plant a wider folder.
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  if (process.platform === "win32") return;
+  let mode: number;
+  try {
+    mode = statSync(dir).mode & 0o7777;
+  } catch {
+    return;
+  }
+  // Shared folder: drop only group/other write, keep setgid/sticky and read access.
+  const wanted = dir === dedicatedDir ? 0o700 : mode & ~0o022;
+  if (mode === wanted) return;
+  try {
+    chmodSync(dir, wanted);
+  } catch (e) {
+    // stderr: stdout is the MCP channel. Best effort, but never silent.
+    console.error(
+      `[mcp-telegram] could not tighten permissions of ${dir} (${(e as Error).message}); other accounts may be able to replace session files there`,
+    );
+  }
 }
 
 export function lockPath(): string {
@@ -52,9 +83,7 @@ export function tryAcquireLock(): boolean {
   const lock = lockPath();
   const dir = dirname(lock);
 
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-  }
+  secureSessionDir(dir);
 
   if (existsSync(lock)) {
     try {

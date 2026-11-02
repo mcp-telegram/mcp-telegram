@@ -14,6 +14,9 @@ on:
 
 jobs:
   publish-npm:
+    # Release tags only (environment policy + tag ruleset): a branch dispatch
+    # by anyone with write access cannot publish.
+    environment: release
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,6 +67,9 @@ jobs:
           exit 1
 
   publish-mcp-registry:
+    # Release tags only (environment policy + tag ruleset): a branch dispatch
+    # by anyone with write access cannot publish.
+    environment: release
     # Publish server metadata to the official MCP Registry
     # (registry.modelcontextprotocol.io).
     # Runs after publish-npm so the npm package the registry verifies ownership
@@ -79,8 +85,8 @@ jobs:
       id-token: write
     steps:
       # Check out the triggering ref (the release tag on a release event or a
-      # dispatch on the tag, main on a manual dispatch without --ref) — NOT the
-      # resolved tag. Unlike publish-binaries (which checks out the tag so
+      # dispatch on the tag; since the `release` environment admits only v* tags,
+      # a dispatch from main no longer runs) — NOT the resolved tag. Unlike publish-binaries (which checks out the tag so
       # compiled
       # binaries match released code), we publish *metadata*: server.json lives
       # on main
@@ -174,11 +180,18 @@ jobs:
         if:
           "steps.ver.outputs.version != '' && steps.exists.outputs.found != 't\
           rue'"
+        # Pinned version + checksum: this job holds an OIDC token, so a swapped
+        # "latest" binary must not be able to run here. Bump both together.
+        env:
+          PUBLISHER_VERSION: v1.8.7
+          PUBLISHER_SHA256:
+            00b21004149a4ce66f0782508ae4a2bce67d1bea395a8da0bd8028159fb59579
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/l\
-          atest/download/mcp-publisher_$(uname -s | tr '[:upper:]' \
-          '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').ta\
-          r.gz" | tar xz mcp-publisher
+          curl -fsSL -o mcp-publisher.tar.gz "https://github.com/modelcontext\
+          protocol/registry/releases/download/${PUBLISHER_VERSION}/mcp-publish\
+          er_linux_amd64.tar.gz"
+          echo "${PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
       - name: Pin server.json version to the release tag
         if:
           "steps.ver.outputs.version != '' && steps.exists.outputs.found != 't\
@@ -216,6 +229,9 @@ jobs:
           exit 1
 
   publish-docker:
+    # Release tags only (environment policy + tag ruleset): a branch dispatch
+    # by anyone with write access cannot publish.
+    environment: release
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -246,6 +262,9 @@ jobs:
             steps.version.outputs.version }}
 
   publish-binaries:
+    # Release tags only (environment policy + tag ruleset): a branch dispatch
+    # by anyone with write access cannot publish.
+    environment: release
     # Runs for both `release: published` and a manual `workflow_dispatch` on a
     # tag.
     # release-please creates the GitHub Release with the default GITHUB_TOKEN,

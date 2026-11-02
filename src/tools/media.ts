@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
+import { checkReadablePath, prepareWritablePath, releaseReservedPath } from "./file-access.js";
 import { fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
 
 export function registerMediaTools(server: McpServer, telegram: TelegramService) {
@@ -10,7 +11,11 @@ export function registerMediaTools(server: McpServer, telegram: TelegramService)
       description: "Send a file (photo, document, video, etc.) to a Telegram chat",
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
-        filePath: z.string().describe("Absolute path to file"),
+        filePath: z
+          .string()
+          .describe(
+            "Absolute path to a file under the home or temp folder (hidden folders are refused), or an http(s) URL",
+          ),
         caption: z.string().optional().describe("File caption"),
       },
       annotations: WRITE,
@@ -20,7 +25,11 @@ export function registerMediaTools(server: McpServer, telegram: TelegramService)
       if (err) return fail(new Error(err));
 
       try {
-        await telegram.sendFile(chatId, filePath, caption);
+        // http(s) URLs are fetched by Telegram's servers, not read locally.
+        const source = /^https?:\/\//i.test(filePath)
+          ? filePath
+          : await checkReadablePath(filePath, telegram.credentialFiles);
+        await telegram.sendFile(chatId, source, caption);
         return ok(`File sent to ${chatId}`);
       } catch (e) {
         return fail(e);
@@ -35,7 +44,11 @@ export function registerMediaTools(server: McpServer, telegram: TelegramService)
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
         messageId: z.number().describe("Message ID containing media"),
-        downloadPath: z.string().describe("Absolute path to save file"),
+        downloadPath: z
+          .string()
+          .describe(
+            "Absolute path to save the file, in Downloads, Desktop, Documents or a temp folder. An existing file is kept; a numbered name is used instead",
+          ),
       },
       annotations: READ_ONLY,
     },
@@ -43,10 +56,13 @@ export function registerMediaTools(server: McpServer, telegram: TelegramService)
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
+      let target: string | undefined;
       try {
-        const path = await telegram.downloadMedia(chatId, messageId, downloadPath);
+        target = await prepareWritablePath(downloadPath, telegram.credentialFiles);
+        const path = await telegram.downloadMedia(chatId, messageId, target);
         return ok(`Media downloaded to ${path}`);
       } catch (e) {
+        if (target) await releaseReservedPath(target);
         return fail(e);
       }
     },
@@ -59,7 +75,12 @@ export function registerMediaTools(server: McpServer, telegram: TelegramService)
         "Download profile photo of a Telegram user, group, or channel. Returns inline image or saves to file",
       inputSchema: {
         entityId: z.string().describe("User/Chat/Channel ID or username"),
-        savePath: z.string().optional().describe("Absolute path to save file. If omitted, returns inline base64 image"),
+        savePath: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to save the file (Downloads, Desktop, Documents or a temp folder). If omitted, returns inline base64 image",
+          ),
         size: z
           .enum(["small", "big"])
           .optional()
@@ -71,13 +92,16 @@ export function registerMediaTools(server: McpServer, telegram: TelegramService)
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
+      let target: string | undefined;
       try {
+        target = savePath ? await prepareWritablePath(savePath, telegram.credentialFiles) : undefined;
         const result = await telegram.downloadProfilePhoto(entityId, {
           isBig: size !== "small",
-          savePath,
+          savePath: target,
         });
 
         if (!result) {
+          if (target) await releaseReservedPath(target);
           return ok("No profile photo found");
         }
 
@@ -95,6 +119,7 @@ export function registerMediaTools(server: McpServer, telegram: TelegramService)
           ],
         };
       } catch (e) {
+        if (target) await releaseReservedPath(target);
         return fail(e);
       }
     },

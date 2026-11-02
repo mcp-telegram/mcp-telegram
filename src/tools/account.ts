@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
+import { checkReadablePath } from "./file-access.js";
 import {
   ABSOLUTE_PATH_ERROR,
   DESTRUCTIVE,
@@ -688,7 +689,8 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
       try {
-        const { id } = await telegram.setProfilePhoto({ filePath, isVideo, videoStartTs, fallback });
+        const source = await checkReadablePath(filePath, telegram.credentialFiles);
+        const { id } = await telegram.setProfilePhoto({ filePath: source, isVideo, videoStartTs, fallback });
         const label = fallback ? "Fallback profile photo" : "Profile photo";
         return ok(`${label} updated [id=${id}]`);
       } catch (e) {

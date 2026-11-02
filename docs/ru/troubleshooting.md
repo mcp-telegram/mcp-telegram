@@ -1,5 +1,15 @@
 # Решение проблем
 
+## «Refusing to read» / «Refusing to write» при работе с файлом
+
+Инструменты читают файлы только из домашней папки и временных папок, а скачанное сохраняют в `Downloads`, `Desktop`, `Documents` или временные папки. Скрытые файлы и папки, `~/Library`, `~/AppData` и файл сессии недоступны всегда: сообщение в чате не сможет заставить ассистента отправить ваши учётные данные или перезаписать профиль оболочки.
+
+Чтобы разрешить другую папку, перечислите нужные папки в `MCP_TELEGRAM_FILE_DIRS` (через `:`, в Windows через `;`). Переменная заменяет список по умолчанию:
+
+```bash
+claude mcp add telegram -s user -e MCP_TELEGRAM_FILE_DIRS=/data/exports:/tmp ... -- npx @overpod/mcp-telegram
+```
+
 ## AUTH_KEY_DUPLICATED
 
 **Проблема:** Ошибка `AUTH_KEY_DUPLICATED`.

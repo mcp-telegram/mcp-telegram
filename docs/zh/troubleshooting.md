@@ -1,5 +1,15 @@
 # 故障排除
 
+## 文件提示 "Refusing to read" / "Refusing to write"
+
+文件工具只读取主目录和临时目录中的文件，下载内容只保存到 `Downloads`、`Desktop`、`Documents` 或临时目录。隐藏文件和文件夹、`~/Library`、`~/AppData` 以及会话文件始终被拒绝，因此聊天中的消息无法让助手上传您的凭据或覆盖 shell 配置文件。
+
+如需使用其他文件夹，请在 `MCP_TELEGRAM_FILE_DIRS` 中列出（用 `:` 分隔，Windows 上用 `;`）。它会替换默认列表：
+
+```bash
+claude mcp add telegram -s user -e MCP_TELEGRAM_FILE_DIRS=/data/exports:/tmp ... -- npx @overpod/mcp-telegram
+```
+
 ## AUTH_KEY_DUPLICATED
 
 **问题：** 出现 `AUTH_KEY_DUPLICATED` 错误。

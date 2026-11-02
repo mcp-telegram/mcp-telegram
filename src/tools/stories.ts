@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
+import { checkReadablePath } from "./file-access.js";
 import {
   ABSOLUTE_PATH_ERROR,
   DESTRUCTIVE,
@@ -208,7 +209,8 @@ export function registerStoryTools(server: McpServer, telegram: TelegramService)
         return fail(new Error("privacy='selected' requires at least one user ID in allowUserIds"));
       }
       try {
-        const result = await telegram.sendStory(chatId, filePath, {
+        const source = await checkReadablePath(filePath, telegram.credentialFiles);
+        const result = await telegram.sendStory(chatId, source, {
           type,
           caption,
           parseMode,
@@ -263,8 +265,9 @@ export function registerStoryTools(server: McpServer, telegram: TelegramService)
         return fail(new Error("privacy='selected' requires at least one user ID in allowUserIds"));
       }
       try {
+        const source = filePath ? await checkReadablePath(filePath, telegram.credentialFiles) : undefined;
         const result = await telegram.editStory(chatId, storyId, {
-          filePath,
+          filePath: source,
           type,
           caption,
           parseMode,

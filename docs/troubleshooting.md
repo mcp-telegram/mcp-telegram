@@ -1,5 +1,15 @@
 # Troubleshooting
 
+## "Refusing to read" / "Refusing to write" a file
+
+File tools only read files under your home folder and temp folders, and save downloads to `Downloads`, `Desktop`, `Documents` or temp folders. Hidden files and folders, `~/Library`, `~/AppData` and the session file are always refused, so a message in a chat cannot make the assistant upload your credentials or overwrite your shell profile.
+
+To use another folder, set `MCP_TELEGRAM_FILE_DIRS` to the folders you need (separated by `:`, or `;` on Windows). It replaces the default list:
+
+```bash
+claude mcp add telegram -s user -e MCP_TELEGRAM_FILE_DIRS=/data/exports:/tmp ... -- npx @overpod/mcp-telegram
+```
+
 ## AUTH_KEY_DUPLICATED
 
 **Problem:** You see `AUTH_KEY_DUPLICATED` error.

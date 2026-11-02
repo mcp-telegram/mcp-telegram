@@ -7,7 +7,9 @@ import {
   fail,
   formatMedia,
   formatReactions,
+  messageText,
   ok,
+  oneLine,
   READ_ONLY,
   requireConnection,
   sanitize,
@@ -104,7 +106,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
         const text = messages
           .map(
             (m) =>
-              `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
+              `[#${m.id}] [${m.date}] ${oneLine(m.sender)}: ${messageText(m.text)}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
         return ok(text || "No messages");
@@ -136,7 +138,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
         const text = messages
           .map(
             (m) =>
-              `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
+              `[#${m.id}] [${m.date}] ${oneLine(m.sender)}: ${messageText(m.text)}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
         return ok(text || "No messages found");
@@ -167,7 +169,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
         const text = messages
           .map(
             (m) =>
-              `[#${m.id}] [${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${m.chat.name}${m.chat.username ? ` @${m.chat.username}` : ""}] ${m.sender}: ${m.text}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
+              `[#${m.id}] [${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${oneLine(m.chat.name)}${m.chat.username ? ` @${m.chat.username}` : ""}] ${oneLine(m.sender)}: ${messageText(m.text)}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
         return ok(text || "No messages found");
@@ -304,7 +306,9 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
 
       try {
         const messages = await telegram.getScheduledMessages(chatId);
-        const text = messages.map((m) => `[#${m.id}] [${m.date}] ${m.text}${formatMedia(m.media)}`).join("\n\n");
+        const text = messages
+          .map((m) => `[#${m.id}] [${m.date}] ${messageText(m.text)}${formatMedia(m.media)}`)
+          .join("\n\n");
         return ok(text || "No scheduled messages");
       } catch (e) {
         return fail(e);
@@ -359,7 +363,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
         const text = messages
           .map(
             (m) =>
-              `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
+              `[#${m.id}] [${m.date}] ${oneLine(m.sender)}: ${messageText(m.text)}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
         return ok(text || "No replies");
@@ -413,7 +417,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
         const text = messages
           .map(
             (m) =>
-              `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
+              `[#${m.id}] [${m.date}] ${oneLine(m.sender)}: ${messageText(m.text)}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
         return ok(text || "No unread mentions");
@@ -443,7 +447,7 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
         const text = messages
           .map(
             (m) =>
-              `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
+              `[#${m.id}] [${m.date}] ${oneLine(m.sender)}: ${messageText(m.text)}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
         return ok(text || "No unread reactions");

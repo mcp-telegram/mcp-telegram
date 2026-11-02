@@ -406,6 +406,16 @@ export class TelegramService {
     return dirname(this.sessionPath);
   }
 
+  /** Files holding this account's credentials or daemon handles; file tools never read or write them. */
+  get credentialFiles(): string[] {
+    return [
+      this.sessionPath,
+      LEGACY_SESSION_FILE,
+      join(this.sessionDir, "daemon.lock"),
+      join(this.sessionDir, "daemon.sock"),
+    ];
+  }
+
   hasLocalSession(): boolean {
     return existsSync(this.sessionPath);
   }

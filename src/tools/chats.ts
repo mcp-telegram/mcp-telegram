@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
+import { checkReadablePath } from "./file-access.js";
 import { DESTRUCTIVE, fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
 
 export function registerChatTools(server: McpServer, telegram: TelegramService) {
@@ -344,7 +345,8 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
       if (err) return fail(new Error(err));
 
       try {
-        await telegram.editGroup(chatId, { title, description, photoPath });
+        const photo = photoPath ? await checkReadablePath(photoPath, telegram.credentialFiles) : undefined;
+        await telegram.editGroup(chatId, { title, description, photoPath: photo });
         const changed = [title && "title", description != null && "description", photoPath && "photo"].filter(Boolean);
         return ok(`Updated ${changed.join(", ")} for ${chatId}`);
       } catch (e) {

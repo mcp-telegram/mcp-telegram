@@ -1,7 +1,17 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, formatMedia, formatReactions, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
+import {
+  fail,
+  formatMedia,
+  formatReactions,
+  messageText,
+  ok,
+  oneLine,
+  READ_ONLY,
+  requireConnection,
+  WRITE,
+} from "./shared.js";
 
 export function registerExtraTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -174,7 +184,7 @@ export function registerExtraTools(server: McpServer, telegram: TelegramService)
         const text = messages
           .map(
             (m) =>
-              `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
+              `[#${m.id}] [${m.date}] ${oneLine(m.sender)}: ${messageText(m.text)}${formatMedia(m.media)}${formatReactions(m.reactions)}`,
           )
           .join("\n\n");
         return ok(text || "No messages in this topic");

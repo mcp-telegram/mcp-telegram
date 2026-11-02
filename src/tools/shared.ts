@@ -30,12 +30,25 @@ function oneLineThirdParty(text: string): string {
 }
 
 /**
+ * Message text from another Telegram user: continuation lines are indented, so a message
+ * cannot start a line of its own that looks like the next `[#id] [date] sender:` entry.
+ */
+export function messageText(text: string): string {
+  return text.replace(/\r\n?/g, "\n").replace(/\n/g, "\n  ");
+}
+
+/** A name chosen by another user (sender, chat title): kept on one line. */
+export function oneLine(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/**
  * Format a message media descriptor like: [photo], [document: a.pdf], [webpage: Title | Instant View: ...].
  * Instant View text comes from a third-party page, so it is labelled and kept on one line.
  */
 export function formatMedia(media?: { type: string; fileName?: string; title?: string; text?: string }): string {
   if (!media) return "";
-  const parts = [media.fileName ?? (media.title && oneLineThirdParty(media.title))];
+  const parts = [oneLineThirdParty(media.fileName ?? media.title ?? "")];
   if (media.text) parts.push(`Instant View: ${oneLineThirdParty(media.text)}`);
   const details = parts.filter(Boolean).join(" | ");
   return ` [${media.type}${details ? `: ${details}` : ""}]`;

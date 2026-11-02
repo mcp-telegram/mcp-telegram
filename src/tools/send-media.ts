@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
+import { checkReadablePath } from "./file-access.js";
 import {
   ABSOLUTE_PATH_ERROR,
   fail,
@@ -38,7 +39,8 @@ export function registerSendMediaTools(server: McpServer, telegram: TelegramServ
       if (err) return fail(new Error(err));
 
       try {
-        const { id } = await telegram.sendVoice(chatId, filePath, {
+        const source = await checkReadablePath(filePath, telegram.credentialFiles);
+        const { id } = await telegram.sendVoice(chatId, source, {
           caption,
           replyTo,
           topicId,
@@ -79,7 +81,8 @@ export function registerSendMediaTools(server: McpServer, telegram: TelegramServ
       if (err) return fail(new Error(err));
 
       try {
-        const { id } = await telegram.sendVideoNote(chatId, filePath, {
+        const source = await checkReadablePath(filePath, telegram.credentialFiles);
+        const { id } = await telegram.sendVideoNote(chatId, source, {
           duration,
           length,
           replyTo,
@@ -304,7 +307,11 @@ export function registerSendMediaTools(server: McpServer, telegram: TelegramServ
       if (err) return fail(new Error(err));
 
       try {
-        const { ids } = await telegram.sendAlbum(chatId, items, { caption, parseMode, replyTo, topicId });
+        const checked = [];
+        for (const item of items) {
+          checked.push({ ...item, filePath: await checkReadablePath(item.filePath, telegram.credentialFiles) });
+        }
+        const { ids } = await telegram.sendAlbum(chatId, checked, { caption, parseMode, replyTo, topicId });
         const idList = ids.map((id) => `#${id}`).join(", ");
         return ok(`Album sent to ${chatId} (${ids.length} items) [${idList}]`);
       } catch (e) {

@@ -75,6 +75,8 @@ A QR code will appear in the terminal. Open Telegram on your phone, go to **Sett
 >
 > The password is only used locally to answer Telegram's SRP challenge and is never persisted.
 
+> **Local files:** tools that upload a file (`telegram-send-file`, `telegram-send-voice`, `telegram-send-album`, stories, profile and group photos) read files under your home folder and temp folders, and downloads are saved to `Downloads`, `Desktop`, `Documents` or temp folders. Hidden files and folders (`~/.ssh`, `~/.mcp-telegram`, ...), `~/Library`, `~/AppData` and the session file are always refused, and an existing file is never overwritten (`name (1).ext` is used). To use other folders, list them in `MCP_TELEGRAM_FILE_DIRS` (separated by `:`, or `;` on Windows); this replaces the defaults.
+
 ### 3. Add to Claude
 
 ```bash

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.47.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.46.1...v1.47.0) (2026-11-17)
+
+
+### Added
+
+* **media:** stream downloads and uploads over MTProto without buffering whole files, keep video notes round, report the real reason a download fails ([#138](https://github.com/mcp-telegram/mcp-telegram/issues/138)) ([d5442e8](https://github.com/mcp-telegram/mcp-telegram/commit/d5442e8932d1b5d35e62b92ce474684ca2e21102))
+
 ## [1.46.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.46.0...v1.46.1) (2026-11-17)
 
 

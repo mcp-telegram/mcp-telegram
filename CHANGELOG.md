@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.46.0...v1.46.1) (2026-11-17)
+
+
+### Fixed
+
+* **deps:** update hono 4.13.19 and @hono/node-server 2.1.9 (security advisories), dotenv, biome, @types/node ([#135](https://github.com/mcp-telegram/mcp-telegram/issues/135)) ([54c5875](https://github.com/mcp-telegram/mcp-telegram/commit/54c5875cd603a0f4bf2fb591b6c087ba19acb591))
+
 ## [1.46.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.45.1...v1.46.0) (2026-11-17)
 
 

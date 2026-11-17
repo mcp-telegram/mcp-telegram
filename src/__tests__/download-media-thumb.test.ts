@@ -80,6 +80,9 @@ describe("downloadMediaAsBuffer thumb support", () => {
     // GramJS returns Buffer.alloc(0) for geo/poll/dice and failure paths.
     // An empty Buffer is truthy, so a naive !buffer guard would let it through.
     const svc = makeService({ full: Buffer.alloc(0) });
-    await assert.rejects(() => svc.downloadMediaAsBuffer("@test", 1), /Failed to download media/);
+    await assert.rejects(
+      () => svc.downloadMediaAsBuffer("@test", 1),
+      (e: Error & { code?: string }) => e.code === "MEDIA_UNAVAILABLE" && /returned no bytes/.test(e.message),
+    );
   });
 });

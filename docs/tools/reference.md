@@ -1,6 +1,6 @@
 # Tools Reference
 
-Telegram MCP Server provides 182 tools organized by category. All tools are auto-discoverable — your AI client will see them with full parameter descriptions when connected.
+Telegram MCP Server provides 184 tools organized by category. All tools are auto-discoverable — your AI client will see them with full parameter descriptions when connected.
 
 ## Auth
 
@@ -171,7 +171,7 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 | ------ | ------------- |
 | `telegram-get-chat-info` | Get detailed chat info (title, members, photo, etc.) |
 | `telegram-get-chat-members` | List members of a group or channel |
-| `telegram-get-chat-folders` | List your chat folders |
+| `telegram-get-chat-folders` | List your chat folders; with `folderId`, one folder's type filters and its pinned, included and excluded chats |
 
 ## Invite Links
 
@@ -187,6 +187,8 @@ All `filePath` arguments must be absolute local filesystem paths. URLs, UNC shar
 | ------ | ------------- |
 | `telegram-get-contacts` | List your contacts |
 | `telegram-add-contact` | Add a new contact |
+| `telegram-rename-contact` | Rename a contact in your own address book only; their profile is untouched |
+| `telegram-delete-contact` | Remove users from your contacts; chats and history stay, nobody is blocked |
 | `telegram-get-contact-requests` | View pending contact requests |
 
 ## Moderation
@@ -349,7 +351,7 @@ Requires **Telegram Business** subscription unless noted otherwise.
 | Tool | Description |
 | ------ | ------------- |
 | `telegram-create-folder` | Create a chat folder — auto-include whole categories via type flags or list specific chats |
-| `telegram-edit-folder` | Edit an existing folder by ID; omitted fields keep their current values |
+| `telegram-edit-folder` | Edit an existing folder by ID; omitted fields keep their current values, `addPeers`/`removePeers` change the chat list without replacing it |
 | `telegram-delete-folder` | Delete a folder by ID (chats remain in All Chats; system folders can't be deleted) |
 | `telegram-reorder-folders` | Reorder folders by specifying the new order of folder IDs |
 | `telegram-toggle-folder-tags` | Enable/disable folder tags — colored labels in chat lists (Premium) |

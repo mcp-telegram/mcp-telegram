@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
+import { DESTRUCTIVE, fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
 
 export function registerContactTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -115,6 +115,56 @@ export function registerContactTools(server: McpServer, telegram: TelegramServic
       try {
         await telegram.addContact(userId, firstName, lastName, phone);
         return ok(`Contact added: ${firstName}${lastName ? ` ${lastName}` : ""} (${userId})`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-rename-contact",
+    {
+      description:
+        "Rename a contact in your own address book only. Their public profile does not change and they are not notified. Works only for users already in your contacts",
+      inputSchema: {
+        userId: z.string().describe("Contact's user ID or username"),
+        firstName: z.string().min(1).describe("New first name to show for the contact"),
+        lastName: z.string().optional().describe("New last name; omit to clear it"),
+      },
+      annotations: WRITE,
+    },
+    async ({ userId, firstName, lastName }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const { id, previousName } = await telegram.renameContact(userId, firstName, lastName);
+        return ok(`Contact ${id} renamed: "${previousName}" -> "${[firstName, lastName].filter(Boolean).join(" ")}"`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-delete-contact",
+    {
+      description:
+        "Remove users from your contacts (address book). Chats and message history stay, nobody is blocked. Users who are not contacts are skipped",
+      inputSchema: {
+        userIds: z.array(z.string()).min(1).max(100).describe("User IDs or usernames to remove from contacts"),
+      },
+      annotations: DESTRUCTIVE,
+    },
+    async ({ userIds }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const { deleted, notContacts } = await telegram.deleteContacts(userIds);
+        const lines = [deleted.length > 0 ? `Removed from contacts: ${deleted.join(", ")}` : "No contacts removed"];
+        if (notContacts.length > 0) lines.push(`Not in contacts, skipped: ${notContacts.join(", ")}`);
+        return ok(lines.join("\n"));
       } catch (e) {
         return fail(e);
       }

@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { TelegramService } from "../telegram-client.js";
+import { formatEditFolderResult, type TelegramService } from "../telegram-client.js";
 import { fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
 
 export function registerFolderTools(server: McpServer, telegram: TelegramService) {
@@ -91,9 +91,27 @@ export function registerFolderTools(server: McpServer, telegram: TelegramService
         excludeMuted: z.boolean().optional(),
         excludeRead: z.boolean().optional(),
         excludeArchived: z.boolean().optional(),
-        includePeers: z.array(z.string()).max(100).optional().describe("Replace includePeers list entirely"),
+        includePeers: z
+          .array(z.string())
+          .max(100)
+          .optional()
+          .describe(
+            "Replace includePeers list entirely. To add or remove a few chats use addPeers/removePeers instead",
+          ),
         excludePeers: z.array(z.string()).max(100).optional().describe("Replace excludePeers list entirely"),
         pinnedPeers: z.array(z.string()).max(5).optional().describe("Replace pinnedPeers list entirely"),
+        addPeers: z
+          .array(z.string())
+          .max(100)
+          .optional()
+          .describe("Chat IDs/usernames to add to the folder; chats already in it stay"),
+        removePeers: z
+          .array(z.string())
+          .max(100)
+          .optional()
+          .describe(
+            "Chat IDs/usernames to take out of the folder (included or pinned); other chats stay. With type filters on, the chat is also excluded so its category does not bring it back",
+          ),
       },
       annotations: WRITE,
     },
@@ -112,11 +130,13 @@ export function registerFolderTools(server: McpServer, telegram: TelegramService
       includePeers,
       excludePeers,
       pinnedPeers,
+      addPeers,
+      removePeers,
     }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
       try {
-        await telegram.editFolder(id, {
+        const result = await telegram.editFolder(id, {
           title,
           emoticon,
           contacts,
@@ -130,8 +150,10 @@ export function registerFolderTools(server: McpServer, telegram: TelegramService
           includePeers,
           excludePeers,
           pinnedPeers,
+          addPeers,
+          removePeers,
         });
-        return ok(`Folder ${id} updated`);
+        return ok(formatEditFolderResult(id, result));
       } catch (e) {
         return fail(e);
       }

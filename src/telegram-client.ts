@@ -12,7 +12,7 @@ import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { computeCheck } from "telegram/Password.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
-import { getInputUser } from "telegram/Utils.js";
+import { getInputUser, getPeerId } from "telegram/Utils.js";
 import { secureSessionDir } from "./lock.js";
 import { FLOOD_WAIT_ERROR_PREFIX, RateLimiter } from "./rate-limiter.js";
 import type {
@@ -361,7 +361,89 @@ const FORUM_READ_MAX_TOPICS = 100;
 
 export type ChatEntity = Api.User | Api.Chat | Api.Channel | Api.TypeUser | Api.TypeChat;
 
+/** A chat listed in a folder: its marked ID (accepted back by folder tools) and display name when Telegram returned one. */
+export type ChatFolderPeer = { id: string; name?: string };
+
+export type ChatFolderDetails = {
+  id: number;
+  title: string;
+  emoticon?: string;
+  /** Shared folder (chat list invite). Its chats are managed through the invite, not edit-folder. */
+  shared: boolean;
+  /** Category flags that pull whole chat types into the folder. */
+  flags: {
+    contacts: boolean;
+    nonContacts: boolean;
+    groups: boolean;
+    broadcasts: boolean;
+    bots: boolean;
+    excludeMuted: boolean;
+    excludeRead: boolean;
+    excludeArchived: boolean;
+  };
+  pinnedPeers: ChatFolderPeer[];
+  includePeers: ChatFolderPeer[];
+  excludePeers: ChatFolderPeer[];
+};
+
+export type EditFolderResult = {
+  added: number;
+  removed: number;
+  /** Requested in removePeers and added to the exclusions, so the folder's type filters do not bring them back. */
+  excluded: string[];
+  /** Requested in addPeers but already in the folder. */
+  alreadyIncluded: string[];
+  /** Requested in removePeers but not found in the folder. */
+  notInFolder: string[];
+};
+
+/** Plain-text view of one folder for tool output; chat IDs are the ones edit-folder accepts. */
+export function formatChatFolder(f: ChatFolderDetails): string {
+  const flags = Object.entries(f.flags)
+    .filter(([, on]) => on)
+    .map(([name]) => name);
+  const peers = (label: string, list: ChatFolderPeer[]) =>
+    list.length === 0
+      ? [`${label}: none`]
+      : [
+          `${label} (${list.length}):`,
+          // One line per chat: a name with line breaks must not fake another entry
+          ...list.map((p) => `- ${p.name ? `${p.name.replace(/\s+/g, " ").trim()} ` : ""}(${p.id})`),
+        ];
+  return [
+    `[${f.id}] ${f.emoticon ? `${f.emoticon} ` : ""}${f.title}${f.shared ? " (shared folder)" : ""}`,
+    `Type filters: ${flags.length > 0 ? flags.join(", ") : "none"}`,
+    ...peers("Pinned chats", f.pinnedPeers),
+    ...peers("Included chats", f.includePeers),
+    ...peers("Excluded chats", f.excludePeers),
+  ].join("\n");
+}
+
+/** Tool output for edit-folder: what changed and which requested chats were no-ops. */
+export function formatEditFolderResult(id: number, r: EditFolderResult): string {
+  const lines = [`Folder ${id} updated`];
+  if (r.added > 0) lines.push(`Added chats: ${r.added}`);
+  if (r.removed > 0) lines.push(`Removed chats: ${r.removed}`);
+  if (r.excluded.length > 0) lines.push(`Excluded, so type filters do not bring them back: ${r.excluded.join(", ")}`);
+  if (r.alreadyIncluded.length > 0) lines.push(`Already in the folder: ${r.alreadyIncluded.join(", ")}`);
+  if (r.notInFolder.length > 0) lines.push(`Not in the folder: ${r.notInFolder.join(", ")}`);
+  return lines.join("\n");
+}
+
+/** Stable key of a folder peer: the marked ID GramJS uses for dialogs, "me" for Saved Messages. */
+function folderPeerKey(peer: Api.TypeInputPeer): string | undefined {
+  if (peer instanceof Api.InputPeerSelf) return "me";
+  try {
+    return getPeerId(peer);
+  } catch {
+    return undefined;
+  }
+}
+
 const NUMERIC_ID_RE = /^-?\d+$/;
+/** Errors that mean the referenced chat does not exist or is not known to this account. */
+const UNKNOWN_PEER_RE =
+  /Could not find|Cannot find|No user has|not found|USERNAME_NOT_OCCUPIED|USERNAME_INVALID|PEER_ID_INVALID|CHANNEL_INVALID|CHAT_ID_INVALID/i;
 
 /**
  * Find the dialog entity for a numeric chat ID. IDs reach us in two shapes:
@@ -1492,6 +1574,65 @@ export class TelegramService {
         phone: phone ?? "",
       }),
     );
+  }
+
+  /** Resolve a reference to a user entity; throws if it points at a group or channel. */
+  private async resolveUser(userId: string): Promise<Api.User> {
+    if (!this.client) throw new Error(NOT_CONNECTED_ERROR);
+    const entity = await this.client.getEntity(await this.resolvePeer(userId));
+    if (!(entity instanceof Api.User)) throw new Error(`${userId} is not a user`);
+    return entity;
+  }
+
+  /**
+   * Change how a contact is named in this account's address book only. The user's own
+   * profile is untouched and they are not notified. Refuses non-contacts so a rename
+   * never silently turns into adding someone.
+   */
+  async renameContact(
+    userId: string,
+    firstName: string,
+    lastName?: string,
+  ): Promise<{ id: string; previousName: string }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const user = await this.resolveUser(userId);
+    if (!user.contact) throw new Error(`${userId} is not in your contacts`);
+    const previousName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+    await this.client.invoke(
+      new Api.contacts.AddContact({
+        id: getInputUser(user),
+        firstName,
+        lastName: lastName ?? "",
+        // Keep the stored number: the rename must not change anything else about the contact
+        phone: user.phone ?? "",
+      }),
+    );
+    return { id: user.id.toString(), previousName };
+  }
+
+  /**
+   * Remove users from this account's address book. Chats, message history and blocks
+   * are not touched. Users that are not contacts are reported, not sent to Telegram.
+   */
+  async deleteContacts(userIds: string[]): Promise<{ deleted: string[]; notContacts: string[] }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const targets: Api.User[] = [];
+    const deleted: string[] = [];
+    const notContacts: string[] = [];
+    for (const ref of userIds) {
+      const user = await this.resolveUser(ref);
+      if (!user.contact) {
+        notContacts.push(ref);
+        continue;
+      }
+      if (targets.some((u) => u.id.equals(user.id))) continue;
+      targets.push(user);
+      deleted.push(ref);
+    }
+    if (targets.length > 0) {
+      await this.client.invoke(new Api.contacts.DeleteContacts({ id: targets.map((u) => getInputUser(u)) }));
+    }
+    return { deleted, notContacts };
   }
 
   async blockUser(userId: string): Promise<void> {
@@ -4507,6 +4648,107 @@ export class TelegramService {
       }));
   }
 
+  /** Full setup of one folder: category flags and the pinned, included and excluded chats with names. */
+  async getChatFolder(id: number): Promise<ChatFolderDetails> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(new Api.messages.GetDialogFilters());
+    const filters = "filters" in result ? result.filters : [];
+    const f = filters.find(
+      (x): x is Api.DialogFilter | Api.DialogFilterChatlist =>
+        (x instanceof Api.DialogFilter || x instanceof Api.DialogFilterChatlist) && x.id === id,
+    );
+    if (!f) throw new Error(`Folder with id=${id} not found`);
+
+    const pinned = f.pinnedPeers ?? [];
+    const include = f.includePeers ?? [];
+    const exclude = f instanceof Api.DialogFilter ? (f.excludePeers ?? []) : [];
+    const names = await this.folderPeerNames([...pinned, ...include, ...exclude]);
+    const describe = (peers: Api.TypeInputPeer[]): ChatFolderPeer[] =>
+      peers.flatMap((p) => {
+        const key = folderPeerKey(p);
+        return key ? [{ id: key, name: names.get(key) }] : [];
+      });
+    const flag = (name: keyof ChatFolderDetails["flags"]) => f instanceof Api.DialogFilter && f[name] === true;
+
+    return {
+      id: f.id,
+      title: typeof f.title === "string" ? f.title : f.title.text,
+      emoticon: f.emoticon,
+      shared: f instanceof Api.DialogFilterChatlist,
+      flags: {
+        contacts: flag("contacts"),
+        nonContacts: flag("nonContacts"),
+        groups: flag("groups"),
+        broadcasts: flag("broadcasts"),
+        bots: flag("bots"),
+        excludeMuted: flag("excludeMuted"),
+        excludeRead: flag("excludeRead"),
+        excludeArchived: flag("excludeArchived"),
+      },
+      pinnedPeers: describe(pinned),
+      includePeers: describe(include),
+      excludePeers: describe(exclude),
+    };
+  }
+
+  /** Display names for folder peers: one batched request per peer kind; a failed batch only loses its names. */
+  private async folderPeerNames(peers: Api.TypeInputPeer[]): Promise<Map<string, string>> {
+    const client = this.client;
+    const names = new Map<string, string>();
+    if (!client) return names;
+
+    const users: Api.InputUser[] = [];
+    const channels: Api.InputChannel[] = [];
+    const chats: bigInt.BigInteger[] = [];
+    for (const p of peers) {
+      if (p instanceof Api.InputPeerSelf) names.set("me", "Saved Messages");
+      else if (p instanceof Api.InputPeerUser)
+        users.push(new Api.InputUser({ userId: p.userId, accessHash: p.accessHash }));
+      else if (p instanceof Api.InputPeerChannel)
+        channels.push(new Api.InputChannel({ channelId: p.channelId, accessHash: p.accessHash }));
+      else if (p instanceof Api.InputPeerChat) chats.push(p.chatId);
+    }
+
+    const remember = (entities: Array<Api.TypeUser | Api.TypeChat>) => {
+      for (const e of entities) {
+        let name: string | undefined;
+        if (e instanceof Api.User) name = [e.firstName, e.lastName].filter(Boolean).join(" ") || e.username;
+        else if (e instanceof Api.Chat || e instanceof Api.Channel) name = e.title;
+        if (!name) continue;
+        try {
+          names.set(getPeerId(e), name);
+        } catch {
+          // No ID: skip the name, the chat itself stays in the list
+        }
+      }
+    };
+
+    if (users.length > 0) {
+      try {
+        remember(await client.invoke(new Api.users.GetUsers({ id: users })));
+      } catch {
+        // Names are best effort: chat IDs are returned either way
+      }
+    }
+    if (channels.length > 0) {
+      try {
+        const res = await client.invoke(new Api.channels.GetChannels({ id: channels }));
+        remember(res.chats);
+      } catch {
+        // Best effort, see above
+      }
+    }
+    if (chats.length > 0) {
+      try {
+        const res = await client.invoke(new Api.messages.GetChats({ id: chats }));
+        remember(res.chats);
+      } catch {
+        // Best effort, see above
+      }
+    }
+    return names;
+  }
+
   async setAutoDelete(chatId: string, period: number): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
@@ -4594,14 +4836,29 @@ export class TelegramService {
       includePeers?: string[];
       excludePeers?: string[];
       pinnedPeers?: string[];
+      /** Chats to add to the folder, keeping the ones already there. */
+      addPeers?: string[];
+      /** Chats to take out of the folder (included or pinned), keeping the rest. */
+      removePeers?: string[];
     },
-  ): Promise<void> {
+  ): Promise<EditFolderResult> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    const incremental = (opts.addPeers?.length ?? 0) > 0 || (opts.removePeers?.length ?? 0) > 0;
+    if (incremental && opts.includePeers !== undefined) {
+      throw new Error("Pass either includePeers (replace the list) or addPeers/removePeers (change it), not both");
+    }
     const filtersResult = await client.invoke(new Api.messages.GetDialogFilters());
     const existing = "filters" in filtersResult ? filtersResult.filters : [];
     const current = existing.find((f): f is Api.DialogFilter => f instanceof Api.DialogFilter && f.id === id);
-    if (!current) throw new Error(`Folder with id=${id} not found`);
+    if (!current) {
+      const shared = existing.some((f) => f instanceof Api.DialogFilterChatlist && f.id === id);
+      throw new Error(
+        shared
+          ? `Folder with id=${id} is a shared folder; its chats are managed through its invite link`
+          : `Folder with id=${id} not found`,
+      );
+    }
 
     const toInput = async (ids: string[]) => {
       const peers: Api.TypeInputPeer[] = [];
@@ -4612,9 +4869,81 @@ export class TelegramService {
       return peers;
     };
 
-    const includePeers = opts.includePeers !== undefined ? await toInput(opts.includePeers) : current.includePeers;
-    const excludePeers = opts.excludePeers !== undefined ? await toInput(opts.excludePeers) : current.excludePeers;
-    const pinnedPeers = opts.pinnedPeers !== undefined ? await toInput(opts.pinnedPeers) : current.pinnedPeers;
+    let includePeers = opts.includePeers !== undefined ? await toInput(opts.includePeers) : [...current.includePeers];
+    let excludePeers = opts.excludePeers !== undefined ? await toInput(opts.excludePeers) : [...current.excludePeers];
+    let pinnedPeers = opts.pinnedPeers !== undefined ? await toInput(opts.pinnedPeers) : [...current.pinnedPeers];
+    const result: EditFolderResult = { added: 0, removed: 0, excluded: [], alreadyIncluded: [], notInFolder: [] };
+
+    if (incremental) {
+      // Saved Messages may be stored as InputPeerSelf or as a user peer with our own ID: one key for both
+      const selfId = (await client.getMe()).id.toString();
+      const keyOf = (p: Api.TypeInputPeer) => {
+        const key = folderPeerKey(p);
+        return key === selfId ? "me" : key;
+      };
+      // Bare ID as other tools print it (users: 123, channels: 123 for -100123, basic groups: 123 for -123)
+      const rawId = (p: Api.TypeInputPeer) =>
+        p instanceof Api.InputPeerUser
+          ? p.userId.toString()
+          : p instanceof Api.InputPeerChannel
+            ? p.channelId.toString()
+            : p instanceof Api.InputPeerChat
+              ? p.chatId.toString()
+              : undefined;
+      /** Folder key a reference points at: matched against the folder first, resolved through Telegram only if needed. */
+      const keyForRef = async (ref: string, folder: Api.TypeInputPeer[]): Promise<string | undefined> => {
+        if (ref === "me" || ref === "@me" || ref === selfId) return "me";
+        const numeric = NUMERIC_ID_RE.test(ref);
+        if (numeric && folder.some((p) => keyOf(p) === ref)) return ref;
+        // Resolve before matching bare IDs: a user and a channel can share the same number
+        try {
+          return keyOf((await toInput([ref]))[0]);
+        } catch (e) {
+          // Only "no such chat" means "not in the folder"; a flood wait or network error must fail the edit
+          if (!UNKNOWN_PEER_RE.test(e instanceof Error ? e.message : String(e))) throw e;
+          // Unresolvable (e.g. a chat we left): fall back to the folder's own peers, only when unambiguous
+          if (!numeric) return undefined;
+          const byRaw = folder.filter((p) => rawId(p) === ref);
+          return byRaw.length === 1 ? keyOf(byRaw[0]) : undefined;
+        }
+      };
+
+      // With type filters on, a chat taken off the list would come back through its category, so it is excluded too
+      const categories = ["contacts", "nonContacts", "groups", "broadcasts", "bots"] as const;
+      const hasCategories = categories.some((k) => (opts[k] !== undefined ? opts[k] : current[k]) === true);
+      for (const ref of opts.removePeers ?? []) {
+        const listed = [...includePeers, ...pinnedPeers];
+        const key = await keyForRef(ref, listed);
+        const match = key === undefined ? undefined : listed.find((p) => keyOf(p) === key);
+        if (match) {
+          includePeers = includePeers.filter((p) => keyOf(p) !== key);
+          pinnedPeers = pinnedPeers.filter((p) => keyOf(p) !== key);
+          result.removed++;
+        }
+        if (hasCategories && key !== undefined) {
+          if (!excludePeers.some((p) => keyOf(p) === key)) {
+            excludePeers.push(match ?? (await toInput([ref]))[0]);
+            result.excluded.push(ref);
+          }
+        } else if (!match) {
+          result.notInFolder.push(ref);
+        }
+      }
+
+      for (const ref of opts.addPeers ?? []) {
+        const key = await keyForRef(ref, [...includePeers, ...pinnedPeers]);
+        if (key !== undefined && [...includePeers, ...pinnedPeers].some((p) => keyOf(p) === key)) {
+          result.alreadyIncluded.push(ref);
+          continue;
+        }
+        const [peer] = await toInput([ref]);
+        includePeers.push(peer);
+        // An explicit add wins over an earlier explicit exclusion
+        const added = keyOf(peer);
+        excludePeers = excludePeers.filter((p) => keyOf(p) !== added);
+        result.added++;
+      }
+    }
 
     const titleText =
       opts.title !== undefined ? opts.title : typeof current.title === "string" ? current.title : current.title.text;
@@ -4640,6 +4969,7 @@ export class TelegramService {
         }),
       }),
     );
+    return result;
   }
 
   async deleteFolder(id: number): Promise<void> {

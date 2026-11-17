@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { TelegramService } from "../telegram-client.js";
+import { formatChatFolder, type TelegramService } from "../telegram-client.js";
 import { checkReadablePath } from "./file-access.js";
 import {
   ABSOLUTE_PATH_ERROR,
@@ -63,15 +63,24 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-get-chat-folders",
     {
-      description: "Get list of your Telegram chat folders (filters) with their names and chat counts",
-      inputSchema: {},
+      description:
+        "Get list of your Telegram chat folders (filters) with their names and chat counts. Pass folderId to see one folder in full: its type filters and the pinned, included and excluded chats with IDs",
+      inputSchema: {
+        folderId: z
+          .number()
+          .int()
+          .min(2)
+          .optional()
+          .describe("Folder ID from the list; returns that folder's full setup including its chats"),
+      },
       annotations: READ_ONLY,
     },
-    async () => {
+    async ({ folderId }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
+        if (folderId !== undefined) return ok(formatChatFolder(await telegram.getChatFolder(folderId)));
         const folders = await telegram.getChatFolders();
         if (folders.length === 0) return ok("No chat folders");
         const text = folders
@@ -80,7 +89,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
               `[${f.id}] ${f.emoticon ? `${f.emoticon} ` : ""}${f.title} (${f.includeCount} chats, ${f.pinnedCount} pinned)`,
           )
           .join("\n");
-        return ok(text);
+        return ok(`${text}\n\nPass folderId to list the chats in a folder.`);
       } catch (e) {
         return fail(e);
       }

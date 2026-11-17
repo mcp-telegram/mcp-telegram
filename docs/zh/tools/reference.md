@@ -1,6 +1,6 @@
 # 工具参考
 
-Telegram MCP Server 提供按类别组织的 182 个工具。所有工具通过 MCP 自动发现。
+Telegram MCP Server 提供按类别组织的 184 个工具。所有工具通过 MCP 自动发现。
 
 ## 认证
 
@@ -171,7 +171,7 @@ Telegram MCP Server 提供按类别组织的 182 个工具。所有工具通过 
 | ------ | ------ |
 | `telegram-get-chat-info` | 获取聊天详情 |
 | `telegram-get-chat-members` | 列出群组/频道成员 |
-| `telegram-get-chat-folders` | 列出聊天文件夹 |
+| `telegram-get-chat-folders` | 列出聊天文件夹；传入 `folderId` 时返回该文件夹的类型筛选及置顶、包含和排除的聊天 |
 
 ## 邀请链接
 
@@ -187,6 +187,8 @@ Telegram MCP Server 提供按类别组织的 182 个工具。所有工具通过 
 | ------ | ------ |
 | `telegram-get-contacts` | 联系人列表 |
 | `telegram-add-contact` | 添加联系人 |
+| `telegram-rename-contact` | 仅在自己的通讯录中重命名联系人，不改变对方资料 |
+| `telegram-delete-contact` | 从联系人中移除用户；聊天和历史记录保留，不会屏蔽 |
 | `telegram-get-contact-requests` | 查看待处理的联系请求 |
 
 ## 审核
@@ -349,7 +351,7 @@ Telegram MCP Server 提供按类别组织的 182 个工具。所有工具通过 
 | 工具 | 描述 |
 | ------ | ------ |
 | `telegram-create-folder` | 创建聊天文件夹——通过类型标志自动包含整个分类，或指定具体聊天 |
-| `telegram-edit-folder` | 按 ID 编辑现有文件夹；未传字段保持当前值 |
+| `telegram-edit-folder` | 按 ID 编辑现有文件夹；未传字段保持当前值，`addPeers`/`removePeers` 增减聊天而不替换整个列表 |
 | `telegram-delete-folder` | 按 ID 删除文件夹（聊天仍保留在「所有聊天」中；系统文件夹不可删除） |
 | `telegram-reorder-folders` | 按新的 ID 顺序重新排列文件夹 |
 | `telegram-toggle-folder-tags` | 启用/禁用文件夹标签——聊天列表中的彩色标记（Premium） |

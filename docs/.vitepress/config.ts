@@ -5,7 +5,7 @@ const DOCS_VERSION = `v${version}`;
 
 // Keep in sync with the generated manifest: `npm run build && node dist/manifest.js /tmp/manifest.json`
 // then read `.toolCount` (same number as the rows in docs/**/tools/reference.md).
-const TOOL_COUNT = 182;
+const TOOL_COUNT = 184;
 
 const enNav = [
   { text: "Guide", link: "/getting-started/credentials" },

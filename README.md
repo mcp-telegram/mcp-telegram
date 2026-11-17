@@ -380,7 +380,7 @@ All tools are auto-discoverable via MCP — your AI client will see the full lis
 | **Folders (v1.33.0)** | `telegram-create-folder`, `telegram-edit-folder`, `telegram-delete-folder`, `telegram-reorder-folders`, `telegram-get-suggested-folders`, `telegram-toggle-folder-tags` |
 | **Global Privacy (v1.33.0)** | `telegram-get-global-privacy-settings`, `telegram-set-global-privacy-settings` |
 | **Invite Links** | `telegram-create-invite-link`, `telegram-get-invite-links`, `telegram-revoke-invite-link` |
-| **Contacts** | `telegram-get-contacts`, `telegram-add-contact`, `telegram-get-contact-requests` |
+| **Contacts** | `telegram-get-contacts`, `telegram-add-contact`, `telegram-rename-contact`, `telegram-delete-contact`, `telegram-get-contact-requests` |
 | **Moderation** | `telegram-block-user`, `telegram-unblock-user`, `telegram-report-spam` |
 | **Profiles (read)** | `telegram-get-profile`, `telegram-update-profile` |
 | **Profile (write, v1.32.0)** | `telegram-set-emoji-status` (Premium), `telegram-list-emoji-statuses`, `telegram-clear-recent-emoji-statuses`, `telegram-set-profile-color` (Premium), `telegram-set-birthday`, `telegram-set-personal-channel`, `telegram-set-profile-photo`, `telegram-delete-profile-photo` |

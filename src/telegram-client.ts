@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { chmod, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { chmod, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,24 @@ import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
 import { getInputUser, getPeerId } from "telegram/Utils.js";
 import { secureSessionDir } from "./lock.js";
+import {
+  describeMessageMedia,
+  ensureExtension,
+  type FileInput,
+  isKnownUndownloadable,
+  isUploadedFile,
+  MediaReader,
+  type MediaSource,
+  mapMediaError,
+  nameWithSniffedExtension,
+  notDownloadable,
+  photoFileName,
+  renamedInputFile,
+  TelegramMediaError,
+  type UploadedFile,
+  uploadStream as uploadStreamToTelegram,
+  writeAll,
+} from "./media-transfer.js";
 import { FLOOD_WAIT_ERROR_PREFIX, RateLimiter } from "./rate-limiter.js";
 import type {
   AllStoriesSummary,
@@ -92,6 +110,14 @@ import type { SavedMusicResponse } from "./tl/saved-music.js";
 import { GetSavedMusicRequest } from "./tl/saved-music.js";
 import { type InstantViewSummary, summarizeInstantView } from "./webpage-preview.js";
 
+export type { FileInput, MediaErrorCode, MediaInfo, UploadedFile } from "./media-transfer.js";
+export {
+  isTelegramMediaError,
+  isUploadedFile,
+  TELEGRAM_MAX_FILE_BYTES,
+  TelegramMediaError,
+  UPLOAD_PART_BYTES,
+} from "./media-transfer.js";
 export type {
   AllStoriesSummary,
   BoostSummary,
@@ -1005,12 +1031,23 @@ export class TelegramService {
    * attachment into a re-compressed photo — extension-less paths already went
    * out as documents, and this keeps that contract.
    */
-  async sendFile(chatId: string, filePath: string, caption?: string, opts: { fileName?: string } = {}): Promise<void> {
+  async sendFile(
+    chatId: string,
+    filePath: FileInput,
+    caption?: string,
+    opts: { fileName?: string } = {},
+  ): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const fileName = opts.fileName;
     // pi-lens-ignore: sql-injection
     await this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
+      if (isUploadedFile(filePath)) {
+        // Bytes are already in Telegram; the InputFile name sets the document name and MIME.
+        const name = fileName ?? nameWithSniffedExtension(filePath);
+        await this.client?.sendFile(resolved, { file: renamedInputFile(filePath, name), caption, forceDocument: true });
+        return;
+      }
       if (fileName) {
         const { size } = await stat(filePath);
         await this.client?.sendFile(resolved, {
@@ -1026,7 +1063,7 @@ export class TelegramService {
 
   async sendVoice(
     chatId: string,
-    filePath: string,
+    filePath: FileInput,
     opts: {
       caption?: string;
       replyTo?: number;
@@ -1043,7 +1080,11 @@ export class TelegramService {
     // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
-      const file = opts.fileName ? new CustomFile(opts.fileName, (await stat(filePath)).size, filePath) : filePath;
+      const file = isUploadedFile(filePath)
+        ? renamedInputFile(filePath, opts.fileName ?? nameWithSniffedExtension(filePath))
+        : opts.fileName
+          ? new CustomFile(opts.fileName, (await stat(filePath)).size, filePath)
+          : filePath;
       // Duration is intentionally auto-detected by GramJS from the audio file —
       // letting the AI override it would mis-report playback length in the Telegram UI.
       const message = await client.sendFile(resolved, {
@@ -1059,7 +1100,7 @@ export class TelegramService {
 
   async sendVideoNote(
     chatId: string,
-    filePath: string,
+    filePath: FileInput,
     opts: {
       duration?: number;
       length?: number;
@@ -1072,6 +1113,23 @@ export class TelegramService {
     // pi-lens-ignore: sql-injection
     return this.rateLimiter.execute(async () => {
       const resolved = await this.resolvePeer(chatId);
+      if (isUploadedFile(filePath)) {
+        // An .mp4 name gives video/mp4, and the explicit round attribute makes it a video note.
+        // `videoNote: true` is not passed: GramJS then adds a voice-audio attribute to the video.
+        const message = await client.sendFile(resolved, {
+          file: renamedInputFile(filePath, ensureExtension(filePath.fileName, "mp4")),
+          attributes: [
+            new Api.DocumentAttributeVideo({
+              roundMessage: true,
+              duration: opts.duration ?? 0,
+              w: opts.length ?? 0,
+              h: opts.length ?? 0,
+            }),
+          ],
+          ...topicReplyOptions(opts.replyTo, opts.topicId),
+        });
+        return { id: message.id };
+      }
       const attributes =
         opts.duration || opts.length
           ? [
@@ -1249,7 +1307,7 @@ export class TelegramService {
 
   async sendAlbum(
     chatId: string,
-    items: Array<{ filePath: string; caption?: string; fileName?: string }>,
+    items: Array<{ filePath: FileInput; caption?: string; fileName?: string }>,
     opts: {
       caption?: string;
       parseMode?: "md" | "html";
@@ -1272,11 +1330,13 @@ export class TelegramService {
       // album in that case: album members must be homogeneous, and extension-less
       // temp paths already went out as documents — naming them must not silently
       // promote images to compressed photos and break the grouping.
-      const named = items.some((it) => it.fileName);
+      const named = items.some((it) => it.fileName || isUploadedFile(it.filePath));
       const files = await Promise.all(
-        items.map(async (it) =>
-          it.fileName ? new CustomFile(it.fileName, (await stat(it.filePath)).size, it.filePath) : it.filePath,
-        ),
+        items.map(async (it) => {
+          const path = it.filePath;
+          if (isUploadedFile(path)) return renamedInputFile(path, it.fileName ?? nameWithSniffedExtension(path));
+          return it.fileName ? new CustomFile(it.fileName, (await stat(path)).size, path) : path;
+        }),
       );
       // GramJS sendFile auto-detects `file: string[]` and takes the _sendAlbum path,
       // which invokes messages.UploadMedia per item + messages.SendMultiMedia.
@@ -1297,17 +1357,93 @@ export class TelegramService {
     }, `sendAlbum to ${chatId}`);
   }
 
+  /** Stream a message's original file to `downloadPath` without holding it in memory. */
   async downloadMedia(chatId: string, messageId: number, downloadPath: string): Promise<string> {
+    const reader = await this.openMedia(chatId, messageId);
+    const handle = await open(downloadPath, "w");
+    try {
+      for await (const chunk of reader.stream()) {
+        await writeAll((buf, offset, length) => handle.write(buf, offset, length), chunk);
+      }
+    } catch (e) {
+      // Leave an empty file so the caller's reservation cleanup can remove it.
+      await handle.truncate(0).catch(() => {});
+      throw e;
+    } finally {
+      await handle.close();
+    }
+    return downloadPath;
+  }
+
+  /** Load a message for media access, with coded errors for a missing message or media. */
+  private async loadMediaMessage(chatId: string, messageId: number): Promise<Api.Message> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const resolved = await this.resolvePeer(chatId);
     const messages = await this.client.getMessages(resolved, { ids: [messageId] });
     const message = messages[0];
-    if (!message) throw new Error(`Message ${messageId} not found`);
-    if (!message.media) throw new Error(`Message ${messageId} has no media`);
-    const buffer = await this.client.downloadMedia(message);
-    if (!buffer) throw new Error("Failed to download media");
-    await writeFile(downloadPath, buffer as Buffer);
-    return downloadPath;
+    if (!message) {
+      throw new TelegramMediaError("MESSAGE_NOT_FOUND", `Message ${messageId} was not found in this chat.`);
+    }
+    if (!message.media) throw new TelegramMediaError("NO_MEDIA", `Message ${messageId} has no media.`);
+    return message;
+  }
+
+  private async loadMediaSource(chatId: string, messageId: number): Promise<MediaSource> {
+    return describeMessageMedia((await this.loadMediaMessage(chatId, messageId)).media);
+  }
+
+  /**
+   * Locate a message's original file and return a reader for byte ranges of it.
+   * One message lookup serves every read; an expired file reference reloads it once.
+   */
+  async openMedia(chatId: string, messageId: number): Promise<MediaReader> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const client = this.client;
+    const source = await this.loadMediaSource(chatId, messageId);
+    return new MediaReader(client, source, () => this.loadMediaSource(chatId, messageId));
+  }
+
+  /** Size, MIME type and name of a message's original file, without downloading it. */
+  async getMediaInfo(chatId: string, messageId: number) {
+    return (await this.openMedia(chatId, messageId)).info;
+  }
+
+  /** Read `length` bytes at `offset` of a message's original file straight from Telegram. */
+  async readMediaRange(
+    chatId: string,
+    messageId: number,
+    offset: number,
+    length: number,
+    signal?: AbortSignal,
+  ): Promise<Buffer> {
+    signal?.throwIfAborted();
+    return (await this.openMedia(chatId, messageId)).readRange(offset, length, signal);
+  }
+
+  /** Stream a message's original file from `offset` in chunks of at most 512 KiB. */
+  async *streamMedia(
+    chatId: string,
+    messageId: number,
+    opts: { offset?: number; signal?: AbortSignal } = {},
+  ): AsyncGenerator<Buffer> {
+    opts.signal?.throwIfAborted();
+    const reader = await this.openMedia(chatId, messageId);
+    yield* reader.stream(opts.offset ?? 0, opts.signal);
+  }
+
+  /**
+   * Upload `size` bytes from `source` into Telegram as they arrive, without disk or
+   * full buffering. Pass the result to sendFile, sendVoice, sendVideoNote, sendAlbum,
+   * sendStory or setProfilePhoto instead of a path. `fileName` decides the MIME type.
+   */
+  async uploadStream(
+    source: AsyncIterable<Uint8Array>,
+    size: number,
+    fileName: string,
+    signal?: AbortSignal,
+  ): Promise<UploadedFile> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    return uploadStreamToTelegram(this.client, source, size, fileName, signal);
   }
 
   /**
@@ -1343,12 +1479,10 @@ export class TelegramService {
       if (maxBytes !== undefined && downloaded > maxBytes) throw new Error(`Media exceeds ${maxBytes} byte limit`);
     };
     guard();
-    const resolved = await this.resolvePeer(chatId);
-    const messages = await this.client.getMessages(resolved, { ids: [messageId] });
+    const message = await this.loadMediaMessage(chatId, messageId);
     guard();
-    const message = messages[0];
-    if (!message) throw new Error(`Message ${messageId} not found`);
-    if (!message.media) throw new Error(`Message ${messageId} has no media`);
+    // Fail with the media type up front instead of GramJS's "not implemented" or empty bytes.
+    if (isKnownUndownloadable(message.media)) throw notDownloadable(message.media);
     // SAFETY: GramJS media variants expose document metadata only on documents;
     // every field here is optional, and actual downloaded bytes are separately
     // bounded even when metadata is absent or understates the size.
@@ -1367,16 +1501,29 @@ export class TelegramService {
     const guarded = maxBytes !== undefined || options?.signal ? { progressCallback } : {};
     let isThumb = false;
     let buffer: Buffer | undefined;
+    const client = this.client;
+    const download = async (params: object): Promise<Buffer | undefined> => {
+      try {
+        return (await client.downloadMedia(message, params)) as Buffer | undefined;
+      } catch (e) {
+        throw mapMediaError(e);
+      }
+    };
     if (options?.thumb !== undefined) {
-      buffer = (await this.client.downloadMedia(message, { thumb: options.thumb, ...guarded })) as Buffer | undefined;
+      buffer = await download({ thumb: options.thumb, ...guarded });
       isThumb = !!buffer?.length;
     }
     // No thumb requested, or this media has no thumbnail at that size → full file.
     if (!buffer?.length) {
       checkFullSize();
-      buffer = (await this.client.downloadMedia(message, guarded)) as Buffer;
+      buffer = await download(guarded);
     }
-    if (!buffer?.length) throw new Error("Failed to download media");
+    if (!buffer?.length) {
+      throw new TelegramMediaError(
+        "MEDIA_UNAVAILABLE",
+        "Telegram returned no bytes for this media. It may have expired, been deleted, or be a view-once photo or video.",
+      );
+    }
     guard(buffer.length);
 
     const mimeType = this.detectMimeType(buffer, message.media);
@@ -5749,22 +5896,28 @@ export class TelegramService {
   }
 
   async setProfilePhoto(opts: {
-    filePath: string;
+    filePath: FileInput;
     isVideo: boolean;
     videoStartTs?: number;
     fallback: boolean;
   }): Promise<{ id: string }> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
     const client = this.client;
+    const source = opts.filePath;
+    // Telegram checks the upload's extension (PHOTO_EXT_INVALID), so give it one that matches.
+    const uploadName = (name: string, mimeType?: string) =>
+      opts.isVideo ? ensureExtension(name, "mp4") : photoFileName(name, mimeType);
     return this.rateLimiter.execute(async () => {
-      const inputFile = await client.uploadFile({
-        file: new CustomFile(
-          opts.filePath.split("/").pop() ?? "upload",
-          (await import("node:fs")).statSync(opts.filePath).size,
-          opts.filePath,
-        ),
-        workers: 4,
-      });
+      const inputFile = isUploadedFile(source)
+        ? renamedInputFile(source, uploadName(source.fileName, source.mimeType))
+        : await client.uploadFile({
+            file: new CustomFile(
+              uploadName(source.split("/").pop() || "upload"),
+              (await import("node:fs")).statSync(source).size,
+              source,
+            ),
+            workers: 4,
+          });
       const request = opts.isVideo
         ? new Api.photos.UploadProfilePhoto({
             fallback: opts.fallback || undefined,
@@ -6446,7 +6599,7 @@ export class TelegramService {
 
   async sendStory(
     chatId: string,
-    filePath: string,
+    filePath: FileInput,
     opts: {
       type?: "photo" | "video";
       caption?: string;
@@ -6464,12 +6617,29 @@ export class TelegramService {
     const peer = await this.resolvePeer(chatId);
     return this.rateLimiter.execute(async () => {
       const inputPeer = await client.getInputEntity(peer);
-      const fileData = await readFile(filePath);
-      const uploaded = await client.uploadFile({
-        file: new CustomFile(filePath, fileData.length, filePath, fileData),
-        workers: 4,
-      });
-      const mediaType = opts.type ?? detectMediaType(filePath);
+      let uploaded: Api.TypeInputFile;
+      let mediaType: "photo" | "video";
+      if (isUploadedFile(filePath)) {
+        const sniffed = filePath.mimeType;
+        mediaType =
+          opts.type ??
+          (sniffed?.startsWith("image/")
+            ? "photo"
+            : sniffed?.startsWith("video/")
+              ? "video"
+              : detectMediaType(filePath.fileName));
+        // A photo upload needs an image extension or Telegram answers PHOTO_EXT_INVALID.
+        const name =
+          mediaType === "photo" ? photoFileName(filePath.fileName, sniffed) : nameWithSniffedExtension(filePath);
+        uploaded = renamedInputFile(filePath, name);
+      } else {
+        const fileData = await readFile(filePath);
+        uploaded = await client.uploadFile({
+          file: new CustomFile(filePath, fileData.length, filePath, fileData),
+          workers: 4,
+        });
+        mediaType = opts.type ?? detectMediaType(filePath);
+      }
       const media: Api.TypeInputMedia =
         mediaType === "photo"
           ? new Api.InputMediaUploadedPhoto({ file: uploaded })

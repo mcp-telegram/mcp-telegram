@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.47.1](https://github.com/mcp-telegram/mcp-telegram/compare/v1.47.0...v1.47.1) (2026-11-18)
+
+
+### Fixed
+
+* **media:** skip the defensive chunk copy in uploadStream for sources that own their buffers ([#140](https://github.com/mcp-telegram/mcp-telegram/issues/140)) ([5721087](https://github.com/mcp-telegram/mcp-telegram/commit/57210870888dababb7ef971e0544c35a51ea9055))
+
 ## [1.47.0](https://github.com/mcp-telegram/mcp-telegram/compare/v1.46.1...v1.47.0) (2026-11-17)
 
 

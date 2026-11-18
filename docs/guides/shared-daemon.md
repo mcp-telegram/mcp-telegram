@@ -86,6 +86,36 @@ daemon holds the lock. Credentials are optional for clients (only the daemon nee
 redirecting the remote command's stderr to `/dev/null` — that hides the diagnostics you need when
 something breaks.
 
+## HTTP clients (no process per session)
+
+Every stdio client above is still a process per MCP session (~100 MiB each, since it registers
+every tool schema). MCP hosts that speak Streamable HTTP can skip it: give the daemon an HTTP
+port and point them at the URL.
+
+```bash
+mcp-telegram serve --http-port 8933          # or MCP_TELEGRAM_HTTP_PORT=8933
+```
+
+```bash
+claude mcp add -s user --transport http telegram http://127.0.0.1:8933/mcp \
+  --header "Authorization: Bearer $(cat ~/.mcp-telegram/http-token)"
+```
+
+The endpoint can read and send messages as your account, so it is locked down:
+
+- It binds loopback only (`127.0.0.1`, `localhost` or `::1` via `--http-host` /
+  `MCP_TELEGRAM_HTTP_HOST`); any other address refuses to start.
+- Every request needs `Authorization: Bearer <token>`. The token is generated on first start into
+  `http-token` next to the session file (mode 0600).
+- A non-loopback `Host` and any browser `Origin` are rejected with 403, which blocks DNS
+  rebinding from a web page.
+
+Loopback is shared by every OS user of the machine, so use it on a single-user host.
+
+HTTP is stateless and every call runs on the daemon's own tool registry, through the same global
+lock and per-call timeout as IPC clients. A daemon restart does not strand HTTP clients: their
+next request simply reaches the new process.
+
 ## Observability
 
 The daemon logs to stderr (captured by journald):

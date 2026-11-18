@@ -623,6 +623,15 @@ function safeUploadName(fileName: string): string {
 
 type UploadClient = Pick<TelegramClient, "invoke">;
 
+export interface UploadStreamOptions {
+  /**
+   * The source hands over chunks it never touches again (fresh buffers, not reused for
+   * the next chunk). Saves a copy of every chunk; leave unset for any source you don't
+   * control, since a reused buffer would corrupt parts still waiting to be sent.
+   */
+  ownsChunks?: boolean;
+}
+
 /**
  * Upload `size` bytes from `source` straight to Telegram, 512 KiB per part, up to
  * {@link UPLOAD_CONCURRENCY} parts in flight. Fails if the source yields more or
@@ -634,6 +643,7 @@ export async function uploadStream(
   size: number,
   fileName: string,
   signal?: AbortSignal,
+  opts: UploadStreamOptions = {},
 ): Promise<UploadedFile> {
   if (!Number.isSafeInteger(size) || size <= 0) {
     throw new TelegramMediaError("UPLOAD_SIZE_MISMATCH", "File size must be a positive integer.");
@@ -728,8 +738,8 @@ export async function uploadStream(
           `Received more bytes than the declared size of ${size}. Declare the exact file size.`,
         );
       }
-      // Copy: a source may reuse one Uint8Array for every chunk.
-      const buf = Buffer.from(chunk);
+      // Copy unless the source owns its chunks: a source may reuse one Uint8Array for every chunk.
+      const buf = opts.ownsChunks ? Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength) : Buffer.from(chunk);
       if (head.length < SNIFF_BYTES) head = Buffer.concat([head, buf.subarray(0, SNIFF_BYTES - head.length)]);
       pending.push(buf);
       pendingBytes += buf.length;

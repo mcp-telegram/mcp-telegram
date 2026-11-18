@@ -29,6 +29,7 @@ import {
   renamedInputFile,
   TelegramMediaError,
   type UploadedFile,
+  type UploadStreamOptions,
   uploadStream as uploadStreamToTelegram,
   writeAll,
 } from "./media-transfer.js";
@@ -110,7 +111,7 @@ import type { SavedMusicResponse } from "./tl/saved-music.js";
 import { GetSavedMusicRequest } from "./tl/saved-music.js";
 import { type InstantViewSummary, summarizeInstantView } from "./webpage-preview.js";
 
-export type { FileInput, MediaErrorCode, MediaInfo, UploadedFile } from "./media-transfer.js";
+export type { FileInput, MediaErrorCode, MediaInfo, UploadedFile, UploadStreamOptions } from "./media-transfer.js";
 export {
   isTelegramMediaError,
   isUploadedFile,
@@ -1441,9 +1442,10 @@ export class TelegramService {
     size: number,
     fileName: string,
     signal?: AbortSignal,
+    opts?: UploadStreamOptions,
   ): Promise<UploadedFile> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    return uploadStreamToTelegram(this.client, source, size, fileName, signal);
+    return uploadStreamToTelegram(this.client, source, size, fileName, signal, opts);
   }
 
   /**

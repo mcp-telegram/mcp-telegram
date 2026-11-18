@@ -563,6 +563,27 @@ describe("uploadStream", () => {
     );
   });
 
+  it("ownsChunks skips the per-chunk copy for sources that hand over their buffers", async () => {
+    const f = uploadService();
+    const shared = new Uint8Array(UPLOAD_PART_BYTES / 2);
+    async function* reusing() {
+      for (const value of [1, 2, 3, 4]) {
+        shared.fill(value);
+        yield shared;
+      }
+    }
+    // Only safe for sources that never reuse a chunk; a reusing one shows the copy is gone.
+    await f.svc.uploadStream(reusing(), UPLOAD_PART_BYTES * 2, "a.bin", undefined, { ownsChunks: true });
+    const parts = [...f.requests].sort((a, b) => a.filePart - b.filePart).map((r) => r.bytes);
+    assert.deepEqual(
+      parts.map((p) => [p[0], p[UPLOAD_PART_BYTES / 2]]),
+      [
+        [2, 2],
+        [4, 4],
+      ],
+    );
+  });
+
   it("uses SaveBigFilePart with the total part count above 10 MiB", async () => {
     const f = uploadService();
     const size = BIG_FILE_THRESHOLD_BYTES + 1;

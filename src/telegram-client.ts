@@ -1738,6 +1738,21 @@ export class TelegramService {
    * profile is untouched and they are not notified. Refuses non-contacts so a rename
    * never silently turns into adding someone.
    */
+  /**
+   * Fresh contact state of one peer. getEntity always asks Telegram (users.GetUsers),
+   * unlike the entity cache behind getChatInfo, and costs one small request instead of
+   * downloading the whole contact list.
+   */
+  async getContactStatus(userId: string): Promise<{ id: string; kind: "user" | "bot" | "other"; isContact: boolean }> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    // Числовой ID стабилен - через диалоги (нужен access hash). Username, с @ или без, - прямо
+    // в GramJS, мимо entityCache и поиска по названию диалога: username мог сменить владельца
+    const ref = NUMERIC_ID_RE.test(userId) ? await this.resolveNumericPeer(userId) : userId === "@me" ? "me" : userId;
+    const entity = await this.client.getEntity(ref);
+    if (!(entity instanceof Api.User)) return { id: entity.id.toString(), kind: "other", isContact: false };
+    return { id: entity.id.toString(), kind: entity.bot ? "bot" : "user", isContact: Boolean(entity.contact) };
+  }
+
   async renameContact(
     userId: string,
     firstName: string,

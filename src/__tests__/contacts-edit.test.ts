@@ -14,6 +14,7 @@ const USERS: Record<string, Api.User | Api.Channel> = {
     accessHash: bigInt(1),
   }),
   bob: new Api.User({ id: bigInt(13), firstName: "Bob", contact: true, accessHash: bigInt(2) }),
+  helper: new Api.User({ id: bigInt(15), firstName: "Helper", bot: true, accessHash: bigInt(5) }),
   stranger: new Api.User({ id: bigInt(14), firstName: "Eve", accessHash: bigInt(3) }),
   news: new Api.Channel({
     id: bigInt(12),
@@ -42,6 +43,46 @@ async function makeSvc() {
   (svc as unknown as { resolvePeer: (id: string) => Promise<string> }).resolvePeer = async (id) => id;
   return { svc, invoked };
 }
+
+describe("getContactStatus", () => {
+  it("reports a contact, a non-contact, a bot and a channel from a fresh getEntity, without other requests", async () => {
+    const { svc, invoked } = await makeSvc();
+    assert.deepStrictEqual(await svc.getContactStatus("anna"), { id: "11", kind: "user", isContact: true });
+    assert.deepStrictEqual(await svc.getContactStatus("stranger"), { id: "14", kind: "user", isContact: false });
+    assert.deepStrictEqual(await svc.getContactStatus("helper"), { id: "15", kind: "bot", isContact: false });
+    assert.deepStrictEqual(await svc.getContactStatus("news"), { id: "12", kind: "other", isContact: false });
+    // Ни GetContacts, ни других запросов: только getEntity на одного пользователя
+    assert.strictEqual(invoked.length, 0);
+  });
+
+  it("resolves a username straight through GramJS, never through the entity cache or dialog titles", async () => {
+    const { svc } = await makeSvc();
+    // Кеш ядра хранит прежнего владельца username - метод не должен его спрашивать
+    (svc as unknown as { resolvePeer: () => Promise<never> }).resolvePeer = async () => {
+      throw new Error("getContactStatus must not use resolvePeer for a username");
+    };
+    (svc as unknown as { resolveChat: () => Promise<never> }).resolveChat = async () => {
+      throw new Error("getContactStatus must not use resolveChat for a username");
+    };
+    assert.deepStrictEqual(await svc.getContactStatus("stranger"), { id: "14", kind: "user", isContact: false });
+  });
+
+  it("resolves a numeric ID through the dialog lookup that yields an access hash", async () => {
+    const { svc } = await makeSvc();
+    const seen: string[] = [];
+    (svc as unknown as { resolveNumericPeer: (id: string) => Promise<string> }).resolveNumericPeer = async (id) => {
+      seen.push(id);
+      return "anna";
+    };
+    assert.deepStrictEqual(await svc.getContactStatus("11"), { id: "11", kind: "user", isContact: true });
+    assert.deepStrictEqual(seen, ["11"]);
+  });
+
+  it("propagates an unknown peer", async () => {
+    const { svc } = await makeSvc();
+    await assert.rejects(() => svc.getContactStatus("nobody"), /Could not find the input entity/);
+  });
+});
 
 describe("renameContact", () => {
   it("sends AddContact with the new name and keeps the stored phone", async () => {
